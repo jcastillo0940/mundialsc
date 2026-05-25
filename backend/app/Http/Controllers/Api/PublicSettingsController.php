@@ -12,6 +12,14 @@ class PublicSettingsController extends Controller
     {
         return response()->json([
             'auth_bg_youtube_id' => SiteSetting::get('auth_bg_youtube_id', ''),
+            'hero_video_url' => SiteSetting::get('hero_video_url', ''),
+            'seo_site_title' => SiteSetting::get('seo_site_title', ''),
+            'seo_meta_description' => SiteSetting::get('seo_meta_description', ''),
+            'seo_meta_keywords' => SiteSetting::get('seo_meta_keywords', ''),
+            'seo_og_title' => SiteSetting::get('seo_og_title', ''),
+            'seo_og_description' => SiteSetting::get('seo_og_description', ''),
+            'seo_og_image' => SiteSetting::get('seo_og_image', ''),
+            'terms_and_conditions' => SiteSetting::get('terms_and_conditions', ''),
         ]);
     }
 

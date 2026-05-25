@@ -5,22 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Backoffice Super Carnes' }}</title>
     <style>
-        body{margin:0;font-family:Arial,sans-serif;background:#10181c;color:#f6efe4}
-        .wrap{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
-        .sidebar{padding:24px;background:#141f24;border-right:1px solid #24343b}
-        .content{padding:24px}
+        :root{--bg:#0c1317;--panel:#142028;--panel-soft:#1b2a33;--line:#2d4550;--text:#eef4ef;--muted:#9fb4b2;--accent:#ff7a3d;--accent-soft:#ffd5b8;--ok:#1f8f63;--warn:#b23c2f}
+        *{box-sizing:border-box}
+        body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:radial-gradient(circle at top,#19313b 0,#0c1317 42%);color:var(--text)}
+        .wrap{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+        .sidebar{padding:28px;background:rgba(10,18,22,.92);border-right:1px solid var(--line);backdrop-filter:blur(18px)}
+        .content{padding:28px}
         a{color:#ffd27a;text-decoration:none}
-        .nav a{display:block;padding:10px 0}
-        .card{background:#18262d;border:1px solid #24343b;border-radius:16px;padding:18px;margin-bottom:18px}
+        .nav{display:grid;gap:8px;margin:24px 0}
+        .nav a{display:block;padding:12px 14px;border-radius:12px;background:transparent;border:1px solid transparent}
+        .nav a:hover{background:rgba(255,255,255,.03);border-color:var(--line)}
+        .card{background:rgba(20,32,40,.92);border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 20px 50px rgba(0,0,0,.18)}
         .grid{display:grid;gap:16px}
         .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-        input,select,button{width:100%;padding:10px;border-radius:10px;border:1px solid #35505c;background:#0f171b;color:#f6efe4}
-        button{background:#d85b2a;border:0;cursor:pointer}
-        table{width:100%;border-collapse:collapse}
-        th,td{padding:10px;border-bottom:1px solid #24343b;text-align:left;vertical-align:top}
         .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
-        .status{background:#20313a;padding:10px 12px;border-radius:10px;margin-bottom:16px}
+        input,select,textarea,button{width:100%;padding:11px 12px;border-radius:12px;border:1px solid #35505c;background:#0f171b;color:var(--text)}
+        textarea{min-height:120px;resize:vertical}
+        button{background:linear-gradient(135deg,#ff8a4d,#d85b2a);border:0;cursor:pointer;font-weight:600}
+        button.danger{background:linear-gradient(135deg,#d65e4f,#9f2e22)}
+        button.ghost{background:#20313a;border:1px solid var(--line)}
+        table{width:100%;border-collapse:collapse}
+        th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+        .status{background:#20313a;padding:12px 14px;border-radius:12px;margin-bottom:16px}
+        .muted{color:var(--muted)}
+        .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#20313a;border:1px solid var(--line);font-size:12px}
+        .metric{font-size:30px;font-weight:700;margin-top:6px}
         form{margin:0}
+        @media (max-width: 980px){.wrap{grid-template-columns:1fr}.sidebar{border-right:0;border-bottom:1px solid var(--line)}}
     </style>
 </head>
 <body>
@@ -36,6 +47,8 @@
             <a href="{{ route('admin.prizes') }}">Premios</a>
             <a href="{{ route('admin.winners') }}">Ganadores</a>
             <a href="{{ route('admin.integrations') }}">Integraciones</a>
+            <a href="{{ route('admin.users') }}">Usuarios</a>
+            <a href="{{ route('admin.site') }}">Sitio y SEO</a>
         </nav>
         <form method="post" action="{{ route('admin.logout') }}">
             @csrf

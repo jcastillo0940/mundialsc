@@ -118,6 +118,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if (in_array($user->role, ['admin', 'cashier'], true)) {
+            throw ValidationException::withMessages([
+                'account' => 'Esta cuenta solo puede ingresar por el acceso interno del backoffice.',
+            ]);
+        }
+
         if (! $user->is_active) {
             throw ValidationException::withMessages([
                 'account' => 'La cuenta esta inactiva.',
@@ -165,6 +171,12 @@ class AuthController extends Controller
         if ($user && ! $user->is_active) {
             throw ValidationException::withMessages([
                 'account' => 'La cuenta esta inactiva.',
+            ]);
+        }
+
+        if ($user && in_array($user->role, ['admin', 'cashier'], true)) {
+            throw ValidationException::withMessages([
+                'account' => 'Esta cuenta solo puede ingresar por el acceso interno del backoffice.',
             ]);
         }
 

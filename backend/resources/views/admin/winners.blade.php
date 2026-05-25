@@ -11,7 +11,7 @@
         <p><a href="{{ route('admin.winners.acta') }}" target="_blank">Abrir acta general de ganadores</a></p>
         <form method="post" action="{{ route('admin.winners.generate') }}">
             @csrf
-            <button type="submit">Generar selección inicial</button>
+            <button type="submit">Generar seleccion inicial</button>
         </form>
     @else
         <p>No hay fase de grupos activa configurada.</p>
@@ -20,10 +20,10 @@
 
 @if($tieContext['requires_draw'] ?? false)
     <div class="card">
-        <h2>Empate técnico pendiente</h2>
-        <p>Se detectó un empate total en puntos, exactos y facturas. Debes resolverlo por sorteo para completar los {{ $tieContext['remaining_slots'] }} cupos pendientes.</p>
+        <h2>Empate tecnico pendiente</h2>
+        <p>Se detecto un empate total en puntos, exactos y facturas. Debes resolverlo por sorteo para completar los {{ $tieContext['remaining_slots'] }} cupos pendientes.</p>
         <table>
-            <thead><tr><th>Posición</th><th>Participante</th><th>Puntos</th><th>Exactos</th><th>Facturas</th></tr></thead>
+            <thead><tr><th>Posicion</th><th>Participante</th><th>Puntos</th><th>Exactos</th><th>Facturas</th></tr></thead>
             <tbody>
             @foreach($tieContext['tied_candidates'] as $candidate)
                 <tr>
@@ -50,14 +50,14 @@
 <div class="card">
     <h2>Ranking oficial</h2>
     <table>
-        <thead><tr><th>Posición</th><th>Participante</th><th>Puntos</th><th>Exactos</th><th>Facturas</th><th>Rol</th></tr></thead>
+        <thead><tr><th>Posicion</th><th>Participante</th><th>Puntos</th><th>Exactos</th><th>Facturas</th><th>Rol</th></tr></thead>
         <tbody>
         @forelse($leaderboard as $row)
             <tr>
                 <td>{{ $row['position'] }}</td>
                 <td>
                     <div>{{ $row['full_name'] }}</div>
-                    <small>{{ $row['email'] }} | {{ $row['phone'] ?: 'sin teléfono' }}</small>
+                    <small>{{ $row['email'] }} | {{ $row['phone'] ?: 'sin telefono' }}</small>
                 </td>
                 <td>{{ $row['goals'] }}</td>
                 <td>{{ $row['exact_hits'] }}</td>
@@ -65,7 +65,7 @@
                 <td>{{ $row['football_role'] }}</td>
             </tr>
         @empty
-            <tr><td colspan="6">Todavía no hay ranking disponible.</td></tr>
+            <tr><td colspan="6">Todavia no hay ranking disponible.</td></tr>
         @endforelse
         </tbody>
     </table>
@@ -79,17 +79,44 @@
                 <div>
                     <strong>{{ $winner->user->full_name }}</strong><br>
                     <small>Puesto #{{ $winner->leaderboard_position }} | {{ number_format((float) $winner->total_points, 2) }} pts | exactos: {{ $winner->exact_hits }} | facturas: {{ $winner->invoice_count }}</small><br>
-                    <small>Estado: {{ $winner->status }} | razón: {{ $winner->selection_reason }}</small>
+                    <small>Estado: {{ $winner->status }} | razon: {{ $winner->selection_reason }}</small>
                 </div>
                 <div>
                     <strong>Contacto</strong><br>
                     <small>{{ $winner->user->email }}</small><br>
-                    <small>{{ $winner->user->phone ?: 'sin teléfono' }}</small>
+                    <small>{{ $winner->user->phone ?: 'sin telefono' }}</small>
                     <br><small><a href="{{ route('admin.winners.communications-acta', $winner) }}" target="_blank">Abrir acta de comunicaciones</a></small>
                 </div>
             </div>
 
             <div class="grid">
+                <form method="post" action="{{ route('admin.winners.update', $winner) }}" class="grid">
+                    @csrf
+                    @method('put')
+                    <div class="row">
+                        <input name="leaderboard_position" value="{{ $winner->leaderboard_position }}" placeholder="Posicion" required>
+                        <input name="total_points" value="{{ $winner->total_points }}" placeholder="Puntos" required>
+                        <input name="exact_hits" value="{{ $winner->exact_hits }}" placeholder="Exactos" required>
+                        <input name="invoice_count" value="{{ $winner->invoice_count }}" placeholder="Facturas" required>
+                    </div>
+                    <div class="row">
+                        <select name="status" required>
+                            <option value="selected" @selected($winner->status === 'selected')>selected</option>
+                            <option value="contacting" @selected($winner->status === 'contacting')>contacting</option>
+                            <option value="confirmed" @selected($winner->status === 'confirmed')>confirmed</option>
+                            <option value="disqualified" @selected($winner->status === 'disqualified')>disqualified</option>
+                        </select>
+                        <select name="selection_reason" required>
+                            <option value="rank" @selected($winner->selection_reason === 'rank')>rank</option>
+                            <option value="draw" @selected($winner->selection_reason === 'draw')>draw</option>
+                            <option value="replacement" @selected($winner->selection_reason === 'replacement')>replacement</option>
+                            <option value="manual" @selected($winner->selection_reason === 'manual')>manual</option>
+                        </select>
+                        <input name="notes" value="{{ $winner->notes }}" placeholder="Notas internas">
+                    </div>
+                    <button type="submit">Guardar edicion manual</button>
+                </form>
+
                 <form method="post" action="{{ route('admin.winners.contact', $winner) }}" class="row">
                     @csrf
                     <select name="contact_type">
@@ -101,14 +128,14 @@
                     </select>
                     <select name="contact_status">
                         <option value="attempted">Intentado</option>
-                        <option value="answered">Respondió</option>
-                        <option value="no_answer">No respondió</option>
+                        <option value="answered">Respondio</option>
+                        <option value="no_answer">No respondio</option>
                         <option value="sent">Enviado</option>
                         <option value="bounced">Rebotado</option>
                     </select>
                     <input type="datetime-local" name="contacted_at" value="{{ now()->format('Y-m-d\TH:i') }}">
                     <input name="notes" placeholder="Notas del contacto">
-                    <button type="submit">Registrar gestión</button>
+                    <button type="submit">Registrar gestion</button>
                 </form>
 
                 <div class="row">
@@ -118,8 +145,8 @@
                     </form>
                     <form method="post" action="{{ route('admin.winners.disqualify', $winner) }}" class="row">
                         @csrf
-                        <input name="reason" placeholder="Motivo de descarte: no respondió, correo inválido, etc." required>
-                        <button type="submit">Descartar y pasar al siguiente</button>
+                        <input name="reason" placeholder="Motivo de descarte" required>
+                        <button type="submit" class="danger">Descartar y pasar al siguiente</button>
                     </form>
                 </div>
             </div>
@@ -135,13 +162,13 @@
                         <td>{{ $contact->notes }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="4">Sin comunicaciones registradas aún.</td></tr>
+                    <tr><td colspan="4">Sin comunicaciones registradas aun.</td></tr>
                 @endforelse
                 </tbody>
             </table>
         </div>
     @empty
-        <p>No hay ganadores seleccionados todavía.</p>
+        <p>No hay ganadores seleccionados todavia.</p>
     @endforelse
 </div>
 @endsection

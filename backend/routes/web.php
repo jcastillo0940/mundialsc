@@ -70,7 +70,7 @@ Route::get('/media/{path}', function (string $path) {
     ]);
 })->where('path', '.*');
 
-Route::prefix('admin')->group(function (): void {
+Route::prefix('adminrepus1car')->group(function (): void {
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [AdminAuthController::class, 'showLogin'])->name('admin.login');
         Route::post('/login', [AdminAuthController::class, 'login'])->name('admin.login.submit');
@@ -88,6 +88,8 @@ Route::prefix('admin')->group(function (): void {
         Route::put('/rules/invoice', [BackofficeController::class, 'updateInvoiceSettings'])->name('admin.rules.invoice');
         Route::get('/prizes', [BackofficeController::class, 'prizes'])->name('admin.prizes');
         Route::post('/prizes', [BackofficeController::class, 'storePrize'])->name('admin.prizes.store');
+        Route::put('/prizes/{prize}', [BackofficeController::class, 'updatePrize'])->name('admin.prizes.update');
+        Route::delete('/prizes/{prize}', [BackofficeController::class, 'destroyPrize'])->name('admin.prizes.destroy');
         Route::get('/winners', [BackofficeController::class, 'winners'])->name('admin.winners');
         Route::get('/winners/acta', [BackofficeController::class, 'winnersActa'])->name('admin.winners.acta');
         Route::post('/winners/generate', [BackofficeController::class, 'generateWinners'])->name('admin.winners.generate');
@@ -96,11 +98,16 @@ Route::prefix('admin')->group(function (): void {
         Route::post('/winners/{winner}/contact', [BackofficeController::class, 'logWinnerContact'])->name('admin.winners.contact');
         Route::post('/winners/{winner}/confirm', [BackofficeController::class, 'confirmWinner'])->name('admin.winners.confirm');
         Route::post('/winners/{winner}/disqualify', [BackofficeController::class, 'disqualifyWinner'])->name('admin.winners.disqualify');
+        Route::put('/winners/{winner}', [BackofficeController::class, 'updateWinner'])->name('admin.winners.update');
         Route::get('/integrations', [BackofficeController::class, 'integrations'])->name('admin.integrations');
         Route::put('/integrations/live-score', [BackofficeController::class, 'updateIntegrationSettings'])->name('admin.integrations.live-score');
         Route::post('/integrations/live-score/sync-fixtures', [BackofficeController::class, 'syncFixtures'])->name('admin.integrations.live-score.sync-fixtures');
         Route::post('/integrations/live-score/sync-live', [BackofficeController::class, 'syncLive'])->name('admin.integrations.live-score.sync-live');
         Route::post('/integrations/live-score/sync-commentary', [BackofficeController::class, 'syncCommentary'])->name('admin.integrations.live-score.sync-commentary');
+        Route::get('/users', [BackofficeController::class, 'users'])->name('admin.users');
+        Route::put('/users/{user}', [BackofficeController::class, 'updateUserStatus'])->name('admin.users.update');
+        Route::get('/site', [BackofficeController::class, 'site'])->name('admin.site');
+        Route::put('/site', [BackofficeController::class, 'updateSiteSettings'])->name('admin.site.update');
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
     });
 });
@@ -109,4 +116,4 @@ Route::get('/{any?}', function () use ($frontendDist, $serveFrontendFile) {
     abort_unless($frontendDist, 404, 'Frontend no compilado. Ejecuta npm run build en frontend.');
 
     return $serveFrontendFile($frontendDist.DIRECTORY_SEPARATOR.'index.html');
-})->where('any', '^(?!api|up|admin).*$');
+})->where('any', '^(?!api|up|admin|adminrepus1car).*$');

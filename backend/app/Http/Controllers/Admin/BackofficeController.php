@@ -13,9 +13,11 @@ use App\Models\PhasePrize;
 use App\Models\PromoWinner;
 use App\Models\PromoWinnerContact;
 use App\Models\RegisteredInvoice;
+use App\Models\SiteSetting;
 use App\Models\Team;
 use App\Models\TournamentMatch;
 use App\Models\TournamentPhase;
+use App\Models\User;
 use App\Support\Audit;
 use App\Support\LiveScoreSyncService;
 use App\Support\PromotionRankingService;
@@ -44,6 +46,8 @@ class BackofficeController extends Controller
             'predictionsCount' => MatchPrediction::query()->count(),
             'invoiceGoalsCount' => RegisteredInvoice::query()->count(),
             'winnersCount' => PromoWinner::query()->whereIn('status', ['selected', 'contacting', 'confirmed'])->count(),
+            'usersCount' => User::query()->where('role', 'client')->count(),
+            'disqualifiedUsersCount' => User::query()->whereNotNull('disqualified_at')->count(),
         ]);
     }
 
@@ -161,19 +165,35 @@ class BackofficeController extends Controller
 
     public function storePrize(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'phase_id' => ['required', 'exists:tournament_phases,id'],
-            'ranking_from' => ['required', 'integer', 'min:1'],
-            'ranking_to' => ['required', 'integer', 'min:1'],
-            'football_role' => ['required', 'string', 'max:80'],
-            'prize_title' => ['required', 'string', 'max:150'],
-            'prize_type' => ['required', 'string', 'max:120'],
-            'stock' => ['required', 'integer', 'min:0'],
-        ]);
+        $data = $this->validatePrize($request);
 
         PhasePrize::query()->create($data);
 
         return back()->with('status', 'Premio registrado.');
+    }
+
+    public function updatePrize(Request $request, PhasePrize $prize): RedirectResponse
+    {
+        $prize->update($this->validatePrize($request));
+
+        Audit::log('phase_prize.updated', 'phase_prize', $prize->id, $request->user(), $request, [
+            'phase_id' => $prize->phase_id,
+            'stock' => $prize->stock,
+        ]);
+
+        return back()->with('status', 'Premio actualizado.');
+    }
+
+    public function destroyPrize(Request $request, PhasePrize $prize): RedirectResponse
+    {
+        Audit::log('phase_prize.deleted', 'phase_prize', $prize->id, $request->user(), $request, [
+            'phase_id' => $prize->phase_id,
+            'title' => $prize->prize_title,
+        ]);
+
+        $prize->delete();
+
+        return back()->with('status', 'Premio eliminado.');
     }
 
     public function winners(): View
@@ -359,6 +379,42 @@ class BackofficeController extends Controller
         return back()->with('status', 'Ganador confirmado.');
     }
 
+    public function updateWinner(Request $request, PromoWinner $winner): RedirectResponse
+    {
+        $data = $request->validate([
+            'leaderboard_position' => ['required', 'integer', 'min:1'],
+            'total_points' => ['required', 'numeric', 'min:0'],
+            'exact_hits' => ['required', 'integer', 'min:0'],
+            'invoice_count' => ['required', 'integer', 'min:0'],
+            'status' => ['required', 'in:selected,contacting,confirmed,disqualified'],
+            'selection_reason' => ['required', 'in:rank,draw,replacement,manual'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $winner->update([
+            'leaderboard_position' => $data['leaderboard_position'],
+            'total_points' => $data['total_points'],
+            'exact_hits' => $data['exact_hits'],
+            'invoice_count' => $data['invoice_count'],
+            'status' => $data['status'],
+            'selection_reason' => $data['selection_reason'],
+            'notes' => $data['notes'] ?? null,
+            'disqualified_at' => $data['status'] === 'disqualified' ? ($winner->disqualified_at ?? now()) : null,
+            'responded_at' => $data['status'] === 'confirmed' ? ($winner->responded_at ?? now()) : $winner->responded_at,
+        ]);
+
+        Audit::log('promo.winner.updated', 'promo_winner', $winner->id, $request->user(), $request, Arr::only($data, [
+            'leaderboard_position',
+            'total_points',
+            'exact_hits',
+            'invoice_count',
+            'status',
+            'selection_reason',
+        ]));
+
+        return back()->with('status', 'Ganador actualizado manualmente.');
+    }
+
     public function disqualifyWinner(Request $request, PromoWinner $winner): RedirectResponse
     {
         $data = $request->validate([
@@ -447,6 +503,111 @@ class BackofficeController extends Controller
         return back()->with('status', $run->status === 'completed'
             ? 'Sincronización de commentary completada.'
             : 'Sincronización commentary falló: '.$run->error_message);
+    }
+
+    public function users(): View
+    {
+        return view('admin.users', [
+            'users' => User::query()
+                ->where('role', 'client')
+                ->orderByDesc('created_at')
+                ->limit(200)
+                ->get(),
+        ]);
+    }
+
+    public function updateUserStatus(Request $request, User $user): RedirectResponse
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+            'disqualify_user' => ['required', 'boolean'],
+            'disqualification_reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $shouldDisqualify = (bool) $data['disqualify_user'];
+        $reason = $data['disqualification_reason'] ?? null;
+
+        $user->update([
+            'is_active' => (bool) $data['is_active'],
+            'disqualified_at' => $shouldDisqualify ? ($user->disqualified_at ?? now()) : null,
+            'disqualification_reason' => $shouldDisqualify ? $reason : null,
+        ]);
+
+        Audit::log('user.status.updated', 'user', $user->id, $request->user(), $request, [
+            'is_active' => $user->is_active,
+            'disqualified_at' => optional($user->disqualified_at)?->toIso8601String(),
+            'disqualification_reason' => $user->disqualification_reason,
+        ]);
+
+        return back()->with('status', 'Estado del usuario actualizado.');
+    }
+
+    public function site(): View
+    {
+        return view('admin.site', [
+            'settings' => $this->siteSettings(),
+        ]);
+    }
+
+    public function updateSiteSettings(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'auth_bg_youtube_id' => ['nullable', 'string', 'max:20'],
+            'hero_video_url' => ['nullable', 'url', 'max:255'],
+            'seo_site_title' => ['nullable', 'string', 'max:120'],
+            'seo_meta_description' => ['nullable', 'string', 'max:255'],
+            'seo_meta_keywords' => ['nullable', 'string', 'max:255'],
+            'seo_og_title' => ['nullable', 'string', 'max:120'],
+            'seo_og_description' => ['nullable', 'string', 'max:255'],
+            'seo_og_image' => ['nullable', 'url', 'max:255'],
+            'terms_and_conditions' => ['nullable', 'string'],
+        ]);
+
+        foreach ($data as $key => $value) {
+            SiteSetting::set($key, $value);
+        }
+
+        Audit::log('site.settings.updated', 'site_setting', null, $request->user(), $request, [
+            'updated_keys' => array_keys($data),
+        ]);
+
+        return back()->with('status', 'Configuracion del sitio actualizada.');
+    }
+
+    private function validatePrize(Request $request): array
+    {
+        return $request->validate([
+            'phase_id' => ['required', 'exists:tournament_phases,id'],
+            'ranking_from' => ['required', 'integer', 'min:1'],
+            'ranking_to' => ['required', 'integer', 'min:1', 'gte:ranking_from'],
+            'football_role' => ['required', 'string', 'max:80'],
+            'prize_title' => ['required', 'string', 'max:150'],
+            'prize_type' => ['required', 'string', 'max:120'],
+            'stock' => ['required', 'integer', 'min:0'],
+        ]);
+    }
+
+    private function siteSettings(): array
+    {
+        $keys = [
+            'auth_bg_youtube_id',
+            'hero_video_url',
+            'seo_site_title',
+            'seo_meta_description',
+            'seo_meta_keywords',
+            'seo_og_title',
+            'seo_og_description',
+            'seo_og_image',
+            'terms_and_conditions',
+        ];
+
+        $settings = [];
+
+        foreach ($keys as $key) {
+            $settings[$key] = SiteSetting::get($key, '');
+        }
+
+        return $settings;
     }
 
     private function createWinnerFromRow(int $phaseId, array $row, string $reason, ?int $createdBy = null, ?int $replacementForWinnerId = null): PromoWinner
