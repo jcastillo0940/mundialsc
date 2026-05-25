@@ -416,6 +416,41 @@ function normalizeStructuredCufeCandidate(value: string) {
   return normalizedSegments.join('-')
 }
 
+function isAtLeast18(dateStr: string): boolean {
+  if (!dateStr) return false
+  const birth = new Date(dateStr)
+  if (Number.isNaN(birth.getTime())) return false
+  const today = new Date()
+  const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate())
+  return birth <= cutoff
+}
+
+async function cropAvatarToSquare(file: File): Promise<File> {
+  const objectUrl = URL.createObjectURL(file)
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('No se pudo cargar la imagen.'))
+    img.src = objectUrl
+  })
+  URL.revokeObjectURL(objectUrl)
+
+  const size = Math.min(image.width, image.height)
+  const sourceX = Math.floor((image.width - size) / 2)
+  const sourceY = Math.floor((image.height - size) / 2)
+  const canvas = document.createElement('canvas')
+  canvas.width = 500
+  canvas.height = 500
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('No se pudo procesar la imagen.')
+  ctx.drawImage(image, sourceX, sourceY, size, size, 0, 0, 500, 500)
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Error al exportar imagen.'))), 'image/jpeg', 0.92)
+  })
+  return new File([blob], `avatar-${Date.now()}.jpg`, { type: 'image/jpeg' })
+}
+
 async function loadImageElement(file: File) {
   const objectUrl = URL.createObjectURL(file)
 
@@ -663,6 +698,10 @@ export function App() {
   const [profileSaving, setProfileSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [authBootstrapping, setAuthBootstrapping] = useState<boolean>(Boolean(localStorage.getItem(TOKEN_KEY)))
+  const [registerStep, setRegisterStep] = useState(1)
+  const [authBgVideoId, setAuthBgVideoId] = useState('')
+  const [termsModalOpen, setTermsModalOpen] = useState(false)
+  const [termsScrolledEnd, setTermsScrolledEnd] = useState(false)
   const [savingPredictionIds, setSavingPredictionIds] = useState<number[]>([])
   const [now, setNow] = useState(() => Date.now())
   const invoiceScannerRef = useRef<InvoiceScannerRef | null>(null)
@@ -698,6 +737,12 @@ export function App() {
 
     return () => URL.revokeObjectURL(objectUrl)
   }, [registrationAvatarFile])
+
+  useEffect(() => {
+    api.get<{ auth_bg_youtube_id: string }>('/public/settings')
+      .then((res) => { if (res.data.auth_bg_youtube_id) setAuthBgVideoId(res.data.auth_bg_youtube_id) })
+      .catch(() => null)
+  }, [])
 
   useEffect(() => {
     setApiToken(token)
@@ -742,7 +787,7 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    if (!user || user.role !== 'client' || currentView !== 'facturas') return
+    if (!user || currentView !== 'facturas') return
 
     const inputs = Array.from(document.querySelectorAll('.client-shell .facturas-view input'))
     const observerTargets = Array.from(document.querySelectorAll('.client-shell .facturas-view section > div'))
@@ -1815,138 +1860,437 @@ export function App() {
     )
   }
 
+  const TERMS_TEXT = `TÉRMINOS Y CONDICIONES
+MUNDIALISTA SUPER CARNES 2026
+
+1. ORGANIZA
+La presente promoción es organizada por Super Carnes S.A. e Importadora Virzi S.A. y sus empresas afiliadas (en adelante, "los Organizadores").
+
+2. VIGENCIA
+La promoción está vigente del 10 de junio de 2026 al 10 de julio de 2026, o hasta agotar los premios disponibles.
+
+3. PARTICIPANTES ELEGIBLES
+Podrán participar personas naturales que cumplan todos los siguientes requisitos:
+• Ser mayor de 18 años de edad.
+• Ser residente en la República de Panamá.
+• NO ser empleado directo, contratista directo ni familiar de primer grado de Super Carnes S.A., Importadora Virzi S.A. ni de ninguna de sus empresas afiliadas o subsidiarias.
+• No haber sido descalificado previamente de esta u otras promociones de los Organizadores.
+
+4. MECÁNICA DE PARTICIPACIÓN
+4.1. El participante deberá registrarse en la plataforma digital proporcionando datos verídicos y completos.
+4.2. Deberá registrar sus facturas de compra emitidas en las tiendas participantes de Super Carnes durante la vigencia de la promoción.
+4.3. Cada factura válida genera puntos ("goles") acumulables en la cuenta del participante.
+4.4. El participante deberá completar sus pronósticos de resultados para los partidos del Mundial FIFA 2026 dentro de los plazos establecidos.
+4.5. El pronóstico de goles totales en la fase de grupos, registrado al momento del registro, servirá como criterio de desempate.
+
+5. PREMIOS
+Los premios serán anunciados en la plataforma y/o en los puntos de venta participantes durante la vigencia de la promoción. Los Organizadores se reservan el derecho de modificar los premios sin previo aviso, siempre que el valor total no sea inferior al anunciado.
+
+6. DETERMINACIÓN DE GANADORES
+Al finalizar la fase de grupos del Mundial FIFA 2026, el participante con mayor puntaje acumulado será el ganador. En caso de empate, se utilizará el pronóstico de goles totales. Si el empate persiste, los Organizadores realizarán un sorteo entre los empatados.
+
+7. VERACIDAD DE LA INFORMACIÓN
+Al registrarse y participar, el participante declara y garantiza que:
+• Toda la información proporcionada es verdadera, exacta y completa.
+• Cumple con todos los requisitos de elegibilidad descritos en el numeral 3.
+• No es empleado directo, contratista ni familiar de primer grado de los Organizadores ni de ninguna empresa afiliada.
+La participación con información falsa o engañosa será motivo de descalificación inmediata y podrá conllevar acciones legales.
+
+8. PROTECCIÓN DE DATOS PERSONALES
+Los datos personales recopilados serán utilizados exclusivamente para la administración y ejecución de esta promoción, conforme a lo establecido en la Ley 81 de 2019 de Protección de Datos Personales de la República de Panamá. El participante autoriza expresamente a los Organizadores a usar su nombre e imagen con fines publicitarios relacionados con la promoción, sin remuneración adicional.
+
+9. LIMITACIÓN DE RESPONSABILIDAD
+Los Organizadores no serán responsables por fallas técnicas, interrupciones del servicio, errores de transmisión de datos ni cualquier otro factor fuera de su control razonable que pudiera afectar la participación.
+
+10. MODIFICACIÓN Y CANCELACIÓN
+Los Organizadores se reservan el derecho de modificar, suspender o cancelar esta promoción en cualquier momento, notificando a los participantes a través de los canales oficiales.
+
+11. LEY APLICABLE
+Esta promoción se rige por las leyes de la República de Panamá. Cualquier controversia será sometida a la jurisdicción de los tribunales competentes de la ciudad de Panamá.
+
+12. ACEPTACIÓN
+Al marcar "Acepto los términos y condiciones", el participante declara haber leído, comprendido y aceptado plenamente e incondicionalmente todos los términos aquí descritos, incluyendo la declaración expresa de no ser empleado, contratista ni familiar de primer grado de los Organizadores ni de sus empresas afiliadas.`
+
   return (
     <div className="marea-app-shell">
       {message ? <div className="feedback success">{message}</div> : null}
       {error ? <div className="feedback error">{error}</div> : null}
 
+      {/* Modal de Términos y Condiciones */}
+      {termsModalOpen ? (
+        <div className="terms-overlay" onClick={() => setTermsModalOpen(false)}>
+          <div className="terms-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="terms-modal-header">
+              <span className="material-symbols-outlined">gavel</span>
+              <span>Términos y Condiciones</span>
+              <button type="button" className="terms-modal-close" onClick={() => setTermsModalOpen(false)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div
+              className="terms-modal-body"
+              onScroll={(e) => {
+                const el = e.currentTarget
+                if (!termsScrolledEnd && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) {
+                  setTermsScrolledEnd(true)
+                }
+              }}
+            >
+              <pre className="terms-text">{TERMS_TEXT}</pre>
+            </div>
+            <div className="terms-modal-footer">
+              {!termsScrolledEnd ? (
+                <p className="terms-scroll-hint">
+                  <span className="material-symbols-outlined">arrow_downward</span>
+                  Desplázate hasta el final para habilitar la aceptación
+                </p>
+              ) : null}
+              <button
+                type="button"
+                className="auth-submit"
+                disabled={!termsScrolledEnd}
+                onClick={() => {
+                  setAuthForm((f) => ({ ...f, accepted_terms: true }))
+                  setTermsModalOpen(false)
+                }}
+              >
+                {termsScrolledEnd ? 'Acepto los términos y condiciones' : 'Lee el documento completo primero'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {!user ? (
         <section className="auth-shell">
           <div className="auth-hero">
-            <p className="auth-kicker">SUPER CARNES 2026</p>
-            <h1>{CONTEST_NAME}</h1>
-            <p>Registro para mayores de edad residentes en Panama. Incluye pronostico de goles totales para desempate.</p>
+            {authBgVideoId ? (
+              <div className="auth-hero-video">
+                <iframe
+                  src={`https://www.youtube.com/embed/${authBgVideoId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${authBgVideoId}&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0`}
+                  allow="autoplay; encrypted-media"
+                  frameBorder={0}
+                  title="Fondo"
+                />
+              </div>
+            ) : null}
+            <div className="auth-hero-overlay" />
+            <div className="auth-hero-content">
+              <p className="auth-kicker">MUNDIALISTA · SUPER CARNES 2026</p>
+              <h1>{CONTEST_NAME}</h1>
+              <p>Registro para mayores de edad residentes en Panamá.</p>
+            </div>
           </div>
 
           <form className="auth-panel" onSubmit={handleAuthSubmit}>
             <div className="auth-tabs">
-              <button className={authMode === 'login' ? 'active' : ''} type="button" onClick={() => setAuthMode('login')}>
-                Iniciar sesion
+              <button className={authMode === 'login' ? 'active' : ''} type="button" onClick={() => { setAuthMode('login'); setRegisterStep(1) }}>
+                Iniciar sesión
               </button>
-              <button className={authMode === 'register' ? 'active' : ''} type="button" onClick={() => setAuthMode('register')}>
+              <button className={authMode === 'register' ? 'active' : ''} type="button" onClick={() => { setAuthMode('register'); setRegisterStep(1) }}>
                 Registrarse
               </button>
             </div>
 
             {authMode === 'register' ? (
               <>
-                <label>
-                  Nombre completo
-                  <input value={authForm.full_name} onChange={(event) => setAuthForm({ ...authForm, full_name: event.target.value })} />
-                </label>
-                <label>
-                  Tipo de documento
-                  <select
-                    value={authForm.document_type}
-                    onChange={(event) => setAuthForm({ ...authForm, document_type: event.target.value as AuthFormState['document_type'] })}
-                  >
-                    <option value="cedula">Cedula</option>
-                    <option value="passport">Pasaporte</option>
-                    <option value="residente">Residente</option>
-                  </select>
-                </label>
-                <label>
-                  {documentNumberLabel(authForm.document_type)}
-                  <input
-                    placeholder={documentNumberPlaceholder(authForm.document_type)}
-                    value={authForm.cedula}
-                    onChange={(event) => setAuthForm({ ...authForm, cedula: normalizeIdentityNumber(authForm.document_type, event.target.value) })}
-                  />
-                </label>
-                <label>
-                  Telefono
-                  <input value={authForm.phone} onChange={(event) => setAuthForm({ ...authForm, phone: event.target.value })} />
-                </label>
-                <label>
-                  Foto para avatar
-                  <input
-                    accept="image/png,image/jpeg,image/webp"
-                    type="file"
-                    onChange={(event) => setRegistrationAvatarFile(event.target.files?.[0] ?? null)}
-                  />
-                  {registrationAvatarPreview ? (
-                    <span className="auth-avatar-preview">
-                      <img alt="Vista previa del avatar" src={registrationAvatarPreview} />
-                    </span>
-                  ) : null}
-                </label>
-                <label>
-                  Fecha de nacimiento
-                  <input type="date" value={authForm.birthdate} onChange={(event) => setAuthForm({ ...authForm, birthdate: event.target.value })} />
-                </label>
-                <label>
-                  Pronostico de goles totales en fase de grupos
-                  <input
-                    type="number"
-                    min="0"
-                    max="300"
-                    value={authForm.group_stage_goal_prediction}
-                    onChange={(event) => setAuthForm({ ...authForm, group_stage_goal_prediction: event.target.value })}
-                  />
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={authForm.resides_in_panama}
-                    onChange={(event) => setAuthForm({ ...authForm, resides_in_panama: event.target.checked })}
-                  />
-                  Resido en Panama y soy mayor de 18 anos.
-                </label>
-                <label>
-                  <input type="checkbox" checked={authForm.accepted_terms} onChange={(event) => setAuthForm({ ...authForm, accepted_terms: event.target.checked })} />
-                  Acepto los terminos y condiciones del concurso.
-                </label>
-                <label>
-                  <input type="checkbox" checked={authForm.is_employee} onChange={(event) => setAuthForm({ ...authForm, is_employee: event.target.checked })} />
-                  Soy empleado directo de Super Carnes.
-                </label>
-                <p>La fecha limite de registro es el {REGISTRATION_DEADLINE}.</p>
+                {/* Indicador de pasos */}
+                <div className="auth-steps-indicator">
+                  {[1, 2, 3, 4].map((s) => (
+                    <div key={s} className={`auth-step-dot${registerStep === s ? ' is-active' : ''}${registerStep > s ? ' is-done' : ''}`}>
+                      {registerStep > s
+                        ? <span className="material-symbols-outlined">check</span>
+                        : s}
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── Paso 1: Tu perfil ── */}
+                {registerStep === 1 ? (
+                  <>
+                    <div className="auth-section-label">
+                      <span className="material-symbols-outlined">person</span>
+                      <span>Tu perfil</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="auth-avatar-zone"
+                      onClick={() => { document.getElementById('reg-avatar-input')?.click() }}
+                    >
+                      {registrationAvatarPreview ? (
+                        <img alt="Vista previa del avatar" className="auth-avatar-zone-img" src={registrationAvatarPreview} />
+                      ) : (
+                        <span className="auth-avatar-zone-placeholder">
+                          <span className="material-symbols-outlined">add_a_photo</span>
+                          <span>Toca para subir tu foto de perfil</span>
+                        </span>
+                      )}
+                    </button>
+                    <input
+                      accept="image/png,image/jpeg,image/webp"
+                      id="reg-avatar-input"
+                      style={{ display: 'none' }}
+                      type="file"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0]
+                        if (!file) return
+                        try {
+                          const cropped = await cropAvatarToSquare(file)
+                          setRegistrationAvatarFile(cropped)
+                        } catch {
+                          setRegistrationAvatarFile(file)
+                        }
+                      }}
+                    />
+                    <div className="auth-field-grid">
+                      <label>
+                        Nombre completo *
+                        <input
+                          required
+                          placeholder="Ej: María González"
+                          value={authForm.full_name}
+                          onChange={(event) => setAuthForm({ ...authForm, full_name: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Teléfono *
+                        <input
+                          required
+                          placeholder="Ej: 6000-0000"
+                          value={authForm.phone}
+                          onChange={(event) => setAuthForm({ ...authForm, phone: event.target.value })}
+                        />
+                      </label>
+                    </div>
+                  </>
+                ) : null}
+
+                {/* ── Paso 2: Documento ── */}
+                {registerStep === 2 ? (
+                  <>
+                    <div className="auth-section-label">
+                      <span className="material-symbols-outlined">badge</span>
+                      <span>Documento de identidad</span>
+                    </div>
+                    <div className="auth-doc-pills">
+                      {(['cedula', 'passport', 'residente'] as const).map((dt) => (
+                        <button
+                          key={dt}
+                          type="button"
+                          className={authForm.document_type === dt ? 'active' : ''}
+                          onClick={() => setAuthForm({ ...authForm, document_type: dt })}
+                        >
+                          <span className="material-symbols-outlined">
+                            {dt === 'cedula' ? 'id_card' : dt === 'passport' ? 'flight' : 'description'}
+                          </span>
+                          {dt === 'cedula' ? 'Cédula' : dt === 'passport' ? 'Pasaporte' : 'Residente'}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="auth-field-grid">
+                      <label>
+                        {documentNumberLabel(authForm.document_type)} *
+                        <input
+                          required
+                          placeholder={documentNumberPlaceholder(authForm.document_type)}
+                          value={authForm.cedula}
+                          onChange={(event) => setAuthForm({ ...authForm, cedula: normalizeIdentityNumber(authForm.document_type, event.target.value) })}
+                        />
+                      </label>
+                      <label>
+                        Fecha de nacimiento *
+                        <input
+                          required
+                          type="date"
+                          max={(() => {
+                            const d = new Date()
+                            d.setFullYear(d.getFullYear() - 18)
+                            return d.toISOString().split('T')[0]
+                          })()}
+                          value={authForm.birthdate}
+                          onChange={(event) => {
+                            setAuthForm({ ...authForm, birthdate: event.target.value })
+                            if (event.target.value && !isAtLeast18(event.target.value)) {
+                              setError('Debes ser mayor de 18 años para participar.')
+                            } else {
+                              setError(null)
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </>
+                ) : null}
+
+                {/* ── Paso 3: Pronóstico + Confirmaciones ── */}
+                {registerStep === 3 ? (
+                  <>
+                    <div className="auth-section-label">
+                      <span className="material-symbols-outlined">sports_soccer</span>
+                      <span>Pronóstico de desempate</span>
+                    </div>
+                    <div className="auth-goal-stepper">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAuthForm((f) => ({
+                            ...f,
+                            group_stage_goal_prediction: String(Math.max(0, Number(f.group_stage_goal_prediction || 0) - 1)),
+                          }))
+                        }
+                      >
+                        −
+                      </button>
+                      <input
+                        className="auth-goal-input"
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        max="300"
+                        placeholder="0"
+                        value={authForm.group_stage_goal_prediction}
+                        onChange={(event) => {
+                          const raw = event.target.value.replace(/\D/g, '')
+                          setAuthForm({ ...authForm, group_stage_goal_prediction: raw === '' ? '' : String(Math.min(300, Number(raw))) })
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAuthForm((f) => ({
+                            ...f,
+                            group_stage_goal_prediction: String(Math.min(300, Number(f.group_stage_goal_prediction || 0) + 1)),
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className="auth-goal-hint">¿Cuántos goles totales habrá en la fase de grupos del Mundial 2026?</p>
+
+                    <div className="auth-section-label">
+                      <span className="material-symbols-outlined">check_circle</span>
+                      <span>Confirmaciones</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`auth-toggle-card${authForm.resides_in_panama ? ' is-on' : ''}`}
+                      onClick={() => setAuthForm((f) => ({ ...f, resides_in_panama: !f.resides_in_panama }))}
+                    >
+                      <span className="material-symbols-outlined auth-toggle-card-icon">location_on</span>
+                      <div className="auth-toggle-card-text">
+                        <strong>Resido en Panamá y soy mayor de 18 años</strong>
+                        <span>Obligatorio para participar</span>
+                      </div>
+                      <div className="auth-toggle-switch" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`auth-toggle-card${authForm.accepted_terms ? ' is-on' : ''}`}
+                      onClick={() => { setTermsScrolledEnd(false); setTermsModalOpen(true) }}
+                    >
+                      <span className="material-symbols-outlined auth-toggle-card-icon">gavel</span>
+                      <div className="auth-toggle-card-text">
+                        <strong>
+                          {authForm.accepted_terms ? 'Términos aceptados' : 'Leer y aceptar términos y condiciones'}
+                        </strong>
+                        <span>Obligatorio · Toca para leer el documento completo</span>
+                      </div>
+                      {authForm.accepted_terms
+                        ? <span className="material-symbols-outlined" style={{ color: 'var(--secondary)', flexShrink: 0 }}>check_circle</span>
+                        : <span className="material-symbols-outlined" style={{ color: 'rgba(225,226,236,0.4)', flexShrink: 0 }}>chevron_right</span>}
+                    </button>
+                  </>
+                ) : null}
+
+                {/* ── Paso 4: Cuenta ── */}
+                {registerStep === 4 ? (
+                  <div className="auth-section-label">
+                    <span className="material-symbols-outlined">lock</span>
+                    <span>Correo y contraseña</span>
+                  </div>
+                ) : null}
               </>
             ) : null}
 
-            <label>
-              Correo
-              <input type="email" value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} />
-            </label>
-            <label>
-              Contrasena
-              <input type="password" value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} />
-            </label>
-            {authMode === 'register' ? (
-              <label>
-                Confirmar contrasena
-                <input
-                  type="password"
-                  value={authForm.password_confirmation}
-                  onChange={(event) => setAuthForm({ ...authForm, password_confirmation: event.target.value })}
-                />
-              </label>
+            {/* Campos de email/contraseña: login siempre, registro solo en paso 4 */}
+            {(authMode === 'login' || registerStep === 4) ? (
+              <>
+                <label>
+                  Correo *
+                  <input required type="email" value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} />
+                </label>
+                <label>
+                  Contraseña *
+                  <input required type="password" value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} />
+                </label>
+                {authMode === 'register' ? (
+                  <label>
+                    Confirmar contraseña *
+                    <input
+                      required
+                      type="password"
+                      value={authForm.password_confirmation}
+                      onChange={(event) => setAuthForm({ ...authForm, password_confirmation: event.target.value })}
+                    />
+                  </label>
+                ) : null}
+              </>
             ) : null}
 
-            <button className="auth-submit" disabled={loading} type="submit">
-              {loading ? 'Procesando...' : authMode === 'login' ? 'Entrar a la polla' : 'Completar registro'}
-            </button>
+            {/* Navegación de pasos / submit */}
+            {authMode === 'register' ? (
+              <div className="auth-step-nav">
+                {registerStep > 1 ? (
+                  <button type="button" className="auth-step-back" onClick={() => setRegisterStep((s) => s - 1)}>
+                    <span className="material-symbols-outlined">arrow_back</span>
+                    Anterior
+                  </button>
+                ) : <span />}
+                {registerStep < 4 ? (
+                  <button
+                    type="button"
+                    className="auth-step-next"
+                    onClick={() => {
+                      setError(null)
+                      if (registerStep === 1) {
+                        if (!registrationAvatarFile) { setError('Debes subir tu foto de perfil.'); return }
+                        if (!authForm.full_name.trim()) { setError('Debes ingresar tu nombre completo.'); return }
+                        if (!authForm.phone.trim()) { setError('Debes ingresar tu número de teléfono.'); return }
+                      }
+                      if (registerStep === 2) {
+                        const docError = validateDocumentNumber(authForm.document_type, authForm.cedula)
+                        if (docError) { setError(docError); return }
+                        if (!authForm.birthdate) { setError('Debes ingresar tu fecha de nacimiento.'); return }
+                        if (!isAtLeast18(authForm.birthdate)) { setError('Debes ser mayor de 18 años para participar.'); return }
+                      }
+                      if (registerStep === 3) {
+                        if (!authForm.resides_in_panama) { setError('Debes confirmar que resides en Panamá.'); return }
+                        if (!authForm.accepted_terms) { setError('Debes leer y aceptar los términos y condiciones.'); return }
+                      }
+                      setRegisterStep((s) => s + 1)
+                    }}
+                  >
+                    Siguiente
+                    <span className="material-symbols-outlined">arrow_forward</span>
+                  </button>
+                ) : (
+                  <button className="auth-submit auth-submit-step" disabled={loading} type="submit">
+                    {loading ? 'Procesando...' : 'Completar registro'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button className="auth-submit" disabled={loading} type="submit">
+                {loading ? 'Procesando...' : 'Entrar'}
+              </button>
+            )}
+
+            <p className="auth-deadline">
+              <span className="material-symbols-outlined">calendar_month</span>
+              {authMode === 'register' ? `Registro hasta el ${REGISTRATION_DEADLINE}` : 'Mundialista · Super Carnes 2026'}
+            </p>
           </form>
-        </section>
-      ) : user.role !== 'client' ? (
-        <section className="auth-shell">
-          <div className="auth-panel">
-            <h2>Cuenta interna detectada</h2>
-            <p>Esta vista React esta pensada para participantes. El panel operativo esta en Blade.</p>
-            <a className="auth-submit secondary-link" href="/admin">
-              Abrir backoffice
-            </a>
-          </div>
         </section>
       ) : (
         <div className="client-shell bg-background text-on-background font-body-lg min-h-screen">

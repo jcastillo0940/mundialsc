@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\PredictionController;
 use App\Http\Controllers\Api\PrizeController;
 use App\Http\Controllers\Api\RedemptionController;
 use App\Http\Controllers\Api\TeamFlagController;
+use App\Http\Controllers\Api\PublicSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
@@ -77,3 +78,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('audit-logs', [AdminController::class, 'auditLogs']);
     });
 });
+
+// Configuración pública (sin autenticación)
+Route::get('public/settings', [PublicSettingsController::class, 'index']);
+Route::middleware('auth:sanctum')->post('admin/settings/youtube', [PublicSettingsController::class, 'updateYoutubeId']);
