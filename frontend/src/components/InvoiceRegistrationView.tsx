@@ -1,5 +1,5 @@
 import type { ChangeEvent, FormEvent } from 'react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { RegisteredInvoice, ResolvedInvoiceData } from '../types'
 
 type InvoiceEntryMode = 'scan' | 'manual'
@@ -11,6 +11,24 @@ interface InvoiceFormState {
   issued_at: string
 }
 
+interface InvoiceScannerDebugInfo {
+  origin: string
+  protocol: string
+  hostname: string
+  isSecureContext: boolean
+  hasMediaDevices: boolean
+  hasGetUserMedia: boolean
+  cameraPermission: string
+  fileReaderSupported: boolean
+  userAgent: string
+  likelyCameraBlockedBySecurity: boolean
+  lastStage: string
+  lastError: string | null
+  barcodeDetectorAvailable: boolean
+  scannerType: 'native' | 'html5-qrcode' | 'none'
+  activeFormats: string[]
+}
+
 interface InvoiceRegistrationViewProps {
   invoices: RegisteredInvoice[]
   invoiceEntryMode: InvoiceEntryMode
@@ -18,6 +36,7 @@ interface InvoiceRegistrationViewProps {
   invoiceGalleryProcessing: boolean
   invoiceResolving: boolean
   invoiceScannerError: string | null
+  invoiceScannerDebug: InvoiceScannerDebugInfo
   invoiceSubmitting: boolean
   resolvedInvoiceData: ResolvedInvoiceData | null
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>
@@ -40,6 +59,16 @@ function formatDate(dateValue: string) {
   return date.toLocaleDateString('es-PA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Panama' })
 }
 
+function DebugRow({ label, value, ok }: { label: string; value: string; ok: boolean }) {
+  return (
+    <div className="flex gap-2 items-start">
+      <span className={`flex-shrink-0 w-2 h-2 rounded-full mt-0.5 ${ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
+      <span className="text-on-surface-variant/70 flex-shrink-0 min-w-[110px]">{label}:</span>
+      <span className={ok ? 'text-on-surface' : 'text-red-400'}>{value}</span>
+    </div>
+  )
+}
+
 function invoiceStatusMeta(status: string) {
   if (status === 'approved') return { tone: 'approved' as const, label: 'GOL VÁLIDO', icon: 'verified', points: true }
   if (status === 'pending') return { tone: 'pending' as const, label: 'EN REVISIÓN', icon: 'update', points: false }
@@ -53,6 +82,7 @@ export function InvoiceRegistrationView({
   invoiceGalleryProcessing,
   invoiceResolving,
   invoiceScannerError,
+  invoiceScannerDebug,
   invoiceSubmitting,
   resolvedInvoiceData,
   onGalleryUpload,
@@ -61,6 +91,7 @@ export function InvoiceRegistrationView({
   onFieldChange,
 }: InvoiceRegistrationViewProps) {
   const hasResolved = Boolean(resolvedInvoiceData)
+  const [debugOpen, setDebugOpen] = useState(false)
 
   const totalPoints = useMemo(
     () =>
@@ -150,13 +181,88 @@ export function InvoiceRegistrationView({
                   {invoiceScannerError}
                 </div>
               )}
-              <div className="px-5 pb-5 pt-2 text-center">
+              <div className="px-5 pb-3 pt-2 text-center">
                 <p className="text-xs text-on-surface-variant">
                   Si no funciona el escáner,{' '}
                   <button type="button" className="underline text-primary-container" onClick={() => onModeChange('manual')}>
                     ingresa el CUFE manualmente
                   </button>
                 </p>
+              </div>
+
+              {/* Panel de debug técnico */}
+              <div className="border-t border-outline-variant">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-on-surface-variant hover:bg-surface-container transition-colors"
+                  onClick={() => setDebugOpen((v) => !v)}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">bug_report</span>
+                    Info técnica del escáner
+                  </span>
+                  <span className="material-symbols-outlined text-sm">{debugOpen ? 'expand_less' : 'expand_more'}</span>
+                </button>
+
+                {debugOpen && (
+                  <div className="px-4 pb-4 font-mono text-[11px] space-y-1">
+                    <DebugRow
+                      label="Escáner"
+                      value={
+                        invoiceScannerDebug.scannerType === 'native'
+                          ? 'BarcodeDetector nativo ✓'
+                          : invoiceScannerDebug.scannerType === 'html5-qrcode'
+                            ? 'html5-qrcode (fallback)'
+                            : 'sin iniciar'
+                      }
+                      ok={invoiceScannerDebug.scannerType !== 'none'}
+                    />
+                    <DebugRow
+                      label="Etapa"
+                      value={invoiceScannerDebug.lastStage}
+                      ok={!['idle', 'camera-start-failed', 'media-devices-missing', 'insecure-context'].includes(invoiceScannerDebug.lastStage)}
+                    />
+                    {invoiceScannerDebug.lastError && (
+                      <DebugRow label="Último error" value={invoiceScannerDebug.lastError} ok={false} />
+                    )}
+                    <DebugRow
+                      label="BarcodeDetector"
+                      value={invoiceScannerDebug.barcodeDetectorAvailable ? 'disponible' : 'no disponible'}
+                      ok={invoiceScannerDebug.barcodeDetectorAvailable}
+                    />
+                    {invoiceScannerDebug.activeFormats.length > 0 && (
+                      <DebugRow
+                        label="Formatos activos"
+                        value={invoiceScannerDebug.activeFormats.join(', ')}
+                        ok={invoiceScannerDebug.activeFormats.includes('qr_code')}
+                      />
+                    )}
+                    <DebugRow
+                      label="Permiso cámara"
+                      value={invoiceScannerDebug.cameraPermission}
+                      ok={invoiceScannerDebug.cameraPermission === 'granted'}
+                    />
+                    <DebugRow
+                      label="HTTPS / secure"
+                      value={invoiceScannerDebug.isSecureContext ? 'sí' : 'NO — cámara bloqueada'}
+                      ok={invoiceScannerDebug.isSecureContext}
+                    />
+                    <DebugRow
+                      label="mediaDevices"
+                      value={invoiceScannerDebug.hasMediaDevices ? 'disponible' : 'no disponible'}
+                      ok={invoiceScannerDebug.hasMediaDevices}
+                    />
+                    <DebugRow
+                      label="getUserMedia"
+                      value={invoiceScannerDebug.hasGetUserMedia ? 'disponible' : 'no disponible'}
+                      ok={invoiceScannerDebug.hasGetUserMedia}
+                    />
+                    <DebugRow label="Origen" value={invoiceScannerDebug.origin} ok={true} />
+                    <div className="pt-1 text-on-surface-variant/50 break-all leading-relaxed">
+                      UA: {invoiceScannerDebug.userAgent}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

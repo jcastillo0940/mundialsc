@@ -119,6 +119,9 @@ interface InvoiceScannerDebugInfo {
   likelyCameraBlockedBySecurity: boolean
   lastStage: string
   lastError: string | null
+  barcodeDetectorAvailable: boolean
+  scannerType: 'native' | 'html5-qrcode' | 'none'
+  activeFormats: string[]
 }
 
 interface InvoiceScannerRef {
@@ -196,6 +199,7 @@ async function applyAutofocusToActiveStream() {
 // Detecta QR densos que html5-qrcode no puede leer porque trabaja a resolución visual.
 async function startNativeBarcodeScanner(
   elementId: string,
+  formats: string[],
   onSuccess: (text: string) => void,
   onError: (msg: string) => void,
 ): Promise<{ stop: () => Promise<void>; clear: () => void }> {
@@ -238,17 +242,7 @@ async function startNativeBarcodeScanner(
   } catch { /* autofocus opcional */ }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const BarcodeDetectorClass = (window as any).BarcodeDetector
-  const wantedFormats = ['qr_code', 'data_matrix', 'pdf417', 'aztec']
-  let activeFormats: string[]
-  try {
-    const supported: string[] = await BarcodeDetectorClass.getSupportedFormats()
-    activeFormats = wantedFormats.filter((f) => supported.includes(f))
-    if (!activeFormats.includes('qr_code')) activeFormats = ['qr_code']
-  } catch {
-    activeFormats = ['qr_code']
-  }
-  const detector = new BarcodeDetectorClass({ formats: activeFormats })
+  const detector = new (window as any).BarcodeDetector({ formats: formats })
   let stopped = false
   let timerId: ReturnType<typeof setTimeout> | null = null
 
@@ -297,6 +291,9 @@ function buildInvoiceScannerDebugInfo(partial?: Partial<InvoiceScannerDebugInfo>
       likelyCameraBlockedBySecurity: false,
       lastStage: partial?.lastStage ?? 'idle',
       lastError: partial?.lastError ?? null,
+      barcodeDetectorAvailable: false,
+      scannerType: partial?.scannerType ?? 'none',
+      activeFormats: partial?.activeFormats ?? [],
     }
   }
 
@@ -319,6 +316,9 @@ function buildInvoiceScannerDebugInfo(partial?: Partial<InvoiceScannerDebugInfo>
     likelyCameraBlockedBySecurity,
     lastStage: partial?.lastStage ?? 'idle',
     lastError: partial?.lastError ?? null,
+    barcodeDetectorAvailable: 'BarcodeDetector' in window,
+    scannerType: partial?.scannerType ?? 'none',
+    activeFormats: partial?.activeFormats ?? [],
   }
 }
 
@@ -832,7 +832,7 @@ export function App() {
   const [invoiceResolving, setInvoiceResolving] = useState(false)
   const [resolvedInvoiceData, setResolvedInvoiceData] = useState<ResolvedInvoiceData | null>(null)
   const [invoiceScannerError, setInvoiceScannerError] = useState<string | null>(null)
-  const [_invoiceScannerDebug, setInvoiceScannerDebug] = useState<InvoiceScannerDebugInfo>(() =>
+  const [invoiceScannerDebug, setInvoiceScannerDebug] = useState<InvoiceScannerDebugInfo>(() =>
     buildInvoiceScannerDebugInfo({ lastStage: 'idle' }),
   )
   const [invoiceGalleryProcessing, setInvoiceGalleryProcessing] = useState(false)
@@ -1139,12 +1139,26 @@ export function App() {
 
         const useNative = 'BarcodeDetector' in window
         let nativeStarted = false
+        let nativeFormats: string[] = []
 
         if (useNative) {
           // Ruta nativa: full-frame 1080p, autofocus, sin crop — maneja QR densos
           try {
+            // Filtrar a formatos soportados por el dispositivo antes de construir el detector
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const BarcodeDetectorClass = (window as any).BarcodeDetector
+            const wanted = ['qr_code', 'data_matrix', 'pdf417', 'aztec']
+            try {
+              const supported: string[] = await BarcodeDetectorClass.getSupportedFormats()
+              nativeFormats = wanted.filter((f) => supported.includes(f))
+              if (!nativeFormats.includes('qr_code')) nativeFormats = ['qr_code']
+            } catch {
+              nativeFormats = ['qr_code']
+            }
+
             const nativeScanner = await startNativeBarcodeScanner(
               QR_READER_ELEMENT_ID,
+              nativeFormats,
               (decodedText: string) => {
                 if (isCancelled) return
                 setInvoiceForm((current) => ({ ...current, rawInput: decodedText }))
@@ -1203,6 +1217,8 @@ export function App() {
           ...current,
           lastStage: 'camera-active',
           lastError: null,
+          scannerType: nativeStarted ? 'native' : 'html5-qrcode',
+          activeFormats: nativeStarted ? nativeFormats : [],
         }))
       } catch (scannerError) {
         const message = scannerError instanceof Error ? scannerError.message : 'Error desconocido al iniciar la camara'
@@ -1810,6 +1826,7 @@ export function App() {
         invoiceGalleryProcessing={invoiceGalleryProcessing}
         invoiceResolving={invoiceResolving}
         invoiceScannerError={invoiceScannerError}
+        invoiceScannerDebug={invoiceScannerDebug}
         invoiceSubmitting={invoiceSubmitting}
         invoices={invoices}
         onFieldChange={updateInvoiceForm}
