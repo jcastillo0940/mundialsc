@@ -11,21 +11,6 @@ interface InvoiceFormState {
   issued_at: string
 }
 
-interface InvoiceScannerDebugInfo {
-  origin: string
-  protocol: string
-  hostname: string
-  isSecureContext: boolean
-  hasMediaDevices: boolean
-  hasGetUserMedia: boolean
-  cameraPermission: string
-  fileReaderSupported: boolean
-  userAgent: string
-  likelyCameraBlockedBySecurity: boolean
-  lastStage: string
-  lastError: string | null
-}
-
 interface InvoiceRegistrationViewProps {
   invoices: RegisteredInvoice[]
   invoiceEntryMode: InvoiceEntryMode
@@ -33,11 +18,8 @@ interface InvoiceRegistrationViewProps {
   invoiceGalleryProcessing: boolean
   invoiceResolving: boolean
   invoiceScannerError: string | null
-  invoiceScannerDebug: InvoiceScannerDebugInfo
   invoiceSubmitting: boolean
   resolvedInvoiceData: ResolvedInvoiceData | null
-  stadiumImageUrl: string
-  detectedCufe: string
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>
   onGalleryUpload: (event: ChangeEvent<HTMLInputElement>) => void | Promise<void>
   onModeChange: (mode: InvoiceEntryMode) => void
@@ -46,30 +28,22 @@ interface InvoiceRegistrationViewProps {
 
 function formatCurrency(value: number | string | null | undefined) {
   const amount = Number(value ?? 0)
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number.isFinite(amount) ? amount : 0)
+  return new Intl.NumberFormat('es-PA', { style: 'currency', currency: 'USD' }).format(
+    Number.isFinite(amount) ? amount : 0,
+  )
 }
 
-function formatUpperDate(dateValue: string) {
-  const date = new Date(dateValue)
+function formatDate(dateValue: string) {
+  if (!dateValue) return ''
+  const date = new Date(`${dateValue}T12:00:00`)
   if (Number.isNaN(date.getTime())) return dateValue
-
-  const day = date.toLocaleDateString('es-PA', { day: 'numeric', timeZone: 'America/Panama' })
-  const month = date.toLocaleDateString('es-PA', { month: 'long', timeZone: 'America/Panama' })
-  return `${day} ${month.charAt(0).toUpperCase()}${month.slice(1)}`
+  return date.toLocaleDateString('es-PA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Panama' })
 }
 
 function invoiceStatusMeta(status: string) {
-  if (status === 'approved') return { tone: 'approved' as const }
-  if (status === 'pending') return { tone: 'pending' as const }
-  return { tone: 'rejected' as const }
-}
-
-function getCufeSegments(value: string) {
-  const segments = value.split('-').filter(Boolean)
-  const numericTail = segments.at(-1) ?? ''
-  const prefix = segments.length > 1 ? `${segments.slice(0, -1).join('-')}-` : ''
-
-  return { prefix, numericTail }
+  if (status === 'approved') return { tone: 'approved' as const, label: 'GOL VÁLIDO', icon: 'verified', points: true }
+  if (status === 'pending') return { tone: 'pending' as const, label: 'EN REVISIÓN', icon: 'update', points: false }
+  return { tone: 'rejected' as const, label: 'RECHAZADA', icon: 'dangerous', points: false }
 }
 
 export function InvoiceRegistrationView({
@@ -79,346 +53,250 @@ export function InvoiceRegistrationView({
   invoiceGalleryProcessing,
   invoiceResolving,
   invoiceScannerError,
-  invoiceScannerDebug,
   invoiceSubmitting,
   resolvedInvoiceData,
-  stadiumImageUrl,
-  detectedCufe,
   onGalleryUpload,
   onSubmit,
   onModeChange,
   onFieldChange,
 }: InvoiceRegistrationViewProps) {
-  const totalInvoicePoints = useMemo(
+  const hasResolved = Boolean(resolvedInvoiceData)
+
+  const totalPoints = useMemo(
     () =>
       invoices
-        .filter((invoice) => invoice.validation_status === 'approved')
-        .reduce((total, invoice) => total + Number(invoice.points_awarded ?? 0), 0),
+        .filter((i) => i.validation_status === 'approved')
+        .reduce((sum, i) => sum + Number(i.points_awarded ?? 0), 0),
     [invoices],
   )
 
   const invoiceCards = useMemo(
     () =>
-      invoices.length
-        ? invoices.slice(0, 4).map((invoice) => {
-            const status = invoiceStatusMeta(invoice.validation_status)
-            const borderTone =
-              status.tone === 'approved' ? 'border-primary-container' : status.tone === 'pending' ? 'border-secondary' : 'border-error'
-            const iconTone =
-              status.tone === 'approved'
-                ? 'bg-primary-container/10 border-primary-container/20 text-primary-container'
-                : status.tone === 'pending'
-                  ? 'bg-secondary/10 border-secondary/20 text-secondary'
-                  : 'bg-error/10 border-error/20 text-error'
-            const scoreTone = status.tone === 'approved' ? 'text-primary-container' : status.tone === 'pending' ? 'text-secondary' : 'text-error'
-            const badgeText =
-              status.tone === 'approved' ? `+${Number(invoice.points_awarded ?? 0).toFixed(1)}` : status.tone === 'pending' ? '+0.0' : '0.0'
-            const labelText = status.tone === 'approved' ? 'GOL VALIDO' : status.tone === 'pending' ? 'REVISION VAR' : 'FUERA DE JUEGO'
-            const iconName = status.tone === 'approved' ? 'verified' : status.tone === 'pending' ? 'update' : 'dangerous'
-            const title = invoice.invoice_number ? `#${invoice.invoice_number}` : `#PAN-${String(invoice.id).padStart(6, '0')}`
-            const referenceDate = invoice.issued_at ?? invoice.created_at
-            const subtitle = `${referenceDate ? formatUpperDate(referenceDate) : 'Fecha pendiente'} | ${formatCurrency(invoice.purchase_amount)}`
+      invoices.slice(0, 5).map((invoice) => {
+        const meta = invoiceStatusMeta(invoice.validation_status)
+        const colorMap = {
+          approved: { border: 'border-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+          pending:  { border: 'border-yellow-500',  bg: 'bg-yellow-500/10',  text: 'text-yellow-400',  badge: 'bg-yellow-500/20  text-yellow-400  border-yellow-500/30'  },
+          rejected: { border: 'border-red-500',     bg: 'bg-red-500/10',     text: 'text-red-400',     badge: 'bg-red-500/20     text-red-400     border-red-500/30'     },
+        }
+        const c = colorMap[meta.tone]
+        const title = invoice.invoice_number ? `#${invoice.invoice_number}` : `#${String(invoice.id).padStart(6, '0')}`
+        const date = invoice.issued_at ?? invoice.created_at
 
-            return (
-              <div
-                key={invoice.id}
-                className={`bg-surface-container-lowest p-4 rounded-2xl border-l-4 ${borderTone} flex items-center justify-between hover:bg-surface-container transition-colors group`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full ${iconTone} flex items-center justify-center border`}>
-                    <span className={`material-symbols-outlined ${scoreTone}`} data-weight="fill">
-                      {iconName}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="font-title-md text-on-surface">{title}</div>
-                    <div className="text-body-sm text-on-surface-variant">{subtitle}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`${scoreTone} font-display-lg text-headline-lg`}>{badgeText}</div>
-                  <div className={`text-[10px] font-bold uppercase ${scoreTone} tracking-tighter`}>{labelText}</div>
-                </div>
-              </div>
-            )
-          })
-        : null,
+        return (
+          <div key={invoice.id} className={`flex items-center gap-3 p-3 rounded-xl border-l-4 ${c.border} bg-surface-container-lowest`}>
+            <div className={`w-9 h-9 rounded-full ${c.bg} flex items-center justify-center flex-shrink-0`}>
+              <span className={`material-symbols-outlined text-base ${c.text}`} data-weight="fill">{meta.icon}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-title-md text-on-surface text-sm truncate">{title}</div>
+              <div className="text-xs text-on-surface-variant">{date ? formatDate(date) : ''} · {formatCurrency(invoice.purchase_amount)}</div>
+            </div>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${c.badge} whitespace-nowrap`}>
+              {meta.points ? `+${Number(invoice.points_awarded ?? 0).toFixed(1)} GOL` : meta.label}
+            </span>
+          </div>
+        )
+      }),
     [invoices],
   )
 
-  const cufeSegments = useMemo(() => getCufeSegments(detectedCufe), [detectedCufe])
-  const hasDetectedCufe = Boolean(detectedCufe)
-  const hasResolvedInvoice = Boolean(resolvedInvoiceData)
-
   return (
-    <div className="facturas-view">
-      <div className="relative w-full rounded-3xl overflow-hidden mb-gutter h-48 md:h-64 flex items-end p-6 md:p-10 border border-outline-variant">
-        <div className="absolute inset-0 z-0">
-          <img alt="Estadio Rommel Fernandez" className="w-full h-full object-cover opacity-50 scale-105" src={stadiumImageUrl} />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
-        </div>
-        <div className="relative z-10">
-          <h1 className="font-display-lg text-headline-lg md:text-display-lg text-on-surface leading-none mb-2">EL ENTRENAMIENTO NACIONAL</h1>
-          <p className="text-secondary font-title-md text-title-md uppercase tracking-widest">Sube una foto de la factura y te ayudamos a escribir el CUFE</p>
-        </div>
+    <div className="facturas-view flex flex-col gap-6 max-w-lg mx-auto lg:max-w-none">
+
+      {/* Tabs: QR primero, Manual segundo */}
+      <div className="flex rounded-2xl border border-outline-variant overflow-hidden">
+        <button
+          type="button"
+          className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors ${
+            invoiceEntryMode === 'scan'
+              ? 'bg-primary-container text-white'
+              : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
+          }`}
+          onClick={() => onModeChange('scan')}
+        >
+          <span className="material-symbols-outlined text-lg">qr_code_scanner</span>
+          Escanear QR
+        </button>
+        <button
+          type="button"
+          className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors border-l border-outline-variant ${
+            invoiceEntryMode === 'manual'
+              ? 'bg-primary-container text-white'
+              : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
+          }`}
+          onClick={() => onModeChange('manual')}
+        >
+          <span className="material-symbols-outlined text-lg">edit</span>
+          Ingresar CUFE
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
-        <section className="lg:col-span-5 flex flex-col gap-gutter">
-          <div className="bg-surface-container-low p-6 rounded-[1.5rem] border border-outline-variant pitch-glow">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="bg-primary-container/20 p-3 rounded-xl border border-primary-container/30">
-                <span className="material-symbols-outlined text-primary-container text-3xl" data-weight="fill">
-                  document_scanner
-                </span>
-              </div>
-              <div>
-                <h2 className="font-headline-lg text-headline-lg leading-none">REGISTRO</h2>
-                <p className="text-on-surface-variant text-body-sm">La forma mas rapida es tomar una foto. Intentaremos leer el CUFE y escribirlo por ti.</p>
-              </div>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <section className="lg:col-span-5 flex flex-col gap-4">
 
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <button
-                className={invoiceEntryMode === 'manual' ? 'bg-primary-container text-white font-label-caps py-3 rounded-xl border border-primary-container' : 'bg-surface-container-lowest text-on-surface font-label-caps py-3 rounded-xl border border-outline-variant'}
-                type="button"
-                onClick={() => onModeChange('manual')}
-              >
-                Foto y CUFE
-              </button>
-              <button
-                className={invoiceEntryMode === 'scan' ? 'bg-primary-container text-white font-label-caps py-3 rounded-xl border border-primary-container' : 'bg-surface-container-lowest text-on-surface font-label-caps py-3 rounded-xl border border-outline-variant'}
-                type="button"
-                onClick={() => onModeChange('scan')}
-              >
-                QR en vivo
-              </button>
-            </div>
-
-            <form className="flex flex-col gap-6" onSubmit={onSubmit}>
-              <div className="flex flex-col gap-3">
-                <label className="font-label-caps text-label-caps text-on-surface-variant ml-1">FOTO DE LA FACTURA</label>
-                <label className="bg-surface-container-lowest border border-dashed border-outline-variant rounded-2xl p-5 cursor-pointer hover:bg-surface-container transition-colors">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-primary-container/10 text-primary-container rounded-2xl p-3 border border-primary-container/20">
-                      <span className="material-symbols-outlined" data-weight="fill">
-                        photo_camera
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-title-md text-on-surface">
-                        {invoiceGalleryProcessing ? 'Leyendo la imagen y buscando el CUFE...' : 'Tomar foto o subir imagen'}
-                      </div>
-                      <p className="text-body-sm text-on-surface-variant mt-1">
-                        Abre la camara del telefono o elige una imagen de la galeria. Si detectamos el CUFE, lo escribimos automaticamente abajo.
-                      </p>
-                    </div>
-                  </div>
-                  <input accept="image/*" capture="environment" className="hidden" disabled={invoiceGalleryProcessing} type="file" onChange={onGalleryUpload} />
-                </label>
-                <p className="text-body-sm text-on-surface-variant">
-                  Consejo: procura que se vea completa la linea del CUFE o la zona inferior de la factura.
+          {/* Panel QR */}
+          {invoiceEntryMode === 'scan' && (
+            <div className="bg-surface-container-low rounded-2xl border border-outline-variant overflow-hidden">
+              <div className="px-5 pt-5 pb-3">
+                <p className="text-sm text-on-surface-variant text-center">
+                  Apunta la cámara al código QR de tu factura DGI
                 </p>
               </div>
-
-              {invoiceEntryMode === 'scan' ? (
-                <div className="flex flex-col gap-3">
-                  <label className="font-label-caps text-label-caps text-on-surface-variant ml-1">ESCANEAR QR DGI EN VIVO</label>
-                  <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-3">
-                    <div id="dgi-qr-reader" className="overflow-hidden rounded-xl min-h-[260px]" />
-                  </div>
-                  <p className="text-body-sm text-on-surface-variant">
-                    Esta opcion depende de permisos de camara y HTTPS. Si falla, usa la foto de arriba: tambien puede extraer el CUFE por OCR.
-                  </p>
-                  <details className="bg-surface-container rounded-xl border border-outline-variant p-4 text-body-sm text-on-surface-variant">
-                    <summary className="font-title-md text-on-surface cursor-pointer">Ver diagnostico del escaner</summary>
-                    <div className="space-y-2 mt-3">
-                      <p>
-                        Estado: <strong className="text-on-surface">{invoiceScannerDebug.lastStage}</strong>
-                      </p>
-                      <p>
-                        Contexto seguro: <strong className="text-on-surface">{invoiceScannerDebug.isSecureContext ? 'si' : 'no'}</strong>
-                      </p>
-                      <p>
-                        Origen actual: <strong className="text-on-surface break-all">{invoiceScannerDebug.origin}</strong>
-                      </p>
-                      <p>
-                        Camara por SSL/HTTPS: <strong className="text-on-surface">{invoiceScannerDebug.likelyCameraBlockedBySecurity ? 'probablemente bloqueada' : 'sin bloqueo evidente'}</strong>
-                      </p>
-                      <p>
-                        `mediaDevices`: <strong className="text-on-surface">{invoiceScannerDebug.hasMediaDevices ? 'disponible' : 'no disponible'}</strong>
-                      </p>
-                      <p>
-                        `getUserMedia`: <strong className="text-on-surface">{invoiceScannerDebug.hasGetUserMedia ? 'disponible' : 'no disponible'}</strong>
-                      </p>
-                      <p>
-                        Permiso de camara: <strong className="text-on-surface">{invoiceScannerDebug.cameraPermission}</strong>
-                      </p>
-                      <p>
-                        Lectura desde galeria: <strong className="text-on-surface">{invoiceScannerDebug.fileReaderSupported ? 'disponible' : 'no disponible'}</strong>
-                      </p>
-                      {invoiceScannerDebug.lastError ? (
-                        <p className="break-all">
-                          Ultimo error: <strong className="text-error">{invoiceScannerDebug.lastError}</strong>
-                        </p>
-                      ) : null}
-                    </div>
-                  </details>
-                </div>
-              ) : null}
-
-              {invoiceScannerError ? (
-                <div className="bg-error/10 border border-error/20 rounded-xl p-3 text-body-sm text-error">
+              <div id="dgi-qr-reader" className="w-full min-h-[280px] bg-black" />
+              {invoiceScannerError && (
+                <div className="mx-4 mb-4 mt-2 flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-sm text-red-400">
+                  <span className="material-symbols-outlined text-base flex-shrink-0 mt-0.5">error</span>
                   {invoiceScannerError}
                 </div>
-              ) : null}
-
-              <div className="flex flex-col gap-2">
-                <label className="font-label-caps text-label-caps text-on-surface-variant ml-1">CUFE DE LA FACTURA</label>
-                <textarea
-                  className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-on-surface font-title-md transition-all"
-                  placeholder="Escribe o pega el CUFE completo. Si subes una foto, intentaremos llenarlo por ti."
-                  required
-                  rows={3}
-                  value={invoiceForm.rawInput}
-                  onChange={(event) => onFieldChange('rawInput', event.target.value)}
-                />
-                <p className="text-body-sm text-on-surface-variant">
-                  Puedes corregir el texto manualmente si el OCR confundio algun caracter.
+              )}
+              <div className="px-5 pb-5 pt-2 text-center">
+                <p className="text-xs text-on-surface-variant">
+                  Si no funciona el escáner,{' '}
+                  <button type="button" className="underline text-primary-container" onClick={() => onModeChange('manual')}>
+                    ingresa el CUFE manualmente
+                  </button>
                 </p>
-                <div className="bg-surface-container rounded-xl border border-outline-variant p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-title-md text-on-surface">Lectura del CUFE</p>
-                      <p className="text-body-sm text-on-surface-variant">
-                        {hasDetectedCufe ? 'Detectamos una estructura valida. Revisa solo si hace falta.' : 'Todavia no detectamos un CUFE completo.'}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${
-                        hasDetectedCufe
-                          ? 'bg-primary-container/10 text-primary-container border-primary-container/20'
-                          : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant'
-                      }`}
-                    >
-                      {hasDetectedCufe ? 'CUFE detectado' : 'Pendiente'}
-                    </span>
-                  </div>
-                  {cufeSegments.prefix ? (
-                    <div className="text-body-sm text-on-surface-variant break-all">
-                      <strong className="text-on-surface">Prefijo:</strong> {cufeSegments.prefix}
-                    </div>
-                  ) : null}
-                  <div className="flex items-center justify-between gap-3 text-body-sm">
-                    <span className="text-on-surface-variant">Bloque numerico final</span>
-                    <strong className={cufeSegments.numericTail.length >= 40 ? 'text-primary-container' : 'text-on-surface'}>
-                      {cufeSegments.numericTail.length}/40
-                    </strong>
-                  </div>
-                  {hasDetectedCufe ? (
-                    <div className="text-body-sm text-on-surface-variant break-all">
-                      <strong className="text-on-surface">CUFE detectado:</strong> {detectedCufe}
-                    </div>
-                  ) : null}
-                </div>
-                {invoiceResolving ? (
-                  <div className="bg-surface-container rounded-xl border border-outline-variant p-3 text-body-sm text-on-surface-variant">
-                    Consultando datos oficiales de la factura...
-                  </div>
-                ) : null}
               </div>
+            </div>
+          )}
 
-              <div className="flex flex-col gap-2">
-                <label className="font-label-caps text-label-caps text-on-surface-variant ml-1">NUMERO DE FACTURA</label>
-                <input
-                  className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-on-surface font-title-md transition-all"
-                  placeholder="Autollenado por DGI"
-                  readOnly
-                  type="text"
-                  value={invoiceForm.invoice_number}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <label className="font-label-caps text-label-caps text-on-surface-variant ml-1">MONTO TOTAL ($)</label>
-                  <input
-                    className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-on-surface font-title-md transition-all"
-                    placeholder="Autollenado por DGI"
-                    required
-                    min="0.01"
-                    readOnly
-                    step="0.01"
-                    type="number"
-                    value={invoiceForm.purchase_amount}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="font-label-caps text-label-caps text-on-surface-variant ml-1">FECHA DE FACTURA</label>
-                  <input
-                    className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-on-surface font-title-md transition-all"
-                    required
-                    readOnly
-                    type="date"
-                    value={invoiceForm.issued_at}
-                  />
-                </div>
-              </div>
-              {resolvedInvoiceData?.issuer_name ? (
-                <div className="bg-surface-container rounded-xl border border-outline-variant p-3 text-body-sm text-on-surface-variant">
-                  <strong className="text-on-surface">Emisor:</strong> {resolvedInvoiceData.issuer_name}
-                </div>
-              ) : null}
-
-              <div className="mt-4 flex flex-col gap-3">
-                <button
-                  className="bg-primary-container text-white font-display-lg text-headline-lg py-4 rounded-xl flex items-center justify-center gap-3 hover:opacity-90 active:scale-[0.98] transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
-                  disabled={invoiceSubmitting || invoiceResolving || !hasResolvedInvoice}
-                  type="submit"
-                >
-                  <span>{invoiceSubmitting ? 'REGISTRANDO FACTURA...' : 'REGISTRAR FACTURA DGI'}</span>
-                  <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">sports_soccer</span>
-                </button>
-                {!hasResolvedInvoice ? (
-                  <p className="text-center text-body-sm text-on-surface-variant">El boton se activa cuando DGI confirma el CUFE y trae los datos oficiales de la factura.</p>
-                ) : null}
-                <p className="text-center text-body-sm text-on-surface-variant italic">Cada factura valida te acerca a la Copa.</p>
-              </div>
-            </form>
-          </div>
-
-          <div className="bg-surface-container rounded-[1.5rem] p-6 border-l-4 border-secondary flex items-start gap-4">
-            <span className="material-symbols-outlined text-secondary text-3xl">lightbulb</span>
+          {/* Panel Manual */}
+          {invoiceEntryMode === 'manual' && (
+            <div className="bg-surface-container-low rounded-2xl border border-outline-variant p-5 flex flex-col gap-4">
               <div>
-                <h3 className="font-title-md text-title-md text-secondary uppercase">TIP DEL CAPITAN</h3>
-                <p className="text-body-sm text-on-surface-variant">
-                  "Si el QR no abre, toma una foto nitida de la parte baja de la factura. El sistema intentara leer el CUFE y dejarlo listo para validar."
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">
+                  CUFE de la factura
+                </label>
+                <textarea
+                  className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-on-surface text-sm resize-none focus:outline-none focus:border-primary-container transition-colors"
+                  placeholder="Pega o escribe el CUFE completo aquí…"
+                  rows={4}
+                  value={invoiceForm.rawInput}
+                  onChange={(e) => onFieldChange('rawInput', e.target.value)}
+                />
+                <p className="text-xs text-on-surface-variant mt-1.5">
+                  El CUFE está en la parte inferior de tu factura electrónica DGI.
                 </p>
               </div>
-            </div>
-        </section>
 
-        <section className="lg:col-span-7">
-          <div className="bg-surface-container-low rounded-[1.5rem] border border-outline-variant h-full flex flex-col overflow-hidden">
-            <div className="p-6 border-b border-outline-variant flex justify-between items-center">
-              <h2 className="font-headline-lg text-headline-lg">HISTORIAL DE FACTURAS</h2>
-              <div className="flex gap-2">
-                <span className="bg-primary-container/10 text-primary-container px-3 py-1 rounded-full text-[10px] font-bold border border-primary-container/20 uppercase">
-                  {totalInvoicePoints.toFixed(1)} Goles Totales
+              {/* Subir foto como alternativa */}
+              <label className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-outline-variant bg-surface-container cursor-pointer hover:bg-surface-container-low transition-colors">
+                <span className="material-symbols-outlined text-on-surface-variant">photo_camera</span>
+                <span className="text-sm text-on-surface-variant">
+                  {invoiceGalleryProcessing ? 'Leyendo imagen…' : 'O toma una foto de la factura para extraer el CUFE'}
                 </span>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[600px]">
-              {invoiceCards ?? (
-                <div className="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant text-center">
-                  <div className="font-title-md text-on-surface mb-2">Sin facturas registradas todavia</div>
-                  <div className="text-body-sm text-on-surface-variant">Tus facturas validadas, pendientes o rechazadas apareceran aqui.</div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  disabled={invoiceGalleryProcessing}
+                  onChange={onGalleryUpload}
+                />
+              </label>
+
+              {invoiceScannerError && (
+                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-sm text-red-400">
+                  <span className="material-symbols-outlined text-base flex-shrink-0 mt-0.5">error</span>
+                  {invoiceScannerError}
                 </div>
               )}
             </div>
-            <button className="w-full py-4 text-center text-on-surface-variant hover:text-on-surface font-label-caps transition-all border-t border-outline-variant uppercase" type="button">
-              {invoices.length ? `Ver ${invoices.length} facturas registradas` : 'Esperando facturas reales'}
-            </button>
+          )}
+
+          {/* Estado de consulta DGI */}
+          {invoiceResolving && (
+            <div className="flex items-center gap-3 bg-surface-container rounded-xl border border-outline-variant p-4 text-sm text-on-surface-variant">
+              <span className="material-symbols-outlined animate-spin text-primary-container">progress_activity</span>
+              Consultando datos en DGI…
+            </div>
+          )}
+
+          {/* Datos resueltos + botón de registro */}
+          {hasResolved && !invoiceResolving && (
+            <form onSubmit={onSubmit} className="flex flex-col gap-4">
+              <div className="bg-surface-container-low rounded-2xl border border-outline-variant overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-outline-variant">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-emerald-400 text-base" data-weight="fill">check_circle</span>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-on-surface text-sm">Factura verificada en DGI</div>
+                    {resolvedInvoiceData?.issuer_name && (
+                      <div className="text-xs text-on-surface-variant truncate max-w-[220px]">{resolvedInvoiceData.issuer_name}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 divide-x divide-outline-variant">
+                  <div className="px-4 py-3 text-center">
+                    <div className="text-xs text-on-surface-variant mb-0.5">Factura</div>
+                    <div className="font-semibold text-on-surface text-sm truncate">
+                      {invoiceForm.invoice_number ? `#${invoiceForm.invoice_number}` : '—'}
+                    </div>
+                  </div>
+                  <div className="px-4 py-3 text-center">
+                    <div className="text-xs text-on-surface-variant mb-0.5">Monto</div>
+                    <div className="font-semibold text-primary-container text-sm">{formatCurrency(invoiceForm.purchase_amount)}</div>
+                  </div>
+                  <div className="px-4 py-3 text-center">
+                    <div className="text-xs text-on-surface-variant mb-0.5">Fecha</div>
+                    <div className="font-semibold text-on-surface text-sm">{formatDate(invoiceForm.issued_at)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={invoiceSubmitting}
+                className="w-full py-4 bg-primary-container text-white font-bold text-base rounded-2xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {invoiceSubmitting ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                    Registrando…
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-lg">sports_soccer</span>
+                    Registrar factura
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+        </section>
+
+        {/* Historial */}
+        <section className="lg:col-span-7">
+          <div className="bg-surface-container-low rounded-2xl border border-outline-variant flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant">
+              <h2 className="font-semibold text-on-surface">Mis facturas</h2>
+              {totalPoints > 0 && (
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-primary-container/20 text-primary-container border border-primary-container/30">
+                  {totalPoints.toFixed(1)} goles totales
+                </span>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5 max-h-[520px]">
+              {invoiceCards.length > 0 ? invoiceCards : (
+                <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+                  <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">receipt_long</span>
+                  <div>
+                    <p className="text-sm font-medium text-on-surface-variant">Sin facturas aún</p>
+                    <p className="text-xs text-on-surface-variant/60 mt-1">Escanea el QR de tu primera factura DGI para comenzar</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {invoices.length > 5 && (
+              <div className="px-5 py-3 border-t border-outline-variant text-center text-xs text-on-surface-variant">
+                Mostrando 5 de {invoices.length} facturas
+              </div>
+            )}
           </div>
         </section>
       </div>

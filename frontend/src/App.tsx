@@ -133,7 +133,7 @@ interface CanvasCropBounds {
   heightRatio: number
 }
 
-const DGI_QR_URL_PREFIX = 'http://34.60.159.127/api/verificar?cufe='
+const DGI_QR_URL_PREFIX = 'http://35.188.24.113/api/verificar?cufe='
 const QR_READER_ELEMENT_ID = 'dgi-qr-reader'
 const INVOICE_SCANNER_FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
@@ -155,15 +155,14 @@ function createInvoiceScanner() {
 
 function buildInvoiceCameraScanConfig() {
   return {
-    fps: 12,
+    fps: 15,
     qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+      // QR denso necesita el mayor área posible en píxeles
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
-      const targetSize = Math.floor(minEdge * 0.82)
-      const boundedSize = Math.max(240, Math.min(targetSize, 360))
-
+      const targetSize = Math.floor(minEdge * 0.92)
       return {
-        width: Math.min(boundedSize, viewfinderWidth),
-        height: Math.min(boundedSize, viewfinderHeight),
+        width: Math.min(targetSize, viewfinderWidth),
+        height: Math.min(targetSize, viewfinderHeight),
       }
     },
     aspectRatio: 1.333334,
@@ -173,6 +172,113 @@ function buildInvoiceCameraScanConfig() {
       width: { ideal: 1920 },
       height: { ideal: 1080 },
     },
+  }
+}
+
+async function applyAutofocusToActiveStream() {
+  try {
+    const videoEl = document.querySelector<HTMLVideoElement>(`#${QR_READER_ELEMENT_ID} video`)
+    if (!(videoEl?.srcObject instanceof MediaStream)) return
+    const track = videoEl.srcObject.getVideoTracks()[0]
+    if (!track) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const caps = track.getCapabilities() as any
+    if (caps?.focusMode?.includes('continuous')) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as any)
+    }
+  } catch {
+    // autofocus no soportado en este dispositivo, no es bloqueante
+  }
+}
+
+// Scanner nativo usando BarcodeDetector a resolución completa (sin crop/escala).
+// Detecta QR densos que html5-qrcode no puede leer porque trabaja a resolución visual.
+async function startNativeBarcodeScanner(
+  elementId: string,
+  onSuccess: (text: string) => void,
+  onError: (msg: string) => void,
+): Promise<{ stop: () => Promise<void>; clear: () => void }> {
+  const container = document.getElementById(elementId)
+  if (!container) throw new Error('Contenedor del escaner no encontrado')
+
+  const video = document.createElement('video')
+  video.setAttribute('playsinline', 'true')
+  video.muted = true
+  video.style.cssText = 'width:100%;border-radius:12px;display:block;background:#000;'
+  container.innerHTML = ''
+  container.appendChild(video)
+
+  // Intentar primero con alta resolución; si el dispositivo rechaza, reintentar sin constraints de res.
+  let stream: MediaStream
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+    })
+  } catch {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' } },
+    })
+  }
+
+  video.srcObject = stream
+  await video.play()
+
+  // Autofocus continuo — opcional, ignorar si el dispositivo no lo soporta
+  const track = stream.getVideoTracks()[0]
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const caps = track.getCapabilities() as any
+    if (caps?.focusMode?.includes('continuous')) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as any)
+    }
+  } catch { /* autofocus opcional */ }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const BarcodeDetectorClass = (window as any).BarcodeDetector
+  const wantedFormats = ['qr_code', 'data_matrix', 'pdf417', 'aztec']
+  let activeFormats: string[]
+  try {
+    const supported: string[] = await BarcodeDetectorClass.getSupportedFormats()
+    activeFormats = wantedFormats.filter((f) => supported.includes(f))
+    if (!activeFormats.includes('qr_code')) activeFormats = ['qr_code']
+  } catch {
+    activeFormats = ['qr_code']
+  }
+  const detector = new BarcodeDetectorClass({ formats: activeFormats })
+  let stopped = false
+  let timerId: ReturnType<typeof setTimeout> | null = null
+
+  async function scanFrame() {
+    if (stopped) return
+    if (video.readyState >= video.HAVE_ENOUGH_DATA) {
+      try {
+        // detect() acepta HTMLVideoElement directamente — usa el frame nativo a resolución completa
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const codes: any[] = await detector.detect(video)
+        if (codes.length > 0 && !stopped) {
+          onSuccess(codes[0].rawValue as string)
+          return
+        }
+      } catch (e) {
+        onError(String(e))
+      }
+    }
+    if (!stopped) timerId = setTimeout(() => { void scanFrame() }, 80)
+  }
+
+  void scanFrame()
+
+  return {
+    stop: async () => {
+      stopped = true
+      if (timerId !== null) clearTimeout(timerId)
+      stream.getTracks().forEach((t) => t.stop())
+    },
+    clear: () => { container.innerHTML = '' },
   }
 }
 
@@ -715,7 +821,7 @@ export function App() {
   const [walletSnapshot, setWalletSnapshot] = useState<WalletSnapshot | null>(null)
   const [prizes, setPrizes] = useState<Prize[]>([])
   const [invoiceLookupValue, setInvoiceLookupValue] = useState('')
-  const [invoiceEntryMode, setInvoiceEntryMode] = useState<InvoiceEntryMode>('manual')
+  const [invoiceEntryMode, setInvoiceEntryMode] = useState<InvoiceEntryMode>('scan')
   const [invoiceForm, setInvoiceForm] = useState<InvoiceFormState>({
     rawInput: '',
     invoice_number: '',
@@ -726,7 +832,7 @@ export function App() {
   const [invoiceResolving, setInvoiceResolving] = useState(false)
   const [resolvedInvoiceData, setResolvedInvoiceData] = useState<ResolvedInvoiceData | null>(null)
   const [invoiceScannerError, setInvoiceScannerError] = useState<string | null>(null)
-  const [invoiceScannerDebug, setInvoiceScannerDebug] = useState<InvoiceScannerDebugInfo>(() =>
+  const [_invoiceScannerDebug, setInvoiceScannerDebug] = useState<InvoiceScannerDebugInfo>(() =>
     buildInvoiceScannerDebugInfo({ lastStage: 'idle' }),
   )
   const [invoiceGalleryProcessing, setInvoiceGalleryProcessing] = useState(false)
@@ -1025,47 +1131,74 @@ export function App() {
 
         if (isCancelled) return
 
-        const scanner = createInvoiceScanner()
-        invoiceScannerRef.current = scanner
         setInvoiceScannerDebug((current) => ({
           ...current,
           lastStage: 'starting-camera',
           lastError: null,
         }))
 
-        await scanner.start(
-          {
-            facingMode: { ideal: 'environment' },
-          },
-          buildInvoiceCameraScanConfig(),
-          (decodedText: string) => {
-            if (isCancelled) return
+        const useNative = 'BarcodeDetector' in window
+        let nativeStarted = false
 
-            setInvoiceForm((current) => ({
-              ...current,
-              rawInput: decodedText,
-            }))
-            setInvoiceScannerDebug((current) => ({
-              ...current,
-              lastStage: 'decoded-camera',
-              lastError: null,
-            }))
-            setInvoiceEntryMode('manual')
-          },
-          (errorMessage: string) => {
-            setInvoiceScannerDebug((current) =>
-              current.lastStage === 'decoded-camera'
-                ? current
-                : {
-                    ...current,
-                    lastStage: 'scanning-camera',
-                    lastError: errorMessage.includes('No MultiFormat Readers were able to detect the code')
-                      ? current.lastError
-                      : errorMessage,
-                  },
+        if (useNative) {
+          // Ruta nativa: full-frame 1080p, autofocus, sin crop — maneja QR densos
+          try {
+            const nativeScanner = await startNativeBarcodeScanner(
+              QR_READER_ELEMENT_ID,
+              (decodedText: string) => {
+                if (isCancelled) return
+                setInvoiceForm((current) => ({ ...current, rawInput: decodedText }))
+                setInvoiceScannerDebug((current) => ({ ...current, lastStage: 'decoded-camera', lastError: null }))
+                setInvoiceEntryMode('manual')
+              },
+              (errorMessage: string) => {
+                setInvoiceScannerDebug((current) =>
+                  current.lastStage === 'decoded-camera' ? current : { ...current, lastStage: 'scanning-camera', lastError: errorMessage },
+                )
+              },
             )
-          },
-        )
+            if (isCancelled) {
+              await nativeScanner.stop()
+              nativeScanner.clear()
+              return
+            }
+            invoiceScannerRef.current = nativeScanner
+            nativeStarted = true
+          } catch {
+            // BarcodeDetector no disponible o sin soporte suficiente — caer a html5-qrcode
+          }
+        }
+
+        if (!nativeStarted) {
+          // Fallback: html5-qrcode (Safari iOS y dispositivos sin BarcodeDetector)
+          const scanner = createInvoiceScanner()
+          invoiceScannerRef.current = scanner
+          await scanner.start(
+            { facingMode: { ideal: 'environment' } },
+            buildInvoiceCameraScanConfig(),
+            (decodedText: string) => {
+              if (isCancelled) return
+              setInvoiceForm((current) => ({ ...current, rawInput: decodedText }))
+              setInvoiceScannerDebug((current) => ({ ...current, lastStage: 'decoded-camera', lastError: null }))
+              setInvoiceEntryMode('manual')
+            },
+            (errorMessage: string) => {
+              setInvoiceScannerDebug((current) =>
+                current.lastStage === 'decoded-camera'
+                  ? current
+                  : {
+                      ...current,
+                      lastStage: 'scanning-camera',
+                      lastError: errorMessage.includes('No MultiFormat Readers were able to detect the code')
+                        ? current.lastError
+                        : errorMessage,
+                    },
+              )
+            },
+          )
+          void applyAutofocusToActiveStream()
+        }
+
         setInvoiceScannerDebug((current) => ({
           ...current,
           lastStage: 'camera-active',
@@ -1672,13 +1805,11 @@ export function App() {
   function renderFacturas() {
     return (
       <InvoiceRegistrationView
-        detectedCufe={extractInvoiceCufe(invoiceForm.rawInput)}
         invoiceEntryMode={invoiceEntryMode}
         invoiceForm={invoiceForm}
         invoiceGalleryProcessing={invoiceGalleryProcessing}
         invoiceResolving={invoiceResolving}
         invoiceScannerError={invoiceScannerError}
-        invoiceScannerDebug={invoiceScannerDebug}
         invoiceSubmitting={invoiceSubmitting}
         invoices={invoices}
         onFieldChange={updateInvoiceForm}
@@ -1686,7 +1817,6 @@ export function App() {
         onModeChange={setInvoiceEntryMode}
         onSubmit={handleInvoiceSubmit}
         resolvedInvoiceData={resolvedInvoiceData}
-        stadiumImageUrl={STADIUM_IMAGE_URL}
       />
     )
 
