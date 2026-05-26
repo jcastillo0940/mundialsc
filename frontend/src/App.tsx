@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { createWorker, PSM } from 'tesseract.js'
 import { api, setApiToken } from './api'
@@ -135,6 +135,46 @@ interface CanvasCropBounds {
 
 const DGI_QR_URL_PREFIX = 'http://34.60.159.127/api/verificar?cufe='
 const QR_READER_ELEMENT_ID = 'dgi-qr-reader'
+const INVOICE_SCANNER_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+  Html5QrcodeSupportedFormats.PDF_417,
+  Html5QrcodeSupportedFormats.AZTEC,
+]
+
+function createInvoiceScanner() {
+  return new Html5Qrcode(QR_READER_ELEMENT_ID, {
+    verbose: false,
+    formatsToSupport: INVOICE_SCANNER_FORMATS,
+    useBarCodeDetectorIfSupported: true,
+    experimentalFeatures: {
+      useBarCodeDetectorIfSupported: true,
+    },
+  })
+}
+
+function buildInvoiceCameraScanConfig() {
+  return {
+    fps: 12,
+    qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+      const targetSize = Math.floor(minEdge * 0.82)
+      const boundedSize = Math.max(240, Math.min(targetSize, 360))
+
+      return {
+        width: Math.min(boundedSize, viewfinderWidth),
+        height: Math.min(boundedSize, viewfinderHeight),
+      }
+    },
+    aspectRatio: 1.333334,
+    disableFlip: true,
+    videoConstraints: {
+      facingMode: { ideal: 'environment' },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+  }
+}
 
 function buildInvoiceScannerDebugInfo(partial?: Partial<InvoiceScannerDebugInfo>): InvoiceScannerDebugInfo {
   if (typeof window === 'undefined') {
@@ -985,7 +1025,7 @@ export function App() {
 
         if (isCancelled) return
 
-        const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID)
+        const scanner = createInvoiceScanner()
         invoiceScannerRef.current = scanner
         setInvoiceScannerDebug((current) => ({
           ...current,
@@ -994,8 +1034,10 @@ export function App() {
         }))
 
         await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 220, height: 220 } },
+          {
+            facingMode: { ideal: 'environment' },
+          },
+          buildInvoiceCameraScanConfig(),
           (decodedText: string) => {
             if (isCancelled) return
 
@@ -1064,7 +1106,7 @@ export function App() {
 
     try {
       await stopInvoiceScanner()
-      const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID)
+      const scanner = createInvoiceScanner()
 
       try {
         const result = await scanner.scanFile(file, false)
