@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Support\Audit;
 use App\Support\ContestRules;
 use Illuminate\Http\JsonResponse;
@@ -58,14 +59,14 @@ class AuthController extends Controller
         $avatarPath = $request->file('avatar')?->store('avatars', 'public');
 
         $user = User::query()->create([
-            'full_name' => $data['full_name'],
+            'name' => $data['full_name'],
             'cedula' => $data['cedula'],
             'document_type' => $data['document_type'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'avatar_path' => $avatarPath,
             'role' => 'client',
-            'password_hash' => Hash::make($data['password']),
+            'password' => Hash::make($data['password']),
             'is_active' => 1,
             'birthdate' => $data['birthdate'],
             'resides_in_panama' => true,
@@ -73,6 +74,14 @@ class AuthController extends Controller
             'accepted_terms_at' => now(),
             'registration_completed_at' => now(),
             'group_stage_goal_prediction' => $data['group_stage_goal_prediction'],
+        ]);
+
+        Wallet::query()->create([
+            'user_id'               => $user->id,
+            'goals_balance'         => 0,
+            'shots_balance'         => 0,
+            'lifetime_goals_earned' => 0,
+            'lifetime_shots_earned' => 0,
         ]);
 
         $token = $user->createToken('client-app')->plainTextToken;
@@ -107,7 +116,7 @@ class AuthController extends Controller
             ->first();
 
         try {
-            $passwordMatches = $user ? Hash::check($data['password'], $user->password_hash) : false;
+            $passwordMatches = $user ? Hash::check($data['password'], $user->password) : false;
         } catch (RuntimeException) {
             $passwordMatches = false;
         }
@@ -182,7 +191,7 @@ class AuthController extends Controller
 
         if (! $user) {
             $user = User::query()->create([
-                'full_name' => Str::limit($payload['name'] ?? Str::before($payload['email'], '@'), 150, ''),
+                'name' => Str::limit($payload['name'] ?? Str::before($payload['email'], '@'), 150, ''),
                 'cedula' => $this->buildGoogleCedula($payload['sub']),
                 'document_type' => 'passport',
                 'email' => $payload['email'],
@@ -190,7 +199,7 @@ class AuthController extends Controller
                 'phone' => null,
                 'avatar_path' => null,
                 'role' => 'client',
-                'password_hash' => Hash::make(Str::random(40)),
+                'password' => Hash::make(Str::random(40)),
                 'is_active' => 1,
                 'resides_in_panama' => false,
                 'is_employee' => false,
@@ -209,8 +218,8 @@ class AuthController extends Controller
                 $updates['email'] = $payload['email'];
             }
 
-            if (! empty($payload['name']) && $user->full_name !== $payload['name']) {
-                $updates['full_name'] = Str::limit($payload['name'], 150, '');
+            if (! empty($payload['name']) && $user->name !== $payload['name']) {
+                $updates['name'] = Str::limit($payload['name'], 150, ''); // columna name = full_name
             }
 
             if (! $user->email_verified_at) {
@@ -381,7 +390,7 @@ class AuthController extends Controller
         return [
             'id' => $user->id,
             'role' => $user->role,
-            'full_name' => $user->full_name,
+            'full_name' => $user->name,
             'cedula' => $user->cedula,
             'document_type' => $user->document_type,
             'email' => $user->email,

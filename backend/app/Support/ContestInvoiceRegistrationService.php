@@ -18,6 +18,7 @@ class ContestInvoiceRegistrationService
         private readonly CufeParser $cufeParser,
         private readonly ContestInvoiceVerifier $verifier,
         private readonly ContestRules $rules,
+        private readonly WalletService $walletService,
     ) {
     }
 
@@ -50,9 +51,8 @@ class ContestInvoiceRegistrationService
         $canonicalCufe = strtoupper((string) $resolvedInvoice['cufe']);
         $issuedAt = $resolvedInvoice['issued_at'];
         $minimumAmount = $settings ? (float) $settings->min_purchase_amount : $this->rules->minimumInvoiceAmount();
-        $maxAgeDays = $settings ? (int) $settings->max_invoice_age_days : $this->rules->maxInvoiceAgeDays();
         $purchaseAmount = round((float) $resolvedInvoice['purchase_amount'], 2);
-        $oldestAllowed = now('America/Panama')->startOfDay()->subDays($maxAgeDays);
+        $now = now('America/Panama');
 
         if ($purchaseAmount <= $minimumAmount) {
             throw ValidationException::withMessages([
@@ -60,9 +60,15 @@ class ContestInvoiceRegistrationService
             ]);
         }
 
-        if ($issuedAt->lt($oldestAllowed) || $issuedAt->gt(now('America/Panama')->endOfDay())) {
+        if ($issuedAt->month !== $now->month || $issuedAt->year !== $now->year) {
             throw ValidationException::withMessages([
-                'issued_at' => 'La factura debe ser de hoy o de maximo '.$maxAgeDays.' dia anterior.',
+                'issued_at' => 'La factura debe ser del mes en curso ('.$now->locale('es')->isoFormat('MMMM [de] YYYY').').',
+            ]);
+        }
+
+        if ($issuedAt->gt($now->copy()->endOfDay())) {
+            throw ValidationException::withMessages([
+                'issued_at' => 'La fecha de la factura no puede ser futura.',
             ]);
         }
 
@@ -70,7 +76,7 @@ class ContestInvoiceRegistrationService
             'cufe' => $canonicalCufe,
             'purchase_amount' => $purchaseAmount,
             'issued_at' => $issuedAt,
-        ]);
+        ], $resolvedInvoice);
         $canonicalCufe = strtoupper((string) ($verification['canonical_cufe'] ?? $canonicalCufe));
 
         try {
@@ -105,6 +111,14 @@ class ContestInvoiceRegistrationService
 
                 if ($verification['status'] === 'approved') {
                     $this->syncDailyInvoiceGoal($user, $invoice);
+                    $this->walletService->creditGoals(
+                        user: $user,
+                        amount: (int) $pointsAwarded,
+                        type: 'invoice_goal_awarded',
+                        resourceType: 'registered_invoice',
+                        resourceId: $invoice->id,
+                        campaignId: $campaign->id,
+                    );
                 }
 
                 if ($verification['status'] === 'disqualify') {

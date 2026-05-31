@@ -80,9 +80,12 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::get('/', [BackofficeController::class, 'dashboard'])->name('admin.dashboard');
         Route::get('/teams', [BackofficeController::class, 'teams'])->name('admin.teams');
         Route::put('/teams/{team}/ranking', [BackofficeController::class, 'updateTeamRanking'])->name('admin.teams.ranking');
+        Route::post('/teams/import-rankings', [BackofficeController::class, 'importTeamRankings'])->name('admin.teams.import-rankings');
         Route::get('/matches', [BackofficeController::class, 'matches'])->name('admin.matches');
         Route::post('/matches', [BackofficeController::class, 'storeMatch'])->name('admin.matches.store');
         Route::put('/matches/{match}', [BackofficeController::class, 'updateMatch'])->name('admin.matches.update');
+        Route::post('/matches/{match}/finalize', [BackofficeController::class, 'finalizeMatch'])->name('admin.matches.finalize');
+        Route::post('/matches/recalculate-all', [BackofficeController::class, 'recalculateAllScores'])->name('admin.matches.recalculate-all');
         Route::get('/rules', [BackofficeController::class, 'rules'])->name('admin.rules');
         Route::put('/rules/phases/{phase}', [BackofficeController::class, 'updatePhase'])->name('admin.rules.phase');
         Route::put('/rules/invoice', [BackofficeController::class, 'updateInvoiceSettings'])->name('admin.rules.invoice');

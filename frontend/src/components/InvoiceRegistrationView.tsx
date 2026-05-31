@@ -327,8 +327,31 @@ export function InvoiceRegistrationView({
             </div>
           )}
 
+          {/* Loader mientras se verifica con DGI */}
+          {invoiceSubmitting && (
+            <div className="bg-surface-container-low rounded-2xl border border-outline-variant p-8 flex flex-col items-center gap-5 text-center">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-outline-variant border-t-primary-container animate-spin" />
+                <span className="material-symbols-outlined absolute inset-0 flex items-center justify-center text-primary-container text-2xl" data-weight="fill">
+                  receipt_long
+                </span>
+              </div>
+              <div>
+                <p className="font-bold text-on-surface text-lg">Verificando Factura…</p>
+                <p className="text-sm text-on-surface-variant mt-1.5">
+                  Estamos consultando tu factura en la DGI.<br />Por favor espera, puede tardar hasta 45 segundos.
+                </p>
+              </div>
+              <div className="flex gap-1.5 mt-1">
+                <span className="w-2 h-2 rounded-full bg-primary-container animate-bounce [animation-delay:0ms]" />
+                <span className="w-2 h-2 rounded-full bg-primary-container animate-bounce [animation-delay:150ms]" />
+                <span className="w-2 h-2 rounded-full bg-primary-container animate-bounce [animation-delay:300ms]" />
+              </div>
+            </div>
+          )}
+
           {/* Datos resueltos + botón de registro */}
-          {hasResolved && !invoiceResolving && (
+          {hasResolved && !invoiceResolving && !invoiceSubmitting && (
             <form onSubmit={onSubmit} className="flex flex-col gap-4">
               <div className="bg-surface-container-low rounded-2xl border border-outline-variant overflow-hidden">
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-outline-variant">
@@ -362,20 +385,10 @@ export function InvoiceRegistrationView({
 
               <button
                 type="submit"
-                disabled={invoiceSubmitting}
-                className="w-full py-4 bg-primary-container text-white font-bold text-base rounded-2xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 bg-primary-container text-white font-bold text-base rounded-2xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
               >
-                {invoiceSubmitting ? (
-                  <>
-                    <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
-                    Registrando…
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-lg">sports_soccer</span>
-                    Registrar factura
-                  </>
-                )}
+                <span className="material-symbols-outlined text-lg">sports_soccer</span>
+                Registrar factura
               </button>
             </form>
           )}

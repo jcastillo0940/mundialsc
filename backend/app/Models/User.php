@@ -22,14 +22,13 @@ class User extends Authenticatable
         'name',
         'branch_id',
         'role',
-        'full_name',
         'cedula',
         'document_type',
         'email',
         'google_id',
         'phone',
         'avatar_path',
-        'password_hash',
+        'password',
         'is_active',
         'birthdate',
         'resides_in_panama',
@@ -45,7 +44,7 @@ class User extends Authenticatable
     ];
 
     protected $hidden = [
-        'password_hash',
+        'password',
         'remember_token',
     ];
 
@@ -68,7 +67,7 @@ class User extends Authenticatable
 
     public function getAuthPassword(): string
     {
-        return $this->password_hash;
+        return $this->password;
     }
 
     public function branch(): BelongsTo

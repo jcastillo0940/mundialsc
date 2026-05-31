@@ -63,8 +63,64 @@ class BackofficeController extends Controller
     public function teams(): View
     {
         return view('admin.teams', [
-            'teams' => Team::query()->where('is_active', true)->orderBy('group_label')->orderBy('name')->get(),
+            'teams' => Team::query()
+                ->where('is_active', true)
+                ->whereNotNull('group_label')
+                ->orderBy('group_label')
+                ->orderBy('name')
+                ->get(),
         ]);
+    }
+
+    public function importTeamRankings(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:512'],
+        ]);
+
+        $path = $request->file('csv_file')->getRealPath();
+        $handle = fopen($path, 'r');
+        $header = fgetcsv($handle);
+
+        $header = array_map(fn($h) => strtolower(trim($h)), $header);
+        $codeIndex = array_search('code', $header);
+        $rankingIndex = array_search('ranking_fifa', $header);
+
+        if ($codeIndex === false || $rankingIndex === false) {
+            fclose($handle);
+            return back()->withErrors(['csv_file' => 'El CSV debe tener columnas: code, ranking_fifa']);
+        }
+
+        $teams = Team::query()->whereNotNull('group_label')->get()->keyBy(fn($t) => strtoupper(trim($t->code)));
+        $updated = 0;
+        $skipped = [];
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $code = strtoupper(trim($row[$codeIndex] ?? ''));
+            $ranking = isset($row[$rankingIndex]) ? (int) $row[$rankingIndex] : null;
+
+            if (! $code || ! $ranking || $ranking < 1 || $ranking > 999) {
+                continue;
+            }
+
+            if ($teams->has($code)) {
+                $teams[$code]->update(['ranking_fifa' => $ranking]);
+                $updated++;
+            } else {
+                $skipped[] = $code;
+            }
+        }
+
+        fclose($handle);
+
+        $this->liveScoreSync->refreshFavoriteSidesFromRankings();
+
+        $msg = "Ranking FIFA actualizado: {$updated} equipos.";
+        if ($skipped) {
+            $msg .= ' No encontrados: '.implode(', ', $skipped).'.';
+        }
+
+        return back()->with('status', $msg);
     }
 
     public function storeMatch(Request $request): RedirectResponse
@@ -102,6 +158,42 @@ class BackofficeController extends Controller
         }
 
         return back()->with('status', 'Partido actualizado.');
+    }
+
+    public function finalizeMatch(Request $request, TournamentMatch $match): RedirectResponse
+    {
+        $data = $request->validate([
+            'home_score' => ['required', 'integer', 'min:0', 'max:20'],
+            'away_score' => ['required', 'integer', 'min:0', 'max:20'],
+        ]);
+
+        $match->update([
+            'home_score' => $data['home_score'],
+            'away_score' => $data['away_score'],
+            'status' => 'final',
+        ]);
+
+        $this->scoring->recalculateForMatch($match->fresh('phase', 'predictions'));
+
+        $affected = $match->predictions()->count();
+
+        return back()->with('status', "Partido finalizado con {$data['home_score']}-{$data['away_score']}. Puntos recalculados para {$affected} predicción(es).");
+    }
+
+    public function recalculateAllScores(): RedirectResponse
+    {
+        $matches = TournamentMatch::query()
+            ->with('phase', 'predictions')
+            ->where('status', 'final')
+            ->whereNotNull('home_score')
+            ->whereNotNull('away_score')
+            ->get();
+
+        foreach ($matches as $match) {
+            $this->scoring->recalculateForMatch($match);
+        }
+
+        return back()->with('status', "Puntos recalculados para {$matches->count()} partido(s) final(es).");
     }
 
     public function updateTeamRanking(Request $request, Team $team): RedirectResponse

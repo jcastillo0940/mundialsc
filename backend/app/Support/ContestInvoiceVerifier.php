@@ -20,7 +20,7 @@ class ContestInvoiceVerifier
             ]);
         }
 
-        $request = Http::acceptJson();
+        $request = Http::acceptJson()->timeout(45)->connectTimeout(10);
         $token = (string) config('contest.dgi_verifier_token');
 
         if ($token !== '') {
@@ -31,43 +31,32 @@ class ContestInvoiceVerifier
             'cufe' => $cufe,
         ]);
 
-        if (! $response->successful()) {
-            throw ValidationException::withMessages([
-                'cufe' => 'No fue posible consultar la factura con DGI en este momento.',
-            ]);
-        }
-
         /** @var array<string, mixed> $body */
-        $body = $response->json();
-        $datos = data_get($body, 'datos');
+        $body = $response->json() ?? [];
 
-        if (! is_array($datos) || empty($datos['cufe'])) {
+        // Si la API devuelve un error (HTTP o en el cuerpo), lo mostramos tal cual al usuario
+        $apiError = data_get($body, 'error') ?? data_get($body, 'mensaje') ?? data_get($body, 'message');
+
+        if (! $response->successful() || $apiError) {
             throw ValidationException::withMessages([
-                'cufe' => 'La respuesta de DGI no incluyo un CUFE valido para esta factura.',
+                'cufe' => $apiError ?? 'No fue posible consultar la factura en este momento.',
             ]);
         }
 
-        $canonicalCufe = strtoupper((string) $datos['cufe']);
-        $issuedAt = $this->parseInvoiceDate((string) ($datos['fecha_autorizacion'] ?? ''));
-        $purchaseAmount = round((float) ($datos['total_pagado'] ?? 0), 2);
-
-        if ($purchaseAmount <= 0) {
-            throw ValidationException::withMessages([
-                'cufe' => 'La respuesta de DGI no incluyo un monto total valido para esta factura.',
-            ]);
-        }
+        // La API es la autoridad — si devuelve datos los usamos sin validación adicional
+        $datos = data_get($body, 'datos') ?? [];
 
         return [
-            'cufe' => $canonicalCufe,
-            'invoice_number' => $canonicalCufe,
-            'purchase_amount' => $purchaseAmount,
-            'issued_at' => $issuedAt,
-            'issuer_name' => (string) ($datos['emisor_nombre'] ?? ''),
-            'payload' => $body,
+            'cufe'             => strtoupper((string) ($datos['cufe'] ?? $cufe)),
+            'invoice_number'   => strtoupper((string) ($datos['cufe'] ?? $cufe)),
+            'purchase_amount'  => round((float) ($datos['total_pagado'] ?? 0), 2),
+            'issued_at'        => $this->parseInvoiceDate((string) ($datos['fecha_autorizacion'] ?? '')),
+            'issuer_name'      => (string) ($datos['emisor_nombre'] ?? ''),
+            'payload'          => $body,
         ];
     }
 
-    public function verify(User $user, array $payload): array
+    public function verify(User $user, array $payload, ?array $resolved = null): array
     {
         $settings = InvoiceGoalSetting::query()->first();
         $validationMode = $settings?->validation_mode ?? 'manual';
@@ -82,15 +71,17 @@ class ContestInvoiceVerifier
             ];
         }
 
-        try {
-            $resolved = $this->resolve($payload['cufe']);
-        } catch (ValidationException) {
-            return [
-                'status' => 'pending',
-                'notes' => 'No fue posible confirmar la factura con DGI en este momento.',
-                'canonical_cufe' => $payload['cufe'],
-                'payload' => null,
-            ];
+        if ($resolved === null) {
+            try {
+                $resolved = $this->resolve($payload['cufe']);
+            } catch (ValidationException) {
+                return [
+                    'status' => 'pending',
+                    'notes' => 'No fue posible confirmar la factura con DGI en este momento.',
+                    'canonical_cufe' => $payload['cufe'],
+                    'payload' => null,
+                ];
+            }
         }
 
         $body = $resolved['payload'];

@@ -51,7 +51,7 @@ class PromotionRankingService
             ->whereNull('users.disqualified_at')
             ->selectRaw("
                 users.id,
-                users.full_name,
+                users.name,
                 users.email,
                 users.phone,
                 users.group_stage_goal_prediction,
@@ -73,7 +73,7 @@ class PromotionRankingService
 
                 return [
                     'user_id' => (int) $row->id,
-                    'full_name' => $row->full_name,
+                    'full_name' => $row->name,
                     'email' => $row->email,
                     'phone' => $row->phone,
                     'goals' => (float) $row->total_points,
@@ -94,7 +94,7 @@ class PromotionRankingService
                     $right['invoice_total_amount'] <=> $left['invoice_total_amount'],
                     $left['goal_prediction_delta'] <=> $right['goal_prediction_delta'],
                     strcmp((string) $left['ranking_timestamp'], (string) $right['ranking_timestamp']),
-                    strcmp((string) $left['full_name'], (string) $right['full_name']),
+                    strcmp((string) $left['full_name'], (string) $right['full_name']), // full_name proviene de users.name
                 ] as $comparison) {
                     if ($comparison !== 0) {
                         return $comparison;
