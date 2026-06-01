@@ -44,7 +44,7 @@ interface ParticipantBrand {
 const CLIENT_VIEW_PATHS: Record<MainView, string> = {
   cancha: '/cancha',
   facturas: '/entrenamiento',
-  perfil: '/vestuario',
+  perfil: '/ranking',
   reglas: '/vitrina',
   cuenta: '/cuenta',
 }

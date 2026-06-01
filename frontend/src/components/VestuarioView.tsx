@@ -148,8 +148,7 @@ export function VestuarioView({
                   </span>
                   <h3>{entry.full_name}</h3>
                   <p>{roleLabel(entry.football_role)}</p>
-                  <strong>{formatCompactNumber(entry.goals)}</strong>
-                  <small>{formatCompactNumber(entry.total_points)} pts acumulados</small>
+                  <strong>{formatCompactNumber(entry.goals)} goles</strong>
                 </article>
               )
             })}
@@ -232,7 +231,6 @@ export function VestuarioView({
                             <div className="vestuario-row-player-badge">{userInitials(entry.full_name)}</div>
                             <div>
                               <strong>{entry.full_name}</strong>
-                              <span>{formatCompactNumber(entry.invoice_count)} facturas validadas</span>
                             </div>
                           </div>
                         </td>

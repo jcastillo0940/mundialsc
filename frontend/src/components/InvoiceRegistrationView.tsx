@@ -1,6 +1,8 @@
 import type { ChangeEvent, FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { RegisteredInvoice, ResolvedInvoiceData } from '../types'
+
+const CUFE_PREFIX = 'FE01200000032812-2-249262-'
 
 type InvoiceEntryMode = 'scan' | 'manual'
 
@@ -93,6 +95,25 @@ export function InvoiceRegistrationView({
 }: InvoiceRegistrationViewProps) {
   const hasResolved = Boolean(resolvedInvoiceData)
   const [debugOpen, setDebugOpen] = useState(false)
+
+  const deriveShortCode = (raw: string) => {
+    if (!raw) return ''
+    if (raw.startsWith(CUFE_PREFIX)) return raw.slice(CUFE_PREFIX.length)
+    const idx = raw.lastIndexOf('-')
+    return idx >= 0 ? raw.slice(idx + 1) : raw
+  }
+
+  const [shortCode, setShortCode] = useState(() => deriveShortCode(invoiceForm.rawInput))
+
+  useEffect(() => {
+    setShortCode(deriveShortCode(invoiceForm.rawInput))
+  }, [invoiceForm.rawInput])
+
+  function handleShortCodeChange(value: string) {
+    const trimmed = value.replace(/\s/g, '')
+    setShortCode(trimmed)
+    onFieldChange('rawInput', trimmed ? CUFE_PREFIX + trimmed : '')
+  }
 
   const totalPoints = useMemo(
     () =>
@@ -278,20 +299,48 @@ export function InvoiceRegistrationView({
           {/* Panel Manual */}
           {invoiceEntryMode === 'manual' && (
             <div className="bg-surface-container-low rounded-2xl border border-outline-variant p-5 flex flex-col gap-4">
+
+              {/* Explicativo */}
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex flex-col gap-2.5">
+                <p className="text-sm font-semibold text-blue-300 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base">info</span>
+                  ¿Qué número debo escribir?
+                </p>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  El CUFE de tu factura Super Carnes tiene varias partes separadas por guiones.
+                  Solo necesitas escribir el bloque final, los números después del último guion:
+                </p>
+                <div className="font-mono text-[11px] bg-surface-container rounded-lg p-3 break-all leading-relaxed">
+                  <span className="text-on-surface-variant/40">FE01200000032812-2-249262-</span><span className="text-emerald-400 font-bold">6300032026051830904933463090311813389704</span>
+                </div>
+                <p className="text-xs text-on-surface-variant/70">
+                  Escribe solo la parte en <span className="text-emerald-400 font-semibold">verde</span>. Lo encontrarás al final de la factura, debajo del código QR, etiquetado como CUFE.
+                </p>
+              </div>
+
+              {/* Input del código corto */}
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">
-                  CUFE de la factura
+                  Código final del CUFE
                 </label>
-                <textarea
-                  className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-on-surface text-sm resize-none focus:outline-none focus:border-primary-container transition-colors"
-                  placeholder="Pega o escribe el CUFE completo aquí…"
-                  rows={4}
-                  value={invoiceForm.rawInput}
-                  onChange={(e) => onFieldChange('rawInput', e.target.value)}
-                />
-                <p className="text-xs text-on-surface-variant mt-1.5">
-                  El CUFE está en la parte inferior de tu factura electrónica DGI.
-                </p>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center rounded-xl border border-outline-variant overflow-hidden bg-surface-container-lowest focus-within:border-primary-container transition-colors">
+                    <span className="px-3 py-3 text-xs text-on-surface-variant/40 font-mono bg-surface-container border-r border-outline-variant select-none whitespace-nowrap shrink-0">
+                      FE…-249262-
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="flex-1 min-w-0 bg-transparent px-3 py-3 text-on-surface text-sm font-mono focus:outline-none"
+                      placeholder="6300032026051830…"
+                      value={shortCode}
+                      onChange={(e) => handleShortCodeChange(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-on-surface-variant">
+                    Solo los números finales, sin espacios ni guiones.
+                  </p>
+                </div>
               </div>
 
               {/* Subir foto como alternativa */}
