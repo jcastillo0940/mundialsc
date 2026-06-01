@@ -23,6 +23,7 @@ Route::prefix('auth')->group(function (): void {
     Route::post('google', [AuthController::class, 'google'])->middleware('throttle:auth-google');
 
     Route::middleware('auth:sanctum')->group(function (): void {
+        Route::post('google/complete', [AuthController::class, 'completeGoogleRegistration'])->middleware('throttle:auth-register');
         Route::get('me', [AuthController::class, 'me']);
         Route::post('profile', [AuthController::class, 'updateProfile']);
         Route::post('logout', [AuthController::class, 'logout']);
@@ -31,7 +32,7 @@ Route::prefix('auth')->group(function (): void {
 
 Route::get('client/teams/{team}/flag', [TeamFlagController::class, 'show'])->name('api.client.teams.flag');
 
-Route::middleware('auth:sanctum')->group(function (): void {
+Route::middleware(['auth:sanctum', 'registration.complete'])->group(function (): void {
     Route::get('client/bootstrap', [ClientTournamentController::class, 'bootstrap']);
     Route::get('client/phases', [ClientTournamentController::class, 'phases']);
     Route::get('client/matches', [ClientTournamentController::class, 'matches']);

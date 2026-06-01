@@ -26,11 +26,7 @@ class AuthController extends Controller
 
     public function register(Request $request): JsonResponse
     {
-        if (now('America/Panama')->greaterThan($this->contestRules->registrationDeadline())) {
-            throw ValidationException::withMessages([
-                'registration' => 'El registro para la promocion cerro el 10 de junio de 2026.',
-            ]);
-        }
+        $this->ensureRegistrationWindowIsOpen();
 
         $data = $request->validate([
             'full_name' => ['required', 'string', 'max:150'],
@@ -54,22 +50,7 @@ class AuthController extends Controller
         $data['cedula'] = $this->normalizeIdentityNumber($data['document_type'], $data['cedula']);
         $this->validateIdentityNumber($data['document_type'], $data['cedula']);
 
-        if ((bool) $data['is_employee']) {
-            throw ValidationException::withMessages([
-                'is_employee' => 'Los empleados directos de Super Carnes no pueden participar en esta promocion.',
-            ]);
-        }
-
-        $employeeDenylist = array_filter(array_map(
-            fn (string $value) => Str::upper(trim($value)),
-            explode(',', (string) config('contest.employee_identity_denylist', '')),
-        ));
-
-        if (in_array($data['cedula'], $employeeDenylist, true)) {
-            throw ValidationException::withMessages([
-                'cedula' => 'Este documento no es elegible para participar en la promocion.',
-            ]);
-        }
+        $this->ensureEligibleIdentity($data['cedula'], (bool) $data['is_employee']);
 
         $avatarPath = $request->file('avatar')?->store('avatars', 'public');
 
@@ -94,13 +75,7 @@ class AuthController extends Controller
             'group_stage_goal_prediction' => $data['group_stage_goal_prediction'],
         ]);
 
-        Wallet::query()->create([
-            'user_id'               => $user->id,
-            'goals_balance'         => 0,
-            'shots_balance'         => 0,
-            'lifetime_goals_earned' => 0,
-            'lifetime_shots_earned' => 0,
-        ]);
+        $this->createWalletIfMissing($user);
 
         $token = $user->createToken('client-app')->plainTextToken;
 
@@ -179,7 +154,10 @@ class AuthController extends Controller
 
         $data = $request->validate([
             'credential' => ['required', 'string'],
+            'recaptcha_token' => ['nullable', 'string'],
         ]);
+
+        $this->verifyCaptcha($request);
 
         $payload = $this->verifyGoogleCredential($data['credential']);
 
@@ -207,6 +185,10 @@ class AuthController extends Controller
             ]);
         }
 
+        if (! $user || ! $this->isRegistrationComplete($user)) {
+            $this->ensureRegistrationWindowIsOpen();
+        }
+
         if (! $user) {
             $user = User::query()->create([
                 'name' => Str::limit($payload['name'] ?? Str::before($payload['email'], '@'), 150, ''),
@@ -225,6 +207,7 @@ class AuthController extends Controller
                 'last_login_at' => now(),
             ]);
 
+            $this->createWalletIfMissing($user);
             Audit::log('user.google_registered', 'user', $user->id, $user, $request);
         } else {
             $updates = [
@@ -252,9 +235,80 @@ class AuthController extends Controller
         Audit::log('user.google_logged_in', 'user', $user->id, $user, $request);
 
         return response()->json([
-            'message' => 'Bienvenido.',
+            'message' => $this->isRegistrationComplete($user)
+                ? 'Bienvenido.'
+                : 'Completa tu registro para participar en la promocion.',
             'token' => $token,
             'user' => $this->serializeUser($user->fresh('wallet')),
+            'requires_registration_completion' => ! $this->isRegistrationComplete($user),
+        ]);
+    }
+
+    public function completeGoogleRegistration(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if (! $user->google_id) {
+            throw ValidationException::withMessages([
+                'account' => 'Esta cuenta no fue creada con Google.',
+            ]);
+        }
+
+        $this->ensureRegistrationWindowIsOpen();
+
+        $data = $request->validate([
+            'full_name' => ['required', 'string', 'max:150'],
+            'document_type' => ['required', 'in:cedula,passport,residente'],
+            'cedula' => ['required', 'string', 'max:40', Rule::unique('users', 'cedula')->ignore($user->id)],
+            'phone' => ['required', 'string', 'max:12', 'regex:/^\+507[0-9]{8}$/', Rule::unique('users', 'phone')->ignore($user->id)],
+            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'birthdate' => ['required', 'date', 'before_or_equal:'.now('America/Panama')->subYears(18)->toDateString()],
+            'resides_in_panama' => ['required', 'accepted'],
+            'is_employee' => ['required', 'boolean'],
+            'accepted_terms' => ['required', 'accepted'],
+            'group_stage_goal_prediction' => ['required', 'integer', 'min:0', 'max:300'],
+            'recaptcha_token' => ['nullable', 'string'],
+        ]);
+
+        $this->verifyCaptcha($request);
+        $this->verifyPanamaIp($request);
+
+        $data['cedula'] = $this->normalizeIdentityNumber($data['document_type'], $data['cedula']);
+        $this->validateIdentityNumber($data['document_type'], $data['cedula']);
+        $this->ensureEligibleIdentity($data['cedula'], (bool) $data['is_employee']);
+
+        $previousAvatarPath = $user->avatar_path;
+        $avatarPath = $request->file('avatar')?->store('avatars', 'public');
+        $registrationNow = now();
+
+        $user->forceFill([
+            'name' => $data['full_name'],
+            'cedula' => $data['cedula'],
+            'document_type' => $data['document_type'],
+            'phone' => $data['phone'],
+            'avatar_path' => $avatarPath,
+            'birthdate' => $data['birthdate'],
+            'resides_in_panama' => true,
+            'is_employee' => false,
+            'accepted_terms_at' => $registrationNow,
+            'registration_completed_at' => $registrationNow,
+            'registration_order_key' => $registrationNow->format('Uu').'-'.Str::random(8),
+            'group_stage_goal_prediction' => (int) $data['group_stage_goal_prediction'],
+        ])->save();
+
+        $this->createWalletIfMissing($user);
+
+        if ($previousAvatarPath && $previousAvatarPath !== $avatarPath) {
+            Storage::disk('public')->delete($previousAvatarPath);
+        }
+
+        Audit::log('user.google_registration_completed', 'user', $user->id, $user, $request);
+
+        return response()->json([
+            'message' => 'Registro completado.',
+            'user' => $this->serializeUser($user->fresh(['wallet', 'branch'])),
+            'requires_registration_completion' => false,
         ]);
     }
 
@@ -406,6 +460,62 @@ class AuthController extends Controller
                 'country' => 'El registro esta habilitado solo para conexiones desde Panama.',
             ]);
         }
+    }
+
+    private function ensureRegistrationWindowIsOpen(): void
+    {
+        if (now('America/Panama')->greaterThan($this->contestRules->registrationDeadline())) {
+            throw ValidationException::withMessages([
+                'registration' => 'El registro para la promocion cerro el 10 de junio de 2026.',
+            ]);
+        }
+    }
+
+    private function ensureEligibleIdentity(string $identityNumber, bool $isEmployee): void
+    {
+        if ($isEmployee) {
+            throw ValidationException::withMessages([
+                'is_employee' => 'Los empleados directos de Super Carnes no pueden participar en esta promocion.',
+            ]);
+        }
+
+        $employeeDenylist = array_filter(array_map(
+            fn (string $value) => Str::upper(trim($value)),
+            explode(',', (string) config('contest.employee_identity_denylist', '')),
+        ));
+
+        if (in_array($identityNumber, $employeeDenylist, true)) {
+            throw ValidationException::withMessages([
+                'cedula' => 'Este documento no es elegible para participar en la promocion.',
+            ]);
+        }
+    }
+
+    private function createWalletIfMissing(User $user): void
+    {
+        if ($user->wallet()->exists()) {
+            return;
+        }
+
+        Wallet::query()->create([
+            'user_id' => $user->id,
+            'goals_balance' => 0,
+            'shots_balance' => 0,
+            'lifetime_goals_earned' => 0,
+            'lifetime_shots_earned' => 0,
+        ]);
+    }
+
+    private function isRegistrationComplete(User $user): bool
+    {
+        return $user->registration_completed_at !== null
+            && $user->accepted_terms_at !== null
+            && $user->birthdate !== null
+            && (bool) $user->resides_in_panama
+            && ! empty($user->phone)
+            && ! empty($user->avatar_path)
+            && $user->group_stage_goal_prediction !== null
+            && ! empty($user->cedula);
     }
 
     private function buildGoogleCedula(string $googleId): string

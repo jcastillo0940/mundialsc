@@ -25,6 +25,8 @@ class PublicSettingsController extends Controller
                 'seo_og_image' => SiteSetting::get('seo_og_image', ''),
                 'terms_and_conditions' => SiteSetting::get('terms_and_conditions', $this->officialTerms()),
                 'recaptcha_site_key' => config('contest.recaptcha_site_key', ''),
+                'allow_google_auth' => (bool) config('contest.allow_google_auth', false),
+                'google_client_id' => config('services.google.client_id', ''),
             ]);
         } catch (Throwable) {
             return response()->json([
@@ -40,6 +42,8 @@ class PublicSettingsController extends Controller
                 'seo_og_image' => '',
                 'terms_and_conditions' => $this->officialTerms(),
                 'recaptcha_site_key' => '',
+                'allow_google_auth' => false,
+                'google_client_id' => '',
             ]);
         }
     }

@@ -36,9 +36,60 @@ type MainView = 'cancha' | 'reglas' | 'facturas' | 'perfil' | 'cuenta'
 type PredictionMode = 'pending' | 'mine'
 type InvoiceEntryMode = 'scan' | 'manual'
 
+interface PublicSettingsResponse {
+  auth_bg_youtube_id: string
+  auth_logo_url?: string
+  hero_video_url?: string
+  participant_brands?: string
+  terms_and_conditions?: string
+  recaptcha_site_key?: string
+  allow_google_auth?: boolean
+  google_client_id?: string
+}
+
+interface AuthResponse {
+  token?: string
+  user: User
+  message?: string
+  requires_registration_completion?: boolean
+}
+
 interface ParticipantBrand {
   name: string
   logo_url?: string
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (options: {
+            client_id: string
+            callback: (response: { credential: string }) => void
+            auto_select?: boolean
+            cancel_on_tap_outside?: boolean
+          }) => void
+          renderButton: (
+            element: HTMLElement,
+            options: {
+              theme?: 'outline' | 'filled_blue' | 'filled_black'
+              size?: 'large' | 'medium' | 'small'
+              type?: 'standard' | 'icon'
+              text?: 'signin_with' | 'signup_with' | 'continue_with'
+              shape?: 'rectangular' | 'pill' | 'circle' | 'square'
+              logo_alignment?: 'left' | 'center'
+              width?: number
+            },
+          ) => void
+        }
+      }
+    }
+    grecaptcha?: {
+      ready: (cb: () => void) => void
+      execute: (key: string, opts: { action: string }) => Promise<string>
+    }
+  }
 }
 
 const CLIENT_VIEW_PATHS: Record<MainView, string> = {
@@ -435,6 +486,10 @@ function normalizePanamaPhone(value: string) {
   return localDigits ? `+507${localDigits}` : ''
 }
 
+function getPanamaLocalPhone(value: string) {
+  return value.startsWith('+507') ? value.slice(4, 12) : value.replace(/\D/g, '').slice(0, 8)
+}
+
 function validatePanamaPhone(value: string) {
   return /^\+507\d{8}$/.test(value)
 }
@@ -449,6 +504,32 @@ function validatePassword(value: string) {
   if (!value) return 'Debes ingresar una contrasena.'
   if (value.length < 8) return 'La contrasena debe tener al menos 8 caracteres.'
   return null
+}
+
+function isRegistrationComplete(user: User | null) {
+  if (!user) return false
+
+  return Boolean(
+    user.registration_completed_at &&
+    user.accepted_terms_at &&
+    user.birthdate &&
+    user.resides_in_panama &&
+    user.phone &&
+    user.avatar_url &&
+    user.group_stage_goal_prediction !== null &&
+    user.group_stage_goal_prediction !== undefined &&
+    user.cedula,
+  )
+}
+
+async function getRecaptchaToken(recaptchaSiteKey: string, action: string) {
+  if (!recaptchaSiteKey || !window.grecaptcha) return null
+
+  return new Promise<string>((resolve) => {
+    window.grecaptcha?.ready(() => {
+      window.grecaptcha?.execute(recaptchaSiteKey, { action }).then(resolve).catch(() => resolve(''))
+    })
+  })
 }
 
 function parseParticipantBrands(value?: string | null): ParticipantBrand[] {
@@ -947,6 +1028,8 @@ export function App() {
   const [participantBrands, setParticipantBrands] = useState<ParticipantBrand[]>([])
   const [termsText, setTermsText] = useState(OFFICIAL_TERMS_TEXT)
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('')
+  const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false)
+  const [googleClientId, setGoogleClientId] = useState(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '')
   const [predictionCelebration, setPredictionCelebration] = useState<string | null>(null)
   const [termsModalOpen, setTermsModalOpen] = useState(false)
   const [termsScrolledEnd, setTermsScrolledEnd] = useState(false)
@@ -954,6 +1037,7 @@ export function App() {
   const [now, setNow] = useState(() => Date.now())
   const invoiceScannerRef = useRef<InvoiceScannerRef | null>(null)
   const lastResolvedInvoiceCufeRef = useRef<string | null>(null)
+  const googleButtonRef = useRef<HTMLDivElement | null>(null)
   const [authForm, setAuthForm] = useState<AuthFormState>({
     full_name: '',
     document_type: 'cedula',
@@ -972,6 +1056,8 @@ export function App() {
   const [registrationAvatarPreview, setRegistrationAvatarPreview] = useState<string | null>(null)
   const currentView = currentViewFromPath(location.pathname)
   const isAuthRoute = location.pathname === '/login'
+  const isCompletingGoogleRegistration = Boolean(token && user && !isRegistrationComplete(user))
+  const totalRegisterSteps = isCompletingGoogleRegistration ? 3 : 4
   const currentViewLabel = CLIENT_VIEW_LABELS[currentView]
   const authCarouselBrands = useMemo(() => {
     const baseBrands = participantBrands.length > 0
@@ -993,9 +1079,9 @@ export function App() {
       if (!registrationAvatarFile) errors.avatar = 'Debes subir tu foto de perfil.'
       if (!authForm.full_name.trim()) errors.full_name = 'Debes ingresar tu nombre completo.'
       if (!authForm.phone.trim()) {
-        errors.phone = 'Debes ingresar tu telefono en formato +507 seguido de 8 digitos. Ejemplo: +50761234567.'
+        errors.phone = 'Debes ingresar los 8 digitos de tu telefono.'
       } else if (!validatePanamaPhone(authForm.phone)) {
-        errors.phone = 'Formato esperado: +507 seguido de 8 digitos. Ejemplo: +50761234567.'
+        errors.phone = 'Ingresa 8 digitos validos despues del prefijo +507. Ejemplo: 61234567.'
       }
     }
 
@@ -1014,7 +1100,7 @@ export function App() {
       if (!authForm.accepted_terms) errors.accepted_terms = 'Debes leer y aceptar los terminos y condiciones.'
     }
 
-    if (registerStep === 4) {
+    if (!isCompletingGoogleRegistration && registerStep === 4) {
       const emailError = validateEmail(authForm.email)
       const passwordError = validatePassword(authForm.password)
       if (emailError) errors.email = emailError
@@ -1027,7 +1113,7 @@ export function App() {
     }
 
     return errors
-  }, [authForm, registerStep, registrationAvatarFile])
+  }, [authForm, isCompletingGoogleRegistration, registerStep, registrationAvatarFile])
   const registrationStepValid = Object.keys(registrationStepErrors).length === 0
 
   useEffect(() => {
@@ -1043,13 +1129,15 @@ export function App() {
   }, [registrationAvatarFile])
 
   useEffect(() => {
-    api.get<{ auth_bg_youtube_id: string; auth_logo_url?: string; hero_video_url?: string; participant_brands?: string; terms_and_conditions?: string; recaptcha_site_key?: string }>('/public/settings')
+    api.get<PublicSettingsResponse>('/public/settings')
       .then((res) => {
         if (res.data.auth_bg_youtube_id) setAuthBgVideoId(res.data.auth_bg_youtube_id)
         if (res.data.auth_logo_url) setAuthLogoUrl(res.data.auth_logo_url)
         if (res.data.hero_video_url) setHeroVideoUrl(res.data.hero_video_url)
         if (res.data.terms_and_conditions?.trim()) setTermsText(res.data.terms_and_conditions)
         if (res.data.recaptcha_site_key) setRecaptchaSiteKey(res.data.recaptcha_site_key)
+        setGoogleAuthEnabled(Boolean(res.data.allow_google_auth))
+        if (res.data.google_client_id?.trim()) setGoogleClientId(res.data.google_client_id)
         setParticipantBrands(parseParticipantBrands(res.data.participant_brands))
       })
       .catch(() => null)
@@ -1065,6 +1153,94 @@ export function App() {
     script.dataset.recaptcha = 'v3'
     document.head.appendChild(script)
   }, [recaptchaSiteKey])
+
+  useEffect(() => {
+    if (!googleAuthEnabled || !googleClientId || document.querySelector('script[data-google-identity="gsi"]')) return
+
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.dataset.googleIdentity = 'gsi'
+    document.head.appendChild(script)
+  }, [googleAuthEnabled, googleClientId])
+
+  useEffect(() => {
+    if (!isCompletingGoogleRegistration || !user) return
+
+    setAuthMode('register')
+    setRegisterStep((current) => Math.min(current, 3))
+    setAuthForm((current) => ({
+      ...current,
+      full_name: user.full_name || current.full_name,
+      document_type: user.document_type || current.document_type,
+      cedula: user.cedula.startsWith('google-') ? '' : user.cedula,
+      email: user.email || current.email,
+      phone: user.phone || current.phone,
+      birthdate: user.birthdate || current.birthdate,
+      resides_in_panama: user.resides_in_panama ?? current.resides_in_panama,
+      accepted_terms: Boolean(user.accepted_terms_at),
+      group_stage_goal_prediction: user.group_stage_goal_prediction != null
+        ? String(user.group_stage_goal_prediction)
+        : current.group_stage_goal_prediction,
+    }))
+  }, [isCompletingGoogleRegistration, user])
+
+  useEffect(() => {
+    if (!isAuthRoute || !googleAuthEnabled || !googleClientId || !googleButtonRef.current || isCompletingGoogleRegistration) {
+      return
+    }
+
+    let cancelled = false
+
+    const renderGoogleButton = () => {
+      if (cancelled || !window.google?.accounts.id || !googleButtonRef.current) return
+      const buttonWidth = Math.max(
+        240,
+        Math.min(googleButtonRef.current.parentElement?.clientWidth ?? googleButtonRef.current.clientWidth ?? 360, 360),
+      )
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response) => {
+          if (response.credential) {
+            void handleGoogleCredential(response.credential)
+          }
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      })
+
+      googleButtonRef.current.innerHTML = ''
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        text: authMode === 'login' ? 'signin_with' : 'continue_with',
+        shape: 'pill',
+        logo_alignment: 'left',
+        width: buttonWidth,
+      })
+    }
+
+    if (window.google?.accounts.id) {
+      renderGoogleButton()
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (window.google?.accounts.id) {
+        window.clearInterval(intervalId)
+        renderGoogleButton()
+      }
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [authMode, googleAuthEnabled, googleClientId, isAuthRoute, isCompletingGoogleRegistration])
 
   useEffect(() => {
     const trail = document.querySelector('.cursor-trail')
@@ -1112,8 +1288,16 @@ export function App() {
   useEffect(() => {
     if (authBootstrapping) return
     const isKnownClientRoute = Object.values(CLIENT_VIEW_PATHS).includes(location.pathname)
+    const registrationIsComplete = isRegistrationComplete(user)
 
     if (!token) {
+      if (!isAuthRoute) {
+        navigate('/login', { replace: true })
+      }
+      return
+    }
+
+    if (user && !registrationIsComplete) {
       if (!isAuthRoute) {
         navigate('/login', { replace: true })
       }
@@ -1552,6 +1736,23 @@ export function App() {
     )
   }, [groupStageMatches])
 
+  const groupSummaries = useMemo(() => {
+    return groupLabels.map((groupLabel) => {
+      const matchesForGroup = groupStageMatches.filter((match) => groupLabelValue(match.group_label) === groupLabel)
+      const total = matchesForGroup.length
+      const completed = matchesForGroup.filter((match) => predictionMap.has(match.id)).length
+      const pending = Math.max(total - completed, 0)
+
+      return {
+        groupLabel,
+        total,
+        completed,
+        pending,
+        isComplete: total > 0 && pending === 0,
+      }
+    })
+  }, [groupLabels, groupStageMatches, predictionMap])
+
   useEffect(() => {
     if (!groupLabels.length) {
       setSelectedGroupLabel(null)
@@ -1570,6 +1771,11 @@ export function App() {
 
     return selectedGroupMatches.filter((match) => !predictionMap.has(match.id))
   }, [groupStageMatches, predictionMap, predictionMode, selectedGroupLabel])
+
+  const selectedGroupSummary = useMemo(
+    () => groupSummaries.find((summary) => summary.groupLabel === selectedGroupLabel) ?? null,
+    [groupSummaries, selectedGroupLabel],
+  )
 
   const progress = useMemo(() => {
     const total = groupStageMatches.length
@@ -1593,8 +1799,21 @@ export function App() {
   async function bootstrap() {
     try {
       const meResponse = await api.get('/auth/me')
+      const nextUser = meResponse.data.user as User
 
-      setUser(meResponse.data.user)
+      setUser(nextUser)
+
+      if (!isRegistrationComplete(nextUser)) {
+        setPhases([])
+        setMatches([])
+        setPredictionsList([])
+        setInvoices([])
+        setClientOverview(null)
+        setDashboardSnapshot(null)
+        setWalletSnapshot(null)
+        setPrizes([])
+        return
+      }
 
       const [phasesResponse, matchesResponse, predictionsResponse, overviewResponse, dashboardResponse, walletResponse, prizesResponse] = await Promise.all([
         api.get<PhasesResponse>('/client/phases'),
@@ -1676,6 +1895,44 @@ export function App() {
     setMessage(null)
 
     try {
+      if (isCompletingGoogleRegistration) {
+        const documentError = validateDocumentNumber(authForm.document_type, authForm.cedula)
+
+        if (documentError) {
+          throw new Error(documentError)
+        }
+
+        if (!registrationAvatarFile) {
+          throw new Error('Debes subir una foto para completar tu registro.')
+        }
+
+        const payload = new FormData()
+        payload.append('full_name', authForm.full_name)
+        payload.append('document_type', authForm.document_type)
+        payload.append('cedula', normalizeIdentityNumber(authForm.document_type, authForm.cedula))
+        payload.append('phone', authForm.phone)
+        payload.append('birthdate', authForm.birthdate)
+        payload.append('resides_in_panama', authForm.resides_in_panama ? '1' : '0')
+        payload.append('is_employee', authForm.is_employee ? '1' : '0')
+        payload.append('accepted_terms', authForm.accepted_terms ? '1' : '0')
+        payload.append('group_stage_goal_prediction', String(Number(authForm.group_stage_goal_prediction)))
+        payload.append('avatar', registrationAvatarFile)
+        const recaptchaToken = await getRecaptchaToken(recaptchaSiteKey, 'google_complete_registration')
+        if (recaptchaToken) payload.append('recaptcha_token', recaptchaToken)
+
+        const response = await api.post<AuthResponse>('/auth/google/complete', payload, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+
+        setUser(response.data.user)
+        setRegistrationAvatarFile(null)
+        setMessage('Registro completado.')
+        navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
+        return
+      }
+
       if (authMode === 'register') {
         const documentError = validateDocumentNumber(authForm.document_type, authForm.cedula)
 
@@ -1707,15 +1964,8 @@ export function App() {
               payload.append('password', authForm.password)
               payload.append('password_confirmation', authForm.password_confirmation)
               payload.append('avatar', registrationAvatarFile)
-              const recaptcha = (window as unknown as { grecaptcha?: { ready: (cb: () => void) => void; execute: (key: string, opts: { action: string }) => Promise<string> } }).grecaptcha
-              if (recaptchaSiteKey && recaptcha) {
-                const recaptchaToken = await new Promise<string>((resolve) => {
-                  recaptcha.ready(() => {
-                    recaptcha.execute(recaptchaSiteKey, { action: 'register' }).then(resolve)
-                  })
-                })
-                payload.append('recaptcha_token', recaptchaToken)
-              }
+              const recaptchaToken = await getRecaptchaToken(recaptchaSiteKey, 'register')
+              if (recaptchaToken) payload.append('recaptcha_token', recaptchaToken)
 
               return api.post(endpoint, payload, {
                 headers: {
@@ -1726,8 +1976,15 @@ export function App() {
       persistToken(response.data.token)
       setUser(response.data.user)
       setRegistrationAvatarFile(null)
-      setMessage(authMode === 'login' ? 'Sesion iniciada.' : 'Registro completado.')
-      navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
+      if (response.data.requires_registration_completion) {
+        setAuthMode('register')
+        setRegisterStep(1)
+        setMessage(response.data.message ?? 'Completa tu registro para participar en la promocion.')
+        navigate('/login', { replace: true })
+      } else {
+        setMessage(authMode === 'login' ? 'Sesion iniciada.' : 'Registro completado.')
+        navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
+      }
     } catch (authError) {
       if (
         authError instanceof Error &&
@@ -1743,6 +2000,41 @@ export function App() {
       } else {
         setError(normalizeError(authError))
       }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGoogleCredential(credential: string) {
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const recaptchaToken = await getRecaptchaToken(recaptchaSiteKey, 'google_auth')
+      const response = await api.post<AuthResponse>('/auth/google', {
+        credential,
+        recaptcha_token: recaptchaToken || undefined,
+      })
+
+      if (!response.data.token) {
+        throw new Error('No se recibio un token de autenticacion.')
+      }
+
+      persistToken(response.data.token)
+      setUser(response.data.user)
+      setAuthMode('register')
+      setRegisterStep(1)
+
+      if (response.data.requires_registration_completion) {
+        setMessage(response.data.message ?? 'Completa tu registro para participar en la promocion.')
+        navigate('/login', { replace: true })
+      } else {
+        setMessage('Sesion iniciada con Google.')
+        navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
+      }
+    } catch (authError) {
+      setError(normalizeError(authError))
     } finally {
       setLoading(false)
     }
@@ -1878,6 +2170,19 @@ export function App() {
 
   function renderCancha() {
     const activeGroupTitle = fullGroupLabel(selectedGroupLabel)
+    const isSelectedGroupComplete = predictionMode === 'pending' && Boolean(selectedGroupSummary?.isComplete)
+    const emptyTitle =
+      predictionMode === 'mine'
+        ? `Todavia no has enviado pronosticos en ${activeGroupTitle}.`
+        : isSelectedGroupComplete
+          ? `Ya completaste todos tus pronosticos de ${activeGroupTitle}.`
+          : 'No hay partidos pendientes en esta fase.'
+    const emptyDescription =
+      predictionMode === 'mine'
+        ? `Cuando envies tus resultados para ${activeGroupTitle}, los veras aqui.`
+        : isSelectedGroupComplete
+          ? `En este grupo ya no te queda ningun partido por llenar. Puedes revisar otro grupo o entrar en Mis pronosticos para ver lo que ya enviaste.`
+          : `Cuando haya partidos habilitados para ${activeGroupTitle} los veras aqui.`
 
     return (
       <>
@@ -1942,14 +2247,22 @@ export function App() {
           </div>
 
           <div className="marea-round-tabs">
-            {groupLabels.map((groupLabel) => (
+            {groupSummaries.map((summary) => (
               <button
-                key={groupLabel}
-                className={groupLabel === selectedGroupLabel ? 'round-tab active' : 'round-tab'}
+                key={summary.groupLabel}
+                className={[
+                  'round-tab',
+                  summary.groupLabel === selectedGroupLabel ? 'active' : '',
+                  summary.isComplete ? 'is-complete' : '',
+                ].filter(Boolean).join(' ')}
                 type="button"
-                onClick={() => setSelectedGroupLabel(groupLabel)}
+                onClick={() => setSelectedGroupLabel(summary.groupLabel)}
+                aria-label={`${fullGroupLabel(summary.groupLabel)}. ${summary.isComplete ? 'Pronosticos completados' : `${summary.pending} partidos pendientes`}.`}
               >
-                {fullGroupLabel(groupLabel)}
+                <span className="round-tab-label">{fullGroupLabel(summary.groupLabel)}</span>
+                <span className="round-tab-status">
+                  {summary.isComplete ? 'Completado' : `${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}
+                </span>
               </button>
             ))}
           </div>
@@ -1957,9 +2270,9 @@ export function App() {
           <label className="marea-mobile-group-select">
             <span>Grupo</span>
             <select value={selectedGroupLabel ?? ''} onChange={(event) => setSelectedGroupLabel(event.target.value)}>
-              {groupLabels.map((groupLabel) => (
-                <option key={groupLabel} value={groupLabel}>
-                  {fullGroupLabel(groupLabel)}
+              {groupSummaries.map((summary) => (
+                <option key={summary.groupLabel} value={summary.groupLabel}>
+                  {`${fullGroupLabel(summary.groupLabel)}${summary.isComplete ? ' - Completado' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
                 </option>
               ))}
             </select>
@@ -2043,9 +2356,10 @@ export function App() {
           ) : (
             <article className="marea-match-card empty">
               <div className="marea-empty-copy">
-                <span className="material-symbols-outlined">sports_soccer</span>
-                <h3>{predictionMode === 'mine' ? 'Todavia no has enviado pronosticos en esta fase.' : 'No hay partidos pendientes en esta fase.'}</h3>
-                <p>Cuando haya partidos habilitados para {activeGroupTitle} los veras aqui.</p>
+                <span className="material-symbols-outlined">{isSelectedGroupComplete ? 'task_alt' : 'sports_soccer'}</span>
+                {isSelectedGroupComplete ? <span className="marea-empty-badge">Grupo completado</span> : null}
+                <h3>{emptyTitle}</h3>
+                <p>{emptyDescription}</p>
               </div>
             </article>
           )}
@@ -2222,6 +2536,7 @@ export function App() {
     if (currentView === 'reglas') {
       return (
         <VitrinaView
+          invoices={invoices}
           user={user!}
           walletSnapshot={walletSnapshot}
         />
@@ -2361,7 +2676,7 @@ export function App() {
         </div>
       ) : null}
 
-      {!user ? (
+      {!user || isCompletingGoogleRegistration ? (
         <section className="auth-shell">
           <div className="auth-ambient" aria-hidden="true" />
           {authBgVideoId ? (
@@ -2410,30 +2725,41 @@ export function App() {
           </div>
 
           <form className="auth-panel" onSubmit={handleAuthSubmit}>
-            <div className="auth-tabs">
+            {isCompletingGoogleRegistration ? null : <div className="auth-tabs">
               <button className={authMode === 'login' ? 'active' : ''} type="button" onClick={() => { setAuthMode('login'); setRegisterStep(1) }}>
                 Iniciar sesión
               </button>
               <button className={authMode === 'register' ? 'active' : ''} type="button" onClick={() => { setAuthMode('register'); setRegisterStep(1) }}>
                 Registrarse
               </button>
-            </div>
+            </div>}
 
             <div className="auth-panel-header">
-              <p>{authMode === 'login' ? 'Acceso privado' : 'Nuevo participante'}</p>
-              <h2>{authMode === 'login' ? 'Entra a la promo' : 'Unete a la promocion'}</h2>
+              <p>{isCompletingGoogleRegistration ? 'Registro pendiente' : authMode === 'login' ? 'Acceso privado' : 'Nuevo participante'}</p>
+              <h2>{isCompletingGoogleRegistration ? 'Completa tus datos legales' : authMode === 'login' ? 'Entra a la promo' : 'Unete a la promocion'}</h2>
               <span>
-                {authMode === 'login'
-                  ? 'Continua registrando facturas y jugando tus predicciones.'
-                  : 'Completa tus datos para participar por premios de Super Carnes.'}
+                {isCompletingGoogleRegistration
+                  ? `Tu correo de Google ya fue verificado: ${user?.email ?? authForm.email}. Solo falta completar los datos obligatorios para participar.`
+                  : authMode === 'login'
+                    ? 'Continua registrando facturas y jugando tus predicciones.'
+                    : 'Completa tus datos para participar por premios de Super Carnes.'}
               </span>
             </div>
 
-            {authMode === 'register' ? (
+            {!isCompletingGoogleRegistration && googleAuthEnabled && googleClientId ? (
+              <>
+                <div className="auth-divider">o continua con Google</div>
+                <div className={`google-button-slot${loading ? ' is-loading' : ''}`}>
+                  <div ref={googleButtonRef} />
+                </div>
+              </>
+            ) : null}
+
+            {isCompletingGoogleRegistration || authMode === 'register' ? (
               <>
                 {/* Indicador de pasos */}
                 <div className="auth-steps-indicator">
-                  {[1, 2, 3, 4].map((s) => (
+                  {Array.from({ length: totalRegisterSteps }, (_, index) => index + 1).map((s) => (
                     <div key={s} className={`auth-step-dot${registerStep === s ? ' is-active' : ''}${registerStep > s ? ' is-done' : ''}`}>
                       {registerStep > s
                         ? <span className="material-symbols-outlined">check</span>
@@ -2493,12 +2819,21 @@ export function App() {
                       </label>
                       <label className={registrationStepErrors.phone ? 'is-invalid' : ''}>
                         Teléfono *
-                        <input
-                          required
-                          placeholder="+50761234567"
-                          value={authForm.phone}
-                          onChange={(event) => setAuthForm({ ...authForm, phone: normalizePanamaPhone(event.target.value) })}
-                        />
+                        <div className="auth-phone-field">
+                          <button className="auth-phone-prefix" type="button">
+                            <span className="auth-phone-prefix-badge" aria-hidden="true">PA</span>
+                            <span>+507</span>
+                            <span className="material-symbols-outlined" aria-hidden="true">arrow_drop_down</span>
+                          </button>
+                          <input
+                            required
+                            inputMode="numeric"
+                            maxLength={8}
+                            placeholder="61234567"
+                            value={getPanamaLocalPhone(authForm.phone)}
+                            onChange={(event) => setAuthForm({ ...authForm, phone: normalizePanamaPhone(event.target.value) })}
+                          />
+                        </div>
                         {registrationStepErrors.phone ? <span className="auth-field-error">{registrationStepErrors.phone}</span> : null}
                       </label>
                     </div>
@@ -2648,7 +2983,7 @@ export function App() {
                 ) : null}
 
                 {/* ── Paso 4: Cuenta ── */}
-                {registerStep === 4 ? (
+                {!isCompletingGoogleRegistration && registerStep === 4 ? (
                   <div className="auth-section-label">
                     <span className="material-symbols-outlined">lock</span>
                     <span>Correo y contraseña</span>
@@ -2658,7 +2993,7 @@ export function App() {
             ) : null}
 
             {/* Campos de email/contraseña: login siempre, registro solo en paso 4 */}
-            {(authMode === 'login' || registerStep === 4) ? (
+            {!isCompletingGoogleRegistration && (authMode === 'login' || registerStep === 4) ? (
               <>
                 <label className={authMode === 'register' && registrationStepErrors.email ? 'is-invalid' : ''}>
                   Correo *
@@ -2686,7 +3021,7 @@ export function App() {
             ) : null}
 
             {/* Navegación de pasos / submit */}
-            {authMode === 'register' ? (
+            {isCompletingGoogleRegistration || authMode === 'register' ? (
               <div className="auth-step-nav">
                 {registerStep > 1 ? (
                   <button type="button" className="auth-step-back" onClick={() => setRegisterStep((s) => s - 1)}>
@@ -2694,7 +3029,7 @@ export function App() {
                     Anterior
                   </button>
                 ) : <span />}
-                {registerStep < 4 ? (
+                {registerStep < totalRegisterSteps ? (
                   <button
                     type="button"
                     className="auth-step-next"
@@ -2704,8 +3039,8 @@ export function App() {
                       if (registerStep === 1) {
                         if (!registrationAvatarFile) { setError('Debes subir tu foto de perfil.'); return }
                         if (!authForm.full_name.trim()) { setError('Debes ingresar tu nombre completo.'); return }
-                        if (!authForm.phone.trim()) { setError('Debes ingresar tu número de teléfono.'); return }
-                        if (!validatePanamaPhone(authForm.phone)) { setError('El telefono debe usar formato panameno +507 seguido de 8 digitos.'); return }
+                        if (!authForm.phone.trim()) { setError('Debes ingresar los 8 digitos de tu telefono.'); return }
+                        if (!validatePanamaPhone(authForm.phone)) { setError('Ingresa 8 digitos validos despues del prefijo +507.'); return }
                       }
                       if (registerStep === 2) {
                         const docError = validateDocumentNumber(authForm.document_type, authForm.cedula)
@@ -2725,7 +3060,7 @@ export function App() {
                   </button>
                 ) : (
                   <button className="auth-submit auth-submit-step" disabled={loading || !registrationStepValid} type="submit">
-                    {loading ? 'Procesando...' : 'Completar registro'}
+                    {loading ? 'Procesando...' : isCompletingGoogleRegistration ? 'Completar registro con Google' : 'Completar registro'}
                   </button>
                 )}
               </div>

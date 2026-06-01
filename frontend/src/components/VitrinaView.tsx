@@ -1,8 +1,15 @@
-import type { User, WalletMovement, WalletSnapshot } from '../types'
+import type { RegisteredInvoice, User, WalletMovement, WalletSnapshot } from '../types'
 
 function formatCompactNumber(value: number | string | null | undefined) {
   const amount = Number(value ?? 0)
   return new Intl.NumberFormat('es-PA').format(Number.isFinite(amount) ? amount : 0)
+}
+
+function formatCurrency(value: number | string | null | undefined) {
+  const amount = Number(value ?? 0)
+  return new Intl.NumberFormat('es-PA', { style: 'currency', currency: 'USD' }).format(
+    Number.isFinite(amount) ? amount : 0,
+  )
 }
 
 function formatUpperDate(dateValue: string | null | undefined) {
@@ -56,12 +63,16 @@ function movementIcon(movement: WalletMovement) {
 export function VitrinaView({
   user,
   walletSnapshot,
+  invoices,
 }: {
   user: User
   walletSnapshot: WalletSnapshot | null
+  invoices: RegisteredInvoice[]
 }) {
   const wallet = walletSnapshot?.wallet ?? user.wallet ?? null
   const movements = walletSnapshot?.movements ?? []
+  const approvedInvoices = invoices.filter((invoice) => invoice.validation_status === 'approved')
+  const approvedInvoiceTotal = approvedInvoices.reduce((total, invoice) => total + Number(invoice.purchase_amount ?? 0), 0)
   const totalGoalsWon = movements.reduce((total, movement) => total + Math.max(Number(movement.goals_delta ?? 0), 0), 0)
   const totalGoalsSpent = movements.reduce((total, movement) => total + Math.abs(Math.min(Number(movement.goals_delta ?? 0), 0)), 0)
 
@@ -71,21 +82,21 @@ export function VitrinaView({
         <div className="vitrina-hero-copy">
           <span className="vitrina-kicker">SUPER CARNES 2026</span>
           <h1>Vitrina de goles</h1>
-          <p>Consulta tu saldo, tus tiros disponibles y cada movimiento registrado durante la promocion.</p>
+          <p>Consulta tus goles acumulados, el total de tus facturas aprobadas y cada movimiento registrado durante la promocion.</p>
         </div>
 
         <div className="vitrina-scoreboard">
-          <article>
-            <span>Saldo actual</span>
-            <strong>{formatCompactNumber(wallet?.goals_balance ?? 0)} G</strong>
-          </article>
-          <article>
+          <article className="vitrina-scoreboard-primary">
             <span>Goles acumulados</span>
             <strong>{formatCompactNumber(wallet?.lifetime_goals_earned ?? totalGoalsWon)} G</strong>
           </article>
           <article>
-            <span>Tiros activos</span>
-            <strong>{formatCompactNumber(wallet?.shots_balance ?? 0)} T</strong>
+            <span>Total facturas</span>
+            <strong>{formatCurrency(approvedInvoiceTotal)}</strong>
+          </article>
+          <article>
+            <span>Saldo disponible</span>
+            <strong>{formatCompactNumber(wallet?.goals_balance ?? 0)} G</strong>
           </article>
         </div>
       </header>

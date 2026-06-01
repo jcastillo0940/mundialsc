@@ -2226,6 +2226,10 @@ a {
 }
 
 .round-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   min-width: 0;
   width: calc(25% - 9px);
   padding: 16px 20px;
@@ -2236,8 +2240,37 @@ a {
   font: 600 20px/1.4 'Archivo Narrow', sans-serif;
 }
 
+.round-tab-label,
+.round-tab-status {
+  display: block;
+}
+
+.round-tab-label {
+  color: inherit;
+  font: inherit;
+  line-height: 1.1;
+}
+
+.round-tab-status {
+  color: rgba(225, 226, 236, 0.68);
+  font: 700 11px/1 'Hanken Grotesk', sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .round-tab:hover {
   background: var(--surface-highest);
+}
+
+.round-tab.is-complete {
+  border-color: rgba(218, 199, 105, 0.28);
+  background:
+    linear-gradient(180deg, rgba(218, 199, 105, 0.08), rgba(39, 42, 50, 0.96)),
+    var(--surface-high);
+}
+
+.round-tab.is-complete .round-tab-status {
+  color: var(--secondary);
 }
 
 .round-tab.active {
@@ -2245,6 +2278,10 @@ a {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.2);
   box-shadow: 0 0 25px rgba(218, 41, 28, 0.3);
+}
+
+.round-tab.active .round-tab-status {
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .marea-mobile-group-select {
@@ -2998,6 +3035,22 @@ a {
   margin-bottom: 16px;
   color: var(--secondary);
   font-size: 36px;
+}
+
+.marea-empty-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  margin-bottom: 14px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(218, 199, 105, 0.28);
+  background: rgba(218, 199, 105, 0.12);
+  color: var(--secondary);
+  font: 800 11px/1 'Archivo Narrow', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .marea-empty-copy h3 {
@@ -3816,6 +3869,21 @@ a {
   padding: 18px;
   border-radius: 22px;
   background: rgba(11, 14, 21, 0.72);
+}
+
+.vitrina-scoreboard article.vitrina-scoreboard-primary {
+  background: linear-gradient(135deg, rgba(218, 41, 28, 0.28), rgba(124, 17, 12, 0.92));
+  border: 1px solid rgba(255, 214, 165, 0.28);
+  box-shadow: 0 18px 36px rgba(124, 17, 12, 0.26);
+}
+
+.vitrina-scoreboard article.vitrina-scoreboard-primary span {
+  color: rgba(255, 241, 238, 0.84);
+}
+
+.vitrina-scoreboard article.vitrina-scoreboard-primary strong {
+  font-size: clamp(36px, 5vw, 54px);
+  color: #fffaf6;
 }
 
 .vitrina-scoreboard article span,
@@ -4724,7 +4792,17 @@ a {
   }
 
   .round-tab {
+    gap: 5px;
     width: auto;
+  }
+
+  .round-tab-label {
+    font-size: 18px;
+  }
+
+  .round-tab-status {
+    font-size: 10px;
+    letter-spacing: 0.08em;
   }
 
   .marea-round-tabs {
@@ -5537,6 +5615,57 @@ a {
   border-radius: 3px;
   background: rgba(9, 10, 14, 0.78);
   font-size: 14px;
+}
+
+.auth-phone-field {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.auth-phone-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  background: rgba(9, 10, 14, 0.78);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: default;
+}
+
+.auth-phone-prefix .material-symbols-outlined {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.auth-phone-prefix-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(227, 38, 29, 0.18);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.auth-phone-field input {
+  flex: 1;
+}
+
+.auth-panel label.is-invalid .auth-phone-prefix,
+.auth-panel label.is-invalid .auth-phone-field input {
+  border-color: rgba(255, 107, 107, 0.9);
 }
 
 .auth-submit,
