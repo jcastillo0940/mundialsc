@@ -959,16 +959,19 @@ export function App() {
   const currentView = currentViewFromPath(location.pathname)
   const isAuthRoute = location.pathname === '/login'
   const currentViewLabel = CLIENT_VIEW_LABELS[currentView]
-  const authCarouselBrands = participantBrands.length > 0
-    ? [...participantBrands, ...participantBrands]
-    : [
-        { name: 'Super Carnes' },
-        { name: 'Importadora Virzi' },
-        { name: 'Marcas participantes' },
-        { name: 'Super Carnes' },
-        { name: 'Importadora Virzi' },
-        { name: 'Marcas participantes' },
-      ]
+  const authCarouselBrands = useMemo(() => {
+    const baseBrands = participantBrands.length > 0
+      ? participantBrands
+      : [
+          { name: 'Super Carnes' },
+          { name: 'Importadora Virzi' },
+          { name: 'Marcas participantes' },
+        ]
+    const repetitionsPerLoop = Math.max(4, Math.ceil(12 / baseBrands.length))
+    const loopBrands = Array.from({ length: repetitionsPerLoop }, () => baseBrands).flat()
+
+    return [...loopBrands, ...loopBrands]
+  }, [participantBrands])
 
   useEffect(() => {
     if (!registrationAvatarFile) {
