@@ -10,6 +10,7 @@ import { VestuarioView } from './components/VestuarioView'
 import { VitrinaView } from './components/VitrinaView'
 import { cropAvatarToSquare, optimizeAvatarFile } from './utils/avatarUpload'
 import type {
+  Branch,
   ClientBootstrap,
   DashboardSnapshot,
   Prediction,
@@ -157,6 +158,7 @@ interface AuthFormState {
   group_stage_goal_prediction: string
   password: string
   password_confirmation: string
+  branch_id: string
 }
 
 interface InvoiceFormState {
@@ -1130,7 +1132,9 @@ export function App() {
     group_stage_goal_prediction: '',
     password: '',
     password_confirmation: '',
+    branch_id: '',
   })
+  const [branches, setBranches] = useState<Branch[]>([])
   const [registrationAvatarFile, setRegistrationAvatarFile] = useState<File | null>(null)
   const [registrationAvatarPreview, setRegistrationAvatarPreview] = useState<string | null>(null)
   const currentView = currentViewFromPath(location.pathname)
@@ -1175,6 +1179,7 @@ export function App() {
     }
 
     if (registerStep === 3) {
+      if (!authForm.branch_id) errors.branch_id = 'Debes seleccionar tu sucursal de preferencia.'
       if (!authForm.resides_in_panama) errors.resides_in_panama = 'Debes confirmar que resides en Panama.'
       if (!authForm.accepted_terms) errors.accepted_terms = 'Debes leer y aceptar los terminos y condiciones.'
     }
@@ -1258,6 +1263,10 @@ export function App() {
         if (res.data.google_client_id?.trim()) setGoogleClientId(res.data.google_client_id)
         setParticipantBrands(parseParticipantBrands(res.data.participant_brands))
       })
+      .catch(() => null)
+
+    api.get<{ data: Branch[] }>('/public/branches')
+      .then((res) => setBranches(res.data.data ?? []))
       .catch(() => null)
   }, [])
 
@@ -2047,6 +2056,7 @@ export function App() {
         payload.append('is_employee', authForm.is_employee ? '1' : '0')
         payload.append('accepted_terms', authForm.accepted_terms ? '1' : '0')
         payload.append('group_stage_goal_prediction', String(Number(authForm.group_stage_goal_prediction)))
+        payload.append('branch_id', authForm.branch_id)
         payload.append('avatar', registrationAvatarFile)
         const recaptchaToken = await getRecaptchaToken(recaptchaSiteKey, 'google_complete_registration')
         if (recaptchaToken) payload.append('recaptcha_token', recaptchaToken)
@@ -2092,6 +2102,7 @@ export function App() {
               payload.append('is_employee', authForm.is_employee ? '1' : '0')
               payload.append('accepted_terms', authForm.accepted_terms ? '1' : '0')
               payload.append('group_stage_goal_prediction', String(Number(authForm.group_stage_goal_prediction)))
+              payload.append('branch_id', authForm.branch_id)
               payload.append('password', authForm.password)
               payload.append('password_confirmation', authForm.password_confirmation)
               payload.append('avatar', registrationAvatarFile)
@@ -2183,7 +2194,7 @@ export function App() {
     }
   }
 
-  async function handleProfileSave(payload: { email: string; phone: string; avatarFile: File | null }) {
+  async function handleProfileSave(payload: { email: string; phone: string; avatarFile: File | null; branchId: string }) {
     setProfileSaving(true)
     setError(null)
     setMessage(null)
@@ -2192,6 +2203,7 @@ export function App() {
       const formData = new FormData()
       formData.append('email', payload.email)
       formData.append('phone', payload.phone)
+      if (payload.branchId) formData.append('branch_id', payload.branchId)
 
       if (payload.avatarFile) {
         formData.append('avatar', payload.avatarFile)
@@ -2700,7 +2712,7 @@ export function App() {
     }
 
     if (currentView === 'cuenta') {
-      return user ? <CuentaView user={user} saving={profileSaving} onSave={handleProfileSave} /> : null
+      return user ? <CuentaView user={user} saving={profileSaving} branches={branches} onSave={handleProfileSave} /> : null
     }
 
     return renderCancha()
@@ -3088,6 +3100,25 @@ export function App() {
                       </button>
                     </div>
                     <p className="auth-goal-hint">¿Cuántos goles totales habrá en la fase de grupos del Mundial 2026?</p>
+
+                    <div className="auth-section-label">
+                      <span className="material-symbols-outlined">store</span>
+                      <span>Sucursal de preferencia</span>
+                    </div>
+                    <label className="auth-field-label">
+                      <span>¿En qué sucursal de Super Carnes compras habitualmente?</span>
+                      <select
+                        className={`auth-select${registrationStepErrors.branch_id ? ' is-invalid' : ''}`}
+                        value={authForm.branch_id}
+                        onChange={(event) => setAuthForm({ ...authForm, branch_id: event.target.value })}
+                      >
+                        <option value="">— Selecciona una sucursal —</option>
+                        {branches.map((branch) => (
+                          <option key={branch.id} value={String(branch.id)}>{branch.name}</option>
+                        ))}
+                      </select>
+                      {registrationStepErrors.branch_id ? <span className="auth-field-error">{registrationStepErrors.branch_id}</span> : null}
+                    </label>
 
                     <div className="auth-section-label">
                       <span className="material-symbols-outlined">check_circle</span>

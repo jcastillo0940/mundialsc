@@ -82,4 +82,5 @@ Route::middleware(['auth:sanctum', 'registration.complete'])->group(function ():
 
 // Configuración pública (sin autenticación)
 Route::get('public/settings', [PublicSettingsController::class, 'index']);
+Route::get('public/branches', [PublicSettingsController::class, 'branches']);
 Route::middleware(['auth:sanctum', 'role:admin'])->post('admin/settings/youtube', [PublicSettingsController::class, 'updateYoutubeId']);

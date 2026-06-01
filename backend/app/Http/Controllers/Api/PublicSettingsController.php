@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\SiteSetting;
 use Illuminate\Http\JsonResponse;
 use Throwable;
@@ -50,6 +51,16 @@ class PublicSettingsController extends Controller
                 'google_client_id' => '',
             ]);
         }
+    }
+
+    public function branches(): JsonResponse
+    {
+        return response()->json([
+            'data' => Branch::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code']),
+        ]);
     }
 
     public function updateYoutubeId(): JsonResponse

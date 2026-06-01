@@ -947,6 +947,41 @@ class BackofficeController extends Controller
         ]);
     }
 
+    public function branches(): View
+    {
+        return view('admin.branches', [
+            'branches' => \App\Models\Branch::query()->orderBy('name')->get(),
+        ]);
+    }
+
+    public function storeBranch(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'code' => ['required', 'string', 'max:40', 'unique:branches,code', 'regex:/^[A-Z0-9_]+$/'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+        ]);
+
+        \App\Models\Branch::query()->create(array_merge($data, ['is_active' => true]));
+
+        return back()->with('status', 'Sucursal creada.');
+    }
+
+    public function updateBranch(Request $request, \App\Models\Branch $branch): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'      => ['required', 'string', 'max:120'],
+            'address'   => ['nullable', 'string', 'max:255'],
+            'phone'     => ['nullable', 'string', 'max:30'],
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $branch->update($data);
+
+        return back()->with('status', 'Sucursal actualizada.');
+    }
+
     public function updateSiteSettings(Request $request): RedirectResponse
     {
         $data = $request->validate([

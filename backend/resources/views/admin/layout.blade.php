@@ -56,6 +56,7 @@
             <a href="{{ route('admin.users') }}">Usuarios</a>
             <a href="{{ route('admin.fraud') }}">Antifraude</a>
             <a href="{{ route('admin.site') }}">Sitio y SEO</a>
+            <a href="{{ route('admin.branches') }}">Sucursales</a>
         </nav>
         <form method="post" action="{{ route('admin.logout') }}">
             @csrf

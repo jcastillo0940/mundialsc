@@ -119,6 +119,9 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::put('/fraud/{flag}', [BackofficeController::class, 'updateFraudFlag'])->name('admin.fraud.update');
         Route::get('/site', [BackofficeController::class, 'site'])->name('admin.site');
         Route::put('/site', [BackofficeController::class, 'updateSiteSettings'])->name('admin.site.update');
+        Route::get('/branches', [BackofficeController::class, 'branches'])->name('admin.branches');
+        Route::post('/branches', [BackofficeController::class, 'storeBranch'])->name('admin.branches.store');
+        Route::put('/branches/{branch}', [BackofficeController::class, 'updateBranch'])->name('admin.branches.update');
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
     });
 });

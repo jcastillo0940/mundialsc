@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Support\Audit;
@@ -43,6 +44,7 @@ class AuthController extends Controller
             'group_stage_goal_prediction' => ['required', 'integer', 'min:0', 'max:300'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
             'recaptcha_token' => ['nullable', 'string'],
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
         ]);
 
         $this->verifyCaptcha($request);
@@ -64,6 +66,7 @@ class AuthController extends Controller
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'avatar_path' => $avatarPath,
+            'branch_id' => $data['branch_id'],
             'role' => 'client',
             'password' => Hash::make($data['password']),
             'is_active' => true,
@@ -329,6 +332,7 @@ class AuthController extends Controller
             'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:12', 'regex:/^\+507[0-9]{8}$/', Rule::unique('users', 'phone')->ignore($user->id)],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
         ]);
 
         $previousAvatarPath = $user->avatar_path;
@@ -343,6 +347,7 @@ class AuthController extends Controller
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'avatar_path' => $data['avatar_path'] ?? $user->avatar_path,
+            'branch_id' => $data['branch_id'] ?? $user->branch_id,
         ])->save();
 
         if (! empty($data['avatar_path']) && $previousAvatarPath && $previousAvatarPath !== $data['avatar_path']) {

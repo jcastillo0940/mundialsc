@@ -343,6 +343,48 @@ a {
   font-size: 34px;
 }
 
+.auth-field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-field-label > span {
+  color: rgba(225, 226, 236, 0.6);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-select {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(11, 14, 21, 0.82);
+  color: #fff;
+  font-size: 15px;
+  appearance: none;
+  color-scheme: dark;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.auth-select:focus {
+  border-color: rgba(218, 199, 105, 0.6);
+  box-shadow: 0 0 0 3px rgba(218, 199, 105, 0.12);
+}
+
+.auth-select.is-invalid {
+  border-color: rgba(255, 100, 80, 0.6);
+}
+
+.auth-select option {
+  background-color: #1a1d26;
+  color: #fff;
+}
+
 /* ── 2-column field grid ── */
 .auth-field-grid {
   display: grid;
@@ -4748,6 +4790,30 @@ a {
   outline: none;
   border-color: var(--secondary);
   box-shadow: 0 0 0 2px rgba(218, 199, 105, 0.18);
+}
+
+.cuenta-select {
+  width: 100%;
+  color: var(--text-main);
+  border: 1px solid var(--outline-variant);
+  border-radius: 18px;
+  background: rgba(11, 14, 21, 0.86);
+  padding: 16px 18px;
+  font-size: 16px;
+  appearance: none;
+  color-scheme: dark;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.cuenta-select:focus {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 2px rgba(218, 199, 105, 0.18);
+}
+
+.cuenta-select option {
+  background-color: #1a1d26;
+  color: #fff;
 }
 
 .cuenta-form-actions {

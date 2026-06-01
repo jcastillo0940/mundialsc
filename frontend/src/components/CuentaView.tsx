@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import type { User } from '../types'
+import type { Branch, User } from '../types'
 import { optimizeAvatarFile } from '../utils/avatarUpload'
 
 function documentTypeLabel(documentType: User['document_type']) {
@@ -26,23 +26,27 @@ function formatBirthdate(dateValue: string | null | undefined) {
 export function CuentaView({
   user,
   saving,
+  branches,
   onSave,
 }: {
   user: User
   saving: boolean
-  onSave: (payload: { email: string; phone: string; avatarFile: File | null }) => Promise<void>
+  branches: Branch[]
+  onSave: (payload: { email: string; phone: string; avatarFile: File | null; branchId: string }) => Promise<void>
 }) {
   const [email, setEmail] = useState(user.email)
   const [phone, setPhone] = useState(user.phone ?? '')
+  const [branchId, setBranchId] = useState(String(user.branch?.id ?? ''))
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url ?? null)
 
   useEffect(() => {
     setEmail(user.email)
     setPhone(user.phone ?? '')
+    setBranchId(String(user.branch?.id ?? ''))
     setAvatarFile(null)
     setAvatarPreview(user.avatar_url ?? null)
-  }, [user.email, user.phone, user.avatar_url])
+  }, [user.email, user.phone, user.avatar_url, user.branch])
 
   useEffect(() => {
     if (!avatarFile) return
@@ -55,7 +59,7 @@ export function CuentaView({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await onSave({ email, phone, avatarFile })
+    await onSave({ email, phone, avatarFile, branchId })
   }
 
   async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
@@ -131,6 +135,16 @@ export function CuentaView({
             <label className="cuenta-field">
               <span>Numero de telefono</span>
               <input type="text" value={phone} onChange={(event) => setPhone(event.target.value)} />
+            </label>
+
+            <label className="cuenta-field">
+              <span>Sucursal de preferencia</span>
+              <select value={branchId} onChange={(event) => setBranchId(event.target.value)} className="cuenta-select">
+                <option value="">— Selecciona una sucursal —</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={String(branch.id)}>{branch.name}</option>
+                ))}
+              </select>
             </label>
 
             <label className="cuenta-field">

@@ -27,6 +27,12 @@ export interface UserBranch {
   code: string
 }
 
+export interface Branch {
+  id: number
+  name: string
+  code: string
+}
+
 export interface WalletSummary {
   goals_balance: number
   shots_balance: number
