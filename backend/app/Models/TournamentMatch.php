@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
 
 class TournamentMatch extends Model
 {
@@ -69,5 +70,14 @@ class TournamentMatch extends Model
     public function resultApprovals(): HasMany
     {
         return $this->hasMany(MatchResultApproval::class, 'tournament_match_id');
+    }
+
+    public function scopeWithAssignedTeams(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('home_team_id')
+            ->whereNotNull('away_team_id')
+            ->whereHas('homeTeam')
+            ->whereHas('awayTeam');
     }
 }

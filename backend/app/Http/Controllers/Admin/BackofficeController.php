@@ -161,6 +161,8 @@ class BackofficeController extends Controller
     public function updateMatch(Request $request, TournamentMatch $match): RedirectResponse
     {
         $data = $request->validate([
+            'home_team_id' => ['required', 'exists:teams,id', 'different:away_team_id'],
+            'away_team_id' => ['required', 'exists:teams,id'],
             'home_score' => ['nullable', 'integer', 'min:0', 'max:20'],
             'away_score' => ['nullable', 'integer', 'min:0', 'max:20'],
             'status' => ['required', 'in:scheduled,locked,final,void'],
@@ -168,6 +170,13 @@ class BackofficeController extends Controller
         ]);
 
         if ($data['status'] === 'final') {
+            $match->update([
+                'home_team_id' => $data['home_team_id'],
+                'away_team_id' => $data['away_team_id'],
+                'favorite_side' => $data['favorite_side'],
+            ]);
+            $this->liveScoreSync->refreshFavoriteSidesFromRankings();
+
             if ($data['home_score'] === null || $data['away_score'] === null) {
                 throw ValidationException::withMessages([
                     'score' => 'Debes ingresar ambos marcadores para solicitar finalizacion.',

@@ -174,11 +174,29 @@
                 @method('put')
                 <div class="row">
                     <div>
-                        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Local</div>
+                        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Equipo local</div>
+                        <select name="home_team_id" required>
+                            @foreach($teams as $team)
+                                <option value="{{ $team->id }}" @selected($match->home_team_id === $team->id)>{{ $team->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Equipo visitante</div>
+                        <select name="away_team_id" required>
+                            @foreach($teams as $team)
+                                <option value="{{ $team->id }}" @selected($match->away_team_id === $team->id)>{{ $team->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div>
+                        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Marcador local</div>
                         <input name="home_score" type="number" min="0" max="20" value="{{ $match->home_score }}" placeholder="0">
                     </div>
                     <div>
-                        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Visitante</div>
+                        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Marcador visitante</div>
                         <input name="away_score" type="number" min="0" max="20" value="{{ $match->away_score }}" placeholder="0">
                     </div>
                     <div>
