@@ -9,6 +9,7 @@ use App\Support\Audit;
 use App\Support\ContestRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -34,7 +35,7 @@ class AuthController extends Controller
             'cedula' => ['required', 'string', 'max:40', 'unique:users,cedula'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:12', 'regex:/^\+507[0-9]{8}$/', 'unique:users,phone'],
-            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
             'birthdate' => ['required', 'date', 'before_or_equal:'.now('America/Panama')->subYears(18)->toDateString()],
             'resides_in_panama' => ['required', 'accepted'],
             'is_employee' => ['required', 'boolean'],
@@ -52,7 +53,7 @@ class AuthController extends Controller
 
         $this->ensureEligibleIdentity($data['cedula'], (bool) $data['is_employee']);
 
-        $avatarPath = $request->file('avatar')?->store('avatars', 'public');
+        $avatarPath = $request->file('avatar') ? $this->storeOptimizedAvatar($request->file('avatar')) : null;
 
         $registrationNow = now();
 
@@ -262,7 +263,7 @@ class AuthController extends Controller
             'document_type' => ['required', 'in:cedula,passport,residente'],
             'cedula' => ['required', 'string', 'max:40', Rule::unique('users', 'cedula')->ignore($user->id)],
             'phone' => ['required', 'string', 'max:12', 'regex:/^\+507[0-9]{8}$/', Rule::unique('users', 'phone')->ignore($user->id)],
-            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
             'birthdate' => ['required', 'date', 'before_or_equal:'.now('America/Panama')->subYears(18)->toDateString()],
             'resides_in_panama' => ['required', 'accepted'],
             'is_employee' => ['required', 'boolean'],
@@ -279,7 +280,7 @@ class AuthController extends Controller
         $this->ensureEligibleIdentity($data['cedula'], (bool) $data['is_employee']);
 
         $previousAvatarPath = $user->avatar_path;
-        $avatarPath = $request->file('avatar')?->store('avatars', 'public');
+        $avatarPath = $request->file('avatar') ? $this->storeOptimizedAvatar($request->file('avatar')) : null;
         $registrationNow = now();
 
         $user->forceFill([
@@ -327,13 +328,13 @@ class AuthController extends Controller
         $data = $request->validate([
             'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:12', 'regex:/^\+507[0-9]{8}$/', Rule::unique('users', 'phone')->ignore($user->id)],
-            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
         ]);
 
         $previousAvatarPath = $user->avatar_path;
 
         if ($request->hasFile('avatar')) {
-            $data['avatar_path'] = $request->file('avatar')?->store('avatars', 'public');
+            $data['avatar_path'] = $this->storeOptimizedAvatar($request->file('avatar'));
         }
 
         unset($data['avatar']);
@@ -504,6 +505,72 @@ class AuthController extends Controller
             'lifetime_goals_earned' => 0,
             'lifetime_shots_earned' => 0,
         ]);
+    }
+
+    private function storeOptimizedAvatar(UploadedFile $avatar): string
+    {
+        $binary = $avatar->get();
+        $sourceImage = imagecreatefromstring($binary);
+
+        if (! $sourceImage) {
+            throw ValidationException::withMessages([
+                'avatar' => 'No se pudo procesar la fotografia subida.',
+            ]);
+        }
+
+        try {
+            $maxDimension = 1600;
+            $width = imagesx($sourceImage);
+            $height = imagesy($sourceImage);
+            $largestSide = max($width, $height);
+            $baseScale = $largestSide > $maxDimension ? $maxDimension / $largestSide : 1;
+            $dimensionScales = [1, 0.85, 0.7, 0.55, 0.4, 0.3];
+            $qualities = [82, 76, 70, 64, 58, 52, 46, 40];
+            $optimizedBinary = null;
+
+            foreach ($dimensionScales as $dimensionScale) {
+                $targetWidth = max(1, (int) round($width * $baseScale * $dimensionScale));
+                $targetHeight = max(1, (int) round($height * $baseScale * $dimensionScale));
+                $workingImage = imagescale($sourceImage, $targetWidth, $targetHeight, IMG_BILINEAR_FIXED);
+
+                if ($workingImage === false) {
+                    continue;
+                }
+
+                try {
+                    foreach ($qualities as $quality) {
+                        ob_start();
+                        imagejpeg($workingImage, null, $quality);
+                        $candidate = ob_get_clean();
+
+                        if ($candidate === false) {
+                            continue;
+                        }
+
+                        $optimizedBinary = $candidate;
+
+                        if (strlen($candidate) <= 500 * 1024) {
+                            break 2;
+                        }
+                    }
+                } finally {
+                    imagedestroy($workingImage);
+                }
+            }
+
+            if ($optimizedBinary === null || strlen($optimizedBinary) > 500 * 1024) {
+                throw ValidationException::withMessages([
+                    'avatar' => 'No fue posible optimizar la fotografia a menos de 500 KB.',
+                ]);
+            }
+
+            $path = 'avatars/'.Str::uuid().'.jpg';
+            Storage::disk('public')->put($path, $optimizedBinary);
+
+            return $path;
+        } finally {
+            imagedestroy($sourceImage);
+        }
     }
 
     private function isRegistrationComplete(User $user): bool

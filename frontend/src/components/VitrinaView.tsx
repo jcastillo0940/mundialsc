@@ -90,13 +90,9 @@ export function VitrinaView({
             <span>Goles acumulados</span>
             <strong>{formatCompactNumber(wallet?.lifetime_goals_earned ?? totalGoalsWon)} G</strong>
           </article>
-          <article>
+          <article className="vitrina-scoreboard-secondary">
             <span>Total facturas</span>
             <strong>{formatCurrency(approvedInvoiceTotal)}</strong>
-          </article>
-          <article>
-            <span>Saldo disponible</span>
-            <strong>{formatCompactNumber(wallet?.goals_balance ?? 0)} G</strong>
           </article>
         </div>
       </header>

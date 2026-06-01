@@ -8,6 +8,7 @@ import { InvoiceRegistrationView } from './components/InvoiceRegistrationView'
 import { CuentaView } from './components/CuentaView'
 import { VestuarioView } from './components/VestuarioView'
 import { VitrinaView } from './components/VitrinaView'
+import { cropAvatarToSquare, optimizeAvatarFile } from './utils/avatarUpload'
 import type {
   ClientBootstrap,
   DashboardSnapshot,
@@ -706,32 +707,6 @@ function isAtLeast18(dateStr: string): boolean {
   const today = new Date()
   const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate())
   return birth <= cutoff
-}
-
-async function cropAvatarToSquare(file: File): Promise<File> {
-  const objectUrl = URL.createObjectURL(file)
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('No se pudo cargar la imagen.'))
-    img.src = objectUrl
-  })
-  URL.revokeObjectURL(objectUrl)
-
-  const size = Math.min(image.width, image.height)
-  const sourceX = Math.floor((image.width - size) / 2)
-  const sourceY = Math.floor((image.height - size) / 2)
-  const canvas = document.createElement('canvas')
-  canvas.width = 500
-  canvas.height = 500
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('No se pudo procesar la imagen.')
-  ctx.drawImage(image, sourceX, sourceY, size, size, 0, 0, 500, 500)
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Error al exportar imagen.'))), 'image/jpeg', 0.92)
-  })
-  return new File([blob], `avatar-${Date.now()}.jpg`, { type: 'image/jpeg' })
 }
 
 async function loadImageElement(file: File) {
@@ -2802,7 +2777,12 @@ export function App() {
                           const cropped = await cropAvatarToSquare(file)
                           setRegistrationAvatarFile(cropped)
                         } catch {
-                          setRegistrationAvatarFile(file)
+                          try {
+                            const optimized = await optimizeAvatarFile(file, 'avatar-registration')
+                            setRegistrationAvatarFile(optimized)
+                          } catch {
+                            setRegistrationAvatarFile(file)
+                          }
                         }
                       }}
                     />

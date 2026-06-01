@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import type { User } from '../types'
+import { optimizeAvatarFile } from '../utils/avatarUpload'
 
 function documentTypeLabel(documentType: User['document_type']) {
   if (documentType === 'cedula') return 'Cedula'
@@ -57,8 +58,20 @@ export function CuentaView({
     await onSave({ email, phone, avatarFile })
   }
 
-  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
-    setAvatarFile(event.target.files?.[0] ?? null)
+  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+
+    if (!file) {
+      setAvatarFile(null)
+      return
+    }
+
+    try {
+      const optimized = await optimizeAvatarFile(file, 'avatar-profile')
+      setAvatarFile(optimized)
+    } catch {
+      setAvatarFile(file)
+    }
   }
 
   return (

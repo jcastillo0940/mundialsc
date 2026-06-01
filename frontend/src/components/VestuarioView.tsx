@@ -34,6 +34,13 @@ function positionLabel(position: number) {
   return String(position).padStart(2, '0')
 }
 
+function podiumLabel(place: number) {
+  if (place === 1) return '1er lugar'
+  if (place === 2) return '2do lugar'
+  if (place === 3) return '3er lugar'
+  return `${place}to lugar`
+}
+
 function leaderboardSlice(entries: LeaderboardEntry[], userId: number) {
   if (entries.length <= 8) return entries
 
@@ -143,6 +150,7 @@ export function VestuarioView({
                 <article key={entry.user_id} className={`${isChampion ? 'vestuario-podium-card champion' : 'vestuario-podium-card support'} place-${place}`}>
                   <div className="vestuario-podium-avatar">{userInitials(entry.full_name)}</div>
                   <div className="vestuario-podium-place">{place}</div>
+                  <span className="vestuario-podium-rank-label">{podiumLabel(place)}</span>
                   <span className="vestuario-podium-icon material-symbols-outlined">
                     {isChampion ? 'emoji_events' : index === 0 ? 'military_tech' : 'workspace_premium'}
                   </span>

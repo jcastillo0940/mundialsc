@@ -128,4 +128,108 @@ class GoogleAuthTest extends TestCase
         $this->assertNotNull($user->registration_completed_at);
         $this->assertNotNull($user->avatar_path);
     }
+
+    public function test_google_registration_avatar_is_optimized_to_at_most_500_kb(): void
+    {
+        Storage::fake('public');
+
+        $user = User::query()->create([
+            'name' => 'Google Pending',
+            'email' => 'pending@example.com',
+            'google_id' => 'google-sub-pending',
+            'document_type' => 'passport',
+            'cedula' => 'GOOGLE-PENDING',
+            'password' => bcrypt('temporary-secret'),
+            'role' => 'client',
+            'is_active' => true,
+            'resides_in_panama' => false,
+            'is_employee' => false,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->post('/api/auth/google/complete', [
+            'full_name' => 'Ana Google',
+            'document_type' => 'cedula',
+            'cedula' => '8-864-1164',
+            'phone' => '+50761234567',
+            'birthdate' => now('America/Panama')->subYears(20)->toDateString(),
+            'resides_in_panama' => '1',
+            'is_employee' => '0',
+            'accepted_terms' => '1',
+            'group_stage_goal_prediction' => '101',
+            'avatar' => $this->makeLargeAvatarUpload(),
+        ]);
+
+        $response->assertOk();
+
+        $user->refresh();
+        $this->assertNotNull($user->avatar_path);
+        Storage::disk('public')->assertExists($user->avatar_path);
+        $this->assertLessThanOrEqual(500 * 1024, Storage::disk('public')->size($user->avatar_path));
+    }
+
+    public function test_profile_avatar_update_is_optimized_to_at_most_500_kb(): void
+    {
+        Storage::fake('public');
+
+        $user = User::query()->create([
+            'name' => 'Jugador Activo',
+            'email' => 'jugador@example.com',
+            'document_type' => 'cedula',
+            'cedula' => '8-864-1164',
+            'password' => bcrypt('temporary-secret'),
+            'role' => 'client',
+            'is_active' => true,
+            'resides_in_panama' => true,
+            'is_employee' => false,
+            'phone' => '+50761234567',
+            'accepted_terms_at' => now(),
+            'registration_completed_at' => now(),
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->post('/api/auth/profile', [
+            'email' => 'jugador@example.com',
+            'phone' => '+50761234567',
+            'avatar' => $this->makeLargeAvatarUpload('profile-avatar.png'),
+        ]);
+
+        $response->assertOk();
+
+        $user->refresh();
+        $this->assertNotNull($user->avatar_path);
+        Storage::disk('public')->assertExists($user->avatar_path);
+        $this->assertLessThanOrEqual(500 * 1024, Storage::disk('public')->size($user->avatar_path));
+    }
+
+    private function makeLargeAvatarUpload(string $filename = 'avatar.png'): UploadedFile
+    {
+        $width = 2200;
+        $height = 2200;
+        $image = imagecreatetruecolor($width, $height);
+
+        if (! $image) {
+            $this->fail('No se pudo crear la imagen de prueba.');
+        }
+
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                imagesetpixel($image, $x, $y, imagecolorallocate($image, ($x * 7 + $y * 3) % 255, ($x * 11 + $y * 5) % 255, ($x * 13 + $y * 17) % 255));
+            }
+        }
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'avatar-test-');
+
+        if ($tempPath === false) {
+            imagedestroy($image);
+            $this->fail('No se pudo crear un archivo temporal para la imagen de prueba.');
+        }
+
+        imagepng($image, $tempPath, 0);
+        imagedestroy($image);
+
+        return new UploadedFile($tempPath, $filename, 'image/png', null, true);
+    }
 }
