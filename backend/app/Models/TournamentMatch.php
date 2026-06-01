@@ -77,7 +77,7 @@ class TournamentMatch extends Model
         return $query
             ->whereNotNull('home_team_id')
             ->whereNotNull('away_team_id')
-            ->whereHas('homeTeam')
-            ->whereHas('awayTeam');
+            ->whereHas('homeTeam', fn (Builder $teamQuery) => $teamQuery->resolvedTournamentTeam())
+            ->whereHas('awayTeam', fn (Builder $teamQuery) => $teamQuery->resolvedTournamentTeam());
     }
 }

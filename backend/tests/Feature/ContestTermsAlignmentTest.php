@@ -167,6 +167,53 @@ class ContestTermsAlignmentTest extends TestCase
             ->assertJsonCount(0, 'data');
     }
 
+    public function test_knockout_phase_stays_hidden_when_match_only_has_placeholder_winner_slots(): void
+    {
+        $user = $this->createEligibleClient();
+
+        TournamentPhase::query()->where('slug', 'fase-grupos')->update(['is_active' => false]);
+
+        $phase = TournamentPhase::query()->where('slug', 'octavos')->firstOrFail();
+        $phase->update([
+            'is_active' => true,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addDay(),
+        ]);
+
+        TournamentMatch::query()->create([
+            'phase_id' => $phase->id,
+            'match_number' => 49,
+            'group_label' => null,
+            'round_label' => 'Octavos',
+            'stage_label' => 'Eliminatoria',
+            'home_team_id' => $this->insertTeam('Winner Group C', 'WINNERGROUPC'),
+            'away_team_id' => $this->insertTeam('Runner-up Group F', 'RUNNERUPGROUPF'),
+            'favorite_side' => 'none',
+            'kickoff_at' => now()->addHours(5),
+            'status' => 'scheduled',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $bootstrapResponse = $this->getJson('/api/client/bootstrap');
+
+        $bootstrapResponse
+            ->assertOk()
+            ->assertJsonPath('active_phase', null);
+
+        $phasesResponse = $this->getJson('/api/client/phases');
+
+        $phasesResponse
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $matchesResponse = $this->getJson('/api/client/matches');
+
+        $matchesResponse
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
     private function createEligibleClient(): User
     {
         $user = User::query()->create([

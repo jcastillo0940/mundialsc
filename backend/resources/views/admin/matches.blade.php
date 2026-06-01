@@ -70,6 +70,32 @@
     </form>
 </div>
 
+<div class="card" style="margin-bottom:18px">
+    <h2 style="margin-top:0">Filtrar listado</h2>
+    <form method="get" action="{{ route('admin.matches') }}" class="grid">
+        <div class="row">
+            <select name="phase_id">
+                <option value="">Todas las fases</option>
+                @foreach($phases as $phase)
+                    <option value="{{ $phase->id }}" @selected(($filters['phase_id'] ?? '') == $phase->id)>{{ $phase->name }}</option>
+                @endforeach
+            </select>
+            <select name="team_id">
+                <option value="">Todos los paises / equipos</option>
+                @foreach($teams as $team)
+                    <option value="{{ $team->id }}" @selected(($filters['team_id'] ?? '') == $team->id)>{{ $team->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="row" style="justify-content:flex-start">
+            <button type="submit">Aplicar filtros</button>
+            <a href="{{ route('admin.matches') }}" class="ghost" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;padding:10px 16px;border-radius:10px">
+                Limpiar filtros
+            </a>
+        </div>
+    </form>
+</div>
+
 @if(($pendingApprovals ?? collect())->count())
 <div class="card" style="margin-bottom:18px;border-color:#8a6a18">
     <h2 style="margin-top:0">Marcadores pendientes de aprobacion dual</h2>

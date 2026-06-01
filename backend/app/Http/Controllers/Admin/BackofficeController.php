@@ -58,10 +58,24 @@ class BackofficeController extends Controller
         ]);
     }
 
-    public function matches(): View
+    public function matches(Request $request): View
     {
+        $phaseId = $request->integer('phase_id');
+        $teamId = $request->integer('team_id');
+
         return view('admin.matches', [
-            'matches' => TournamentMatch::query()->with(['phase', 'homeTeam', 'awayTeam'])->orderBy('kickoff_at')->get(),
+            'matches' => TournamentMatch::query()
+                ->with(['phase', 'homeTeam', 'awayTeam'])
+                ->when($phaseId, fn ($query) => $query->where('phase_id', $phaseId))
+                ->when($teamId, function ($query) use ($teamId): void {
+                    $query->where(function ($teamQuery) use ($teamId): void {
+                        $teamQuery
+                            ->where('home_team_id', $teamId)
+                            ->orWhere('away_team_id', $teamId);
+                    });
+                })
+                ->orderBy('kickoff_at')
+                ->get(),
             'pendingApprovals' => MatchResultApproval::query()
                 ->with(['match.homeTeam', 'match.awayTeam', 'proposer'])
                 ->where('status', 'pending')
@@ -69,6 +83,10 @@ class BackofficeController extends Controller
                 ->get(),
             'phases' => TournamentPhase::query()->orderBy('stage_order')->get(),
             'teams' => Team::query()->where('is_active', true)->orderBy('name')->get(),
+            'filters' => [
+                'phase_id' => $phaseId ?: '',
+                'team_id' => $teamId ?: '',
+            ],
         ]);
     }
 

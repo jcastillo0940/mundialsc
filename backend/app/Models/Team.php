@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Team extends Model
@@ -38,5 +39,14 @@ class Team extends Model
         return $this->external_team_id
             ? route('api.client.teams.flag', ['team' => $this->id])
             : null;
+    }
+
+    public function scopeResolvedTournamentTeam(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('name')
+            ->where('name', 'not like', 'Winner %')
+            ->where('name', 'not like', 'Runner-up %')
+            ->where('name', 'not like', 'Loser %');
     }
 }
