@@ -28,6 +28,6 @@ class ContestRules
 
     public function winnerSlots(): int
     {
-        return (int) config('contest.winner_slots', 3);
+        return (int) config('contest.winner_slots', 10);
     }
 }

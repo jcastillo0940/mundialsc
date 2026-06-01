@@ -49,6 +49,7 @@
             <a href="{{ route('admin.teams') }}">Ranking FIFA</a>
             <a href="{{ route('admin.matches') }}">Partidos</a>
             <a href="{{ route('admin.rules') }}">Reglas</a>
+            <a href="{{ route('admin.points-audit') }}">Auditoría de puntos</a>
             <a href="{{ route('admin.prizes') }}">Premios</a>
             <a href="{{ route('admin.winners') }}">Ganadores</a>
             <a href="{{ route('admin.integrations') }}">Integraciones</a>

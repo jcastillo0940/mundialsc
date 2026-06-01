@@ -62,7 +62,16 @@ class GameController extends Controller
                 'goals_delta' => 0,
                 'shots_delta' => -1,
                 'notes' => 'Consumo de tiro en arena de juegos.',
-                'meta' => ['game_type' => $data['game_type']],
+                'meta' => [
+                    'source' => 'game',
+                    'rule_code' => 'game_shot_debit',
+                    'rule_label' => 'Consumo de tiro en juego',
+                    'game_type' => $data['game_type'],
+                    'rule_snapshot' => [
+                        'shots_spent' => 1,
+                        'major_prizes_enabled' => (bool) $campaign->major_prizes_enabled,
+                    ],
+                ],
                 'created_at' => now(),
             ]);
 

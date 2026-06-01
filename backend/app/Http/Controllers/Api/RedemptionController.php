@@ -128,7 +128,21 @@ class RedemptionController extends Controller
                 'goals_delta' => -1 * (int) $prize->points_cost,
                 'shots_delta' => 0,
                 'notes' => 'Canje directo en tienda de fidelidad.',
-                'meta' => ['prize_id' => $prize->id],
+                'meta' => [
+                    'source' => 'redemption',
+                    'rule_code' => 'redeem_points_debit',
+                    'rule_label' => 'Canje directo en tienda',
+                    'rule_snapshot' => [
+                        'points_cost' => (int) $prize->points_cost,
+                        'category' => $prize->category,
+                        'redemption_type' => $prize->redemption_type,
+                    ],
+                    'prize' => [
+                        'prize_id' => $prize->id,
+                        'name' => $prize->name,
+                        'slug' => $prize->slug,
+                    ],
+                ],
                 'created_at' => now(),
             ]);
 

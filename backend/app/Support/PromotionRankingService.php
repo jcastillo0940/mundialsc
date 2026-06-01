@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class PromotionRankingService
 {
-    public const WINNER_SLOTS = 3;
+    public const WINNER_SLOTS = 10;
 
     public function __construct(
         private readonly ContestRules $contestRules,
@@ -71,7 +71,6 @@ class PromotionRankingService
                 users.group_stage_goal_prediction,
                 users.registration_completed_at,
                 users.registration_order_key,
-                users.predictions_completed_at,
                 users.created_at,
                 COALESCE(prediction_totals.prediction_points, 0) + COALESCE(invoice_totals.invoice_points, 0) as total_points,
                 COALESCE(prediction_totals.exact_hits, 0) as exact_hits,
@@ -82,9 +81,7 @@ class PromotionRankingService
             ->map(function ($row) use ($actualGoals) {
                 $goalPrediction = $row->group_stage_goal_prediction !== null ? (int) $row->group_stage_goal_prediction : null;
                 $goalPredictionDelta = $goalPrediction !== null ? abs($goalPrediction - $actualGoals) : PHP_INT_MAX;
-                $rankingTimestamp = $row->predictions_completed_at
-                    ?? $row->registration_completed_at
-                    ?? $row->created_at;
+                $rankingTimestamp = $row->registration_completed_at ?? $row->created_at;
                 $rankingOrderKey = $row->registration_order_key ?: (string) ($rankingTimestamp ?? $row->created_at);
 
                 return [
@@ -179,11 +176,18 @@ class PromotionRankingService
         ];
     }
 
-    public function groupStagePhase(): ?TournamentPhase
+    public function activeRankingPhase(?int $phaseId = null): ?TournamentPhase
     {
+        if ($phaseId) {
+            return TournamentPhase::query()
+                ->whereKey($phaseId)
+                ->where('is_active', true)
+                ->first();
+        }
+
         return TournamentPhase::query()
-            ->where('slug', 'fase-grupos')
             ->where('is_active', true)
+            ->orderByRaw('CASE WHEN ? BETWEEN starts_at AND ends_at THEN 0 ELSE 1 END', [now()])
             ->orderBy('stage_order')
             ->first();
     }

@@ -24,8 +24,8 @@ import type {
 
 const TOKEN_KEY = 'super-carnes-token'
 const CONTEST_NAME = 'Polla Mundialista Super Carnes 2026'
-const REGISTRATION_DEADLINE = '10 de junio de 2026'
-const WINNERS_ANNOUNCEMENT = '10 de julio de 2026'
+const REGISTRATION_DEADLINE = '10 de junio de 2026 a las 11:59 p. m.'
+const WINNERS_ANNOUNCEMENT = '29 de junio y 20 de julio de 2026'
 const PANAMA_TIMEZONE = 'America/Panama'
 const DEFAULT_AUTH_BG_YOUTUBE_ID = import.meta.env.VITE_AUTH_BG_YOUTUBE_ID ?? 'O9diw9_5pys'
 const DEFAULT_AUTH_LOGO_URL = import.meta.env.VITE_AUTH_LOGO_URL ?? ''
@@ -844,6 +844,47 @@ function fullGroupLabel(groupLabel: string | null | undefined) {
   return value ? `Grupo ${value}` : 'Sin grupo'
 }
 
+function normalizeStageBucket(value: string | null | undefined) {
+  return value?.trim().replace(/\s+/g, ' ') ?? ''
+}
+
+function matchBucket(match: TournamentMatch, phaseName?: string | null) {
+  const groupValue = groupLabelValue(match.group_label)
+  if (groupValue) {
+    return {
+      key: `group:${groupValue}`,
+      label: fullGroupLabel(groupValue),
+      selectorLabel: 'Grupo',
+    }
+  }
+
+  const roundValue = normalizeStageBucket(match.round_label)
+  if (roundValue) {
+    return {
+      key: `round:${roundValue.toLowerCase()}`,
+      label: roundValue,
+      selectorLabel: 'Llave',
+    }
+  }
+
+  const stageValue = normalizeStageBucket(match.stage_label)
+  if (stageValue) {
+    return {
+      key: `stage:${stageValue.toLowerCase()}`,
+      label: stageValue,
+      selectorLabel: 'Etapa',
+    }
+  }
+
+  const fallback = normalizeStageBucket(phaseName) || 'Partidos'
+
+  return {
+    key: `phase:${fallback.toLowerCase()}`,
+    label: fallback,
+    selectorLabel: 'Fase',
+  }
+}
+
 function matchTimeValue(dateValue: string) {
   const date = new Date(dateValue)
   return Number.isNaN(date.getTime()) ? Number.MAX_SAFE_INTEGER : date.getTime()
@@ -957,6 +998,63 @@ Al registrarse, el participante acepta estos términos y condiciones, y autoriza
 8. VALIDACIÓN DE FACTURAS (CUFE)
 Toda factura ingresada para obtener puntos adicionales o para ser utilizada como criterio de desempate será verificada estrictamente contra el sistema de la Dirección General de Ingresos (DGI). Solo serán válidos los Códigos Únicos de Facturación Electrónica (CUFE) legítimos, que no hayan sido registrados previamente por otro participante, y que cumplan con los montos y fechas estipuladas. El intento de registro de un CUFE falso, alterado o perteneciente a otra persona resultará en la descalificación inmediata del participante.`
 
+const OFFICIAL_TERMS_TEXT_V2 = `TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
+
+1. GENERALIDADES DEL CONCURSO
+La promoción comercial denominada "Polla Mundialista Super Carnes 2026" es organizada por Super Carnes y tendrá vigencia desde el 11 de junio de 2026 hasta el 20 de julio de 2026, correspondiente al período oficial de la FIFA de Grupos y de Eliminatoria de la Copa Mundial de la FIFA 2026.
+Super Carnes podrá modificar la vigencia por razones operativas, técnicas, regulatorias o de fuerza mayor, previa comunicación al público participante.
+
+2. ELEGIBILIDAD
+Podrán participar únicamente personas naturales mayores de 18 años, residentes en la República de Panamá, portadoras de cédula de identidad personal o pasaporte vigente, que completen correctamente el proceso de registro.
+No podrán participar colaboradores directos de Super Carnes, personas vinculadas directa o indirectamente con la organización, administración o auditoría de la promoción, ni sus familiares dentro del cuarto grado de consanguinidad y segundo de afinidad.
+
+3. MECÁNICA DE PARTICIPACIÓN
+La promoción premia el conocimiento y habilidad de los participantes respecto a los resultados deportivos de la Copa Mundial de la FIFA 2026, incluyendo la Fase de Grupos y la Fase Eliminatoria.
+Cada participante deberá registrarse en la plataforma oficial antes del inicio del primer partido de la Fase de Grupos, con fecha límite el 10 de junio de 2026 a las 11:59 p. m., completando nombre, documento, correo, teléfono, pronósticos de partidos y predicción del total de goles anotados durante la Fase de Grupos.
+
+4. NATURALEZA DEL CONCURSO
+La promoción constituye un concurso basado en habilidad, conocimiento, análisis y destreza deportiva. La asignación de premios se determina exclusivamente conforme al sistema de puntuación establecido en estos términos y condiciones.
+
+5. SISTEMA DE PUNTUACIÓN
+Los participantes acumularán puntos conforme a la precisión de sus pronósticos en los partidos de la Fase de Grupos:
+- 1 punto por acertar la victoria del equipo Favorito.
+- 2 puntos por acertar que el partido finalizará en empate.
+- 3 puntos por acertar la victoria del equipo No Favorito.
+- 3 puntos adicionales por acertar el marcador exacto.
+Para efectos exclusivos de la promoción, se considerará Favorito al equipo que ocupe la mejor posición en el Ranking Mundial Masculino de la FIFA vigente al inicio de la promoción. Esa clasificación permanecerá fija durante toda la Fase de Grupos.
+Además, el participante podrá acumular 1 punto adicional por cada factura válida registrada en la plataforma, siempre que la compra sea en Super Carnes, supere USD 25.00 sin ITBMS, haya sido emitida dentro del día calendario previo al registro y el CUFE sea válido.
+
+6. VALIDACIÓN DE FACTURAS
+Todas las facturas registradas serán verificadas contra el sistema de la Dirección General de Ingresos (DGI). Solo serán válidas las facturas legítimas, con CUFE verificable, no registradas previamente y que cumplan con los montos y fechas requeridas.
+El intento de usar facturas falsas, alteradas, duplicadas o pertenecientes a terceros constituye causal inmediata de descalificación.
+
+7. PREMIOS
+Se premiará a los 10 participantes con mayor cantidad de puntos al finalizar la Fase de Grupos y a los 10 participantes con mayor cantidad de puntos al finalizar la Fase Eliminatoria.
+Cada ganador de la Fase de Grupos recibirá 1 televisor nuevo de 50 pulgadas, con valor comercial aproximado de B/.500.00.
+Cada ganador de la Fase Eliminatoria recibirá 1 televisor nuevo de 50 pulgadas, con valor comercial aproximado de B/.500.00, más un bono de mercancía de B/.200.00.
+Los premios no son transferibles, no son canjeables por dinero en efectivo y no podrán ser sustituidos por otros bienes o servicios. Los ganadores podrán reclamar su premio dentro de los cinco días posteriores a la finalización de cada fase en la sucursal de Super Carnes más cercana, presentando su documento de identidad.
+
+8. CRITERIOS DE DESEMPATE
+En caso de empate, se aplicarán sucesivamente estos criterios:
+1. Mayor cantidad de marcadores exactos acertados.
+2. Mayor cantidad de facturas válidas registradas.
+3. Mayor monto acumulado en compras válidas.
+4. Mayor aproximación al total de goles anotados en la Fase de Grupos.
+5. Fecha y hora de registro más temprana en el sistema oficial de la plataforma.
+
+9. NOTIFICACIÓN Y ENTREGA DE PREMIOS
+Los ganadores oficiales de la Fase de Grupos serán anunciados el 29 de junio de 2026. Los ganadores oficiales de la Fase Eliminatoria serán anunciados el 20 de julio de 2026, ambos a través de las redes sociales oficiales de Super Carnes.
+Además, serán contactados vía telefónica y/o correo electrónico. Si un ganador potencial no responde dentro de las 24 horas siguientes al primer intento de contacto, perderá el derecho al premio y Super Carnes podrá adjudicarlo al siguiente participante con mayor puntuación.
+
+10. DESCALIFICACIÓN
+Super Carnes podrá descalificar inmediatamente a cualquier participante que incumpla estos términos y condiciones, proporcione información falsa o incompleta, intente manipular la plataforma o el sistema de puntuación, registre facturas fraudulentas o pertenecientes a terceros, o realice actos que afecten la transparencia o integridad de la promoción.
+
+11. PROTECCIÓN DE DATOS PERSONALES
+Los datos personales suministrados serán utilizados exclusivamente para la administración, desarrollo y ejecución de la promoción, así como para la validación de identidad y entrega de premios, de conformidad con la Ley 81 de 2019 y demás normas aplicables de la República de Panamá.
+
+12. ACEPTACIÓN DE LOS TÉRMINOS Y CONDICIONES
+La participación en la promoción implica el conocimiento, aceptación plena e incondicional de los presentes términos y condiciones.`
+
 export function App() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -1002,7 +1100,7 @@ export function App() {
   const [authLogoUrl, setAuthLogoUrl] = useState(DEFAULT_AUTH_LOGO_URL)
   const [heroVideoUrl, setHeroVideoUrl] = useState('')
   const [participantBrands, setParticipantBrands] = useState<ParticipantBrand[]>([])
-  const [termsText, setTermsText] = useState(OFFICIAL_TERMS_TEXT)
+  const [termsText, setTermsText] = useState(OFFICIAL_TERMS_TEXT_V2 || OFFICIAL_TERMS_TEXT)
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('')
   const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false)
   const [googleClientId, setGoogleClientId] = useState(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '')
@@ -1721,61 +1819,82 @@ export function App() {
     [predictionsList],
   )
 
-  const groupStagePhase = useMemo(() => {
-    const groupedPhase = phases.find((phase) => /grupo/i.test(phase.name) || /group/i.test(phase.name))
-    return groupedPhase ?? phases[0] ?? null
-  }, [phases])
+  const activePredictionPhase = useMemo(() => {
+    if (clientOverview?.active_phase) {
+      return clientOverview.active_phase
+    }
 
-  const groupStageMatches = useMemo(() => {
-    const baseMatches = groupStagePhase ? matches.filter((match) => match.phase_id === groupStagePhase.id) : matches
+    return phases[0] ?? null
+  }, [clientOverview, phases])
+
+  const activePhaseMatches = useMemo(() => {
+    const baseMatches = activePredictionPhase ? matches.filter((match) => match.phase_id === activePredictionPhase.id) : matches
 
     return baseMatches
-      .filter((match) => Boolean(groupLabelValue(match.group_label)))
       .slice()
       .sort((left, right) => matchTimeValue(left.kickoff_at) - matchTimeValue(right.kickoff_at))
-  }, [groupStagePhase, matches])
+  }, [activePredictionPhase, matches])
 
-  const groupLabels = useMemo(() => {
-    return Array.from(new Set(groupStageMatches.map((match) => groupLabelValue(match.group_label)).filter(Boolean))).sort((left, right) =>
-      left.localeCompare(right, 'es', { numeric: true }),
+  const matchBuckets = useMemo(() => {
+    const phaseName = activePredictionPhase?.name ?? null
+
+    return Array.from(
+      new Map(
+        activePhaseMatches.map((match) => {
+          const bucket = matchBucket(match, phaseName)
+
+          return [bucket.key, bucket]
+        }),
+      ).values(),
     )
-  }, [groupStageMatches])
+  }, [activePhaseMatches, activePredictionPhase])
+
+  const bucketSelectorLabel = useMemo(() => {
+    const uniqueLabels = Array.from(new Set(matchBuckets.map((bucket) => bucket.selectorLabel)))
+    return uniqueLabels.length === 1 ? uniqueLabels[0] : 'Bloque'
+  }, [matchBuckets])
 
   const groupSummaries = useMemo(() => {
-    return groupLabels.map((groupLabel) => {
-      const matchesForGroup = groupStageMatches.filter((match) => groupLabelValue(match.group_label) === groupLabel)
+    const phaseName = activePredictionPhase?.name ?? null
+
+    return matchBuckets.map((bucket) => {
+      const matchesForGroup = activePhaseMatches.filter((match) => matchBucket(match, phaseName).key === bucket.key)
       const total = matchesForGroup.length
       const completed = matchesForGroup.filter((match) => predictionMap.has(match.id)).length
       const pending = Math.max(total - completed, 0)
 
       return {
-        groupLabel,
+        groupLabel: bucket.key,
+        displayLabel: bucket.label,
         total,
         completed,
         pending,
         isComplete: total > 0 && pending === 0,
       }
     })
-  }, [groupLabels, groupStageMatches, predictionMap])
+  }, [activePhaseMatches, activePredictionPhase, matchBuckets, predictionMap])
 
   useEffect(() => {
-    if (!groupLabels.length) {
+    const availableKeys = groupSummaries.map((summary) => summary.groupLabel)
+
+    if (!availableKeys.length) {
       setSelectedGroupLabel(null)
       return
     }
 
-    setSelectedGroupLabel((current) => (current && groupLabels.includes(current) ? current : groupLabels[0]))
-  }, [groupLabels])
+    setSelectedGroupLabel((current) => (current && availableKeys.includes(current) ? current : availableKeys[0]))
+  }, [groupSummaries])
 
   const visibleMatches = useMemo(() => {
-    const selectedGroupMatches = groupStageMatches.filter((match) => groupLabelValue(match.group_label) === selectedGroupLabel)
+    const phaseName = activePredictionPhase?.name ?? null
+    const selectedGroupMatches = activePhaseMatches.filter((match) => matchBucket(match, phaseName).key === selectedGroupLabel)
 
     if (predictionMode === 'mine') {
       return selectedGroupMatches.filter((match) => predictionMap.has(match.id))
     }
 
     return selectedGroupMatches.filter((match) => !predictionMap.has(match.id))
-  }, [groupStageMatches, predictionMap, predictionMode, selectedGroupLabel])
+  }, [activePhaseMatches, activePredictionPhase, predictionMap, predictionMode, selectedGroupLabel])
 
   const selectedGroupSummary = useMemo(
     () => groupSummaries.find((summary) => summary.groupLabel === selectedGroupLabel) ?? null,
@@ -1783,16 +1902,16 @@ export function App() {
   )
 
   const progress = useMemo(() => {
-    const total = groupStageMatches.length
-    const completed = groupStageMatches.filter((match) => predictionMap.has(match.id)).length
+    const total = activePhaseMatches.length
+    const completed = activePhaseMatches.filter((match) => predictionMap.has(match.id)).length
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
 
     return { total, completed, percentage }
-  }, [groupStageMatches, predictionMap])
+  }, [activePhaseMatches, predictionMap])
 
   const nextDeadlineMatch = useMemo(() => {
-    return groupStageMatches.find((match) => !predictionMap.has(match.id) && matchTimeValue(match.kickoff_at) > now) ?? null
-  }, [groupStageMatches, now, predictionMap])
+    return activePhaseMatches.find((match) => !predictionMap.has(match.id) && matchTimeValue(match.kickoff_at) > now) ?? null
+  }, [activePhaseMatches, now, predictionMap])
 
   const countdownParts = useMemo(() => {
     if (!nextDeadlineMatch) return null
@@ -2174,7 +2293,7 @@ export function App() {
   }
 
   function renderCancha() {
-    const activeGroupTitle = fullGroupLabel(selectedGroupLabel)
+    const activeGroupTitle = selectedGroupSummary?.displayLabel ?? activePredictionPhase?.name ?? 'la fase activa'
     const isSelectedGroupComplete = predictionMode === 'pending' && Boolean(selectedGroupSummary?.isComplete)
     const emptyTitle =
       predictionMode === 'mine'
@@ -2196,6 +2315,7 @@ export function App() {
             <div className="marea-headline-wrap">
               <span className="marea-kicker">SUPER CARNES 2026</span>
               <h1>{CONTEST_NAME}</h1>
+              <p>{activePredictionPhase ? `Fase activa: ${activePredictionPhase.name}` : 'Pronosticos oficiales del torneo'}</p>
             </div>
 
             <div className="marea-phase-meta">
@@ -2220,7 +2340,7 @@ export function App() {
                 <strong>Atencion, seleccionado.</strong>{' '}
                 {nextDeadlineMatch
                   ? `Tienes hasta el ${formatDateTime(nextDeadlineMatch.kickoff_at)} para enviar tus resultados de ${activeGroupTitle}.`
-                  : `Registro legal hasta el ${REGISTRATION_DEADLINE}. Los ganadores se anuncian el ${WINNERS_ANNOUNCEMENT}.`}
+                  : `Registro legal hasta el ${REGISTRATION_DEADLINE}. Los ganadores por fase se anuncian el ${WINNERS_ANNOUNCEMENT}.`}
               </p>
               {nextDeadlineMatch ? (
                 <div className="marea-deadline-global">
@@ -2262,9 +2382,9 @@ export function App() {
                 ].filter(Boolean).join(' ')}
                 type="button"
                 onClick={() => setSelectedGroupLabel(summary.groupLabel)}
-                aria-label={`${fullGroupLabel(summary.groupLabel)}. ${summary.isComplete ? 'Pronosticos completados' : `${summary.pending} partidos pendientes`}.`}
+                aria-label={`${summary.displayLabel}. ${summary.isComplete ? 'Pronosticos completados' : `${summary.pending} partidos pendientes`}.`}
               >
-                <span className="round-tab-label">{fullGroupLabel(summary.groupLabel)}</span>
+                <span className="round-tab-label">{summary.displayLabel}</span>
                 <span className="round-tab-status">
                   {summary.isComplete ? 'Completado' : `${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}
                 </span>
@@ -2273,11 +2393,11 @@ export function App() {
           </div>
 
           <label className="marea-mobile-group-select">
-            <span>Grupo</span>
+            <span>{bucketSelectorLabel}</span>
             <select value={selectedGroupLabel ?? ''} onChange={(event) => setSelectedGroupLabel(event.target.value)}>
               {groupSummaries.map((summary) => (
                 <option key={summary.groupLabel} value={summary.groupLabel}>
-                  {`${fullGroupLabel(summary.groupLabel)}${summary.isComplete ? ' - Completado' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
+                  {`${summary.displayLabel}${summary.isComplete ? ' - Completado' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
                 </option>
               ))}
             </select>
@@ -2299,7 +2419,7 @@ export function App() {
                   <article key={match.id} className={favoriteTeam ? 'marea-match-card featured' : 'marea-match-card'}>
                     <div className="marea-match-topline">
                       <div className="marea-match-banner">
-                        <span>{fullGroupLabel(match.group_label)}</span>
+                        <span>{matchBucket(match, activePredictionPhase?.name).label}</span>
                       </div>
                       <span className="marea-time">{formatDateTime(match.kickoff_at)}</span>
                     </div>
@@ -2610,7 +2730,7 @@ export function App() {
     )
   }
 
-  const TERMS_TEXT = termsText.trim() ? termsText : OFFICIAL_TERMS_TEXT
+  const TERMS_TEXT = termsText.trim() ? termsText : (OFFICIAL_TERMS_TEXT_V2 || OFFICIAL_TERMS_TEXT)
 
   return (
     <div className="marea-app-shell">

@@ -1,0 +1,120 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\TournamentMatch;
+use App\Models\TournamentPhase;
+use App\Models\User;
+use App\Models\Wallet;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class ContestTermsAlignmentTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_client_bootstrap_lists_active_elimination_phase(): void
+    {
+        $user = $this->createEligibleClient();
+
+        TournamentPhase::query()->where('slug', 'fase-grupos')->update(['is_active' => false]);
+
+        $phase = TournamentPhase::query()->where('slug', 'octavos')->firstOrFail();
+        $phase->update([
+            'is_active' => true,
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addDay(),
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson('/api/client/bootstrap');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('active_phase.slug', 'octavos');
+    }
+
+    public function test_client_can_submit_prediction_for_active_elimination_match_before_kickoff(): void
+    {
+        $user = $this->createEligibleClient();
+
+        TournamentPhase::query()->where('slug', 'fase-grupos')->update(['is_active' => false]);
+
+        $phase = TournamentPhase::query()->where('slug', 'octavos')->firstOrFail();
+        $phase->update([
+            'is_active' => true,
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addDays(2),
+        ]);
+
+        $match = TournamentMatch::query()->create([
+            'phase_id' => $phase->id,
+            'match_number' => 99,
+            'group_label' => null,
+            'round_label' => 'Octavos',
+            'stage_label' => 'Eliminatoria',
+            'home_team_id' => $this->insertTeam('Brasil', 'BRA'),
+            'away_team_id' => $this->insertTeam('Argentina', 'ARG'),
+            'favorite_side' => 'home',
+            'kickoff_at' => now()->addHours(6),
+            'status' => 'scheduled',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/client/matches/{$match->id}/predict", [
+            'predicted_home_score' => 2,
+            'predicted_away_score' => 1,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('prediction.phase_id', $phase->id);
+    }
+
+    private function createEligibleClient(): User
+    {
+        $user = User::query()->create([
+            'name' => 'Participante Oficial',
+            'email' => 'cliente@example.com',
+            'cedula' => '8-864-9999',
+            'document_type' => 'cedula',
+            'password' => bcrypt('secret'),
+            'role' => 'client',
+            'is_active' => true,
+            'birthdate' => now()->subYears(25)->toDateString(),
+            'resides_in_panama' => true,
+            'is_employee' => false,
+            'phone' => '+50761234567',
+            'avatar_path' => 'avatars/test.jpg',
+            'accepted_terms_at' => now(),
+            'registration_completed_at' => now(),
+            'group_stage_goal_prediction' => 120,
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $user->id,
+            'goals_balance' => 0,
+            'shots_balance' => 0,
+            'lifetime_goals_earned' => 0,
+            'lifetime_shots_earned' => 0,
+        ]);
+
+        return $user;
+    }
+
+    private function insertTeam(string $name, string $code): int
+    {
+        return (int) \DB::table('teams')->insertGetId([
+            'name' => $name,
+            'code' => $code,
+            'group_label' => null,
+            'flag_emoji' => null,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+}

@@ -1,69 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 
-use App\Http\Controllers\Controller;
-use App\Models\SiteSetting;
-use Illuminate\Http\JsonResponse;
-use Throwable;
-
-class PublicSettingsController extends Controller
+return new class extends Migration
 {
-    public function index(): JsonResponse
-    {
-        try {
-            $officialTerms = $this->officialTerms();
-
-            return response()->json([
-                'auth_bg_youtube_id' => SiteSetting::get('auth_bg_youtube_id', ''),
-                'auth_logo_url' => SiteSetting::get('auth_logo_url', ''),
-                'participant_brands' => SiteSetting::get('participant_brands', ''),
-                'hero_video_url' => SiteSetting::get('hero_video_url', ''),
-                'seo_site_title' => SiteSetting::get('seo_site_title', ''),
-                'seo_meta_description' => SiteSetting::get('seo_meta_description', ''),
-                'seo_meta_keywords' => SiteSetting::get('seo_meta_keywords', ''),
-                'seo_og_title' => SiteSetting::get('seo_og_title', ''),
-                'seo_og_description' => SiteSetting::get('seo_og_description', ''),
-                'seo_og_image' => SiteSetting::get('seo_og_image', ''),
-                'terms_and_conditions' => SiteSetting::get('terms_and_conditions', '') ?: $officialTerms,
-                'recaptcha_site_key' => config('contest.recaptcha_site_key', ''),
-                'allow_google_auth' => (bool) config('contest.allow_google_auth', false),
-                'google_client_id' => config('services.google.client_id', ''),
-            ]);
-        } catch (Throwable) {
-            return response()->json([
-                'auth_bg_youtube_id' => env('AUTH_BG_YOUTUBE_ID', 'O9diw9_5pys'),
-                'auth_logo_url' => env('AUTH_LOGO_URL', ''),
-                'participant_brands' => env('PARTICIPANT_BRANDS', ''),
-                'hero_video_url' => '',
-                'seo_site_title' => '',
-                'seo_meta_description' => '',
-                'seo_meta_keywords' => '',
-                'seo_og_title' => '',
-                'seo_og_description' => '',
-                'seo_og_image' => '',
-                'terms_and_conditions' => $this->officialTerms(),
-                'recaptcha_site_key' => '',
-                'allow_google_auth' => false,
-                'google_client_id' => '',
-            ]);
-        }
-    }
-
-    public function updateYoutubeId(): JsonResponse
-    {
-        $validated = request()->validate([
-            'youtube_id' => ['required', 'string', 'max:20'],
-        ]);
-
-        SiteSetting::set('auth_bg_youtube_id', $validated['youtube_id']);
-
-        return response()->json(['message' => 'Video actualizado.']);
-    }
-
-    private function officialTerms(): string
-    {
-        return <<<'TERMS'
+    private const OFFICIAL_TERMS = <<<'TERMS'
 TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 
 1. GENERALIDADES DEL CONCURSO
@@ -121,5 +63,17 @@ Los datos personales suministrados serán utilizados exclusivamente para la admi
 12. ACEPTACIÓN DE LOS TÉRMINOS Y CONDICIONES
 La participación en la promoción implica el conocimiento, aceptación plena e incondicional de los presentes términos y condiciones.
 TERMS;
+
+    public function up(): void
+    {
+        DB::table('site_settings')->updateOrInsert(
+            ['key' => 'terms_and_conditions'],
+            ['value' => self::OFFICIAL_TERMS, 'updated_at' => now(), 'created_at' => now()],
+        );
     }
-}
+
+    public function down(): void
+    {
+        // Conserva el texto legal actual; no se revierte automáticamente.
+    }
+};

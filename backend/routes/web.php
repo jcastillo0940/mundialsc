@@ -90,6 +90,7 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::post('/matches/approvals/{approval}/reject', [BackofficeController::class, 'rejectMatchResult'])->name('admin.matches.approvals.reject');
         Route::post('/matches/recalculate-all', [BackofficeController::class, 'recalculateAllScores'])->name('admin.matches.recalculate-all');
         Route::get('/rules', [BackofficeController::class, 'rules'])->name('admin.rules');
+        Route::get('/points-audit', [BackofficeController::class, 'pointsAudit'])->name('admin.points-audit');
         Route::put('/rules/phases/{phase}', [BackofficeController::class, 'updatePhase'])->name('admin.rules.phase');
         Route::put('/rules/invoice', [BackofficeController::class, 'updateInvoiceSettings'])->name('admin.rules.invoice');
         Route::get('/prizes', [BackofficeController::class, 'prizes'])->name('admin.prizes');

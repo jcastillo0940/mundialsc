@@ -193,6 +193,28 @@ class ContestInvoiceRegistrationService
                         resourceType: 'registered_invoice',
                         resourceId: $invoice->id,
                         campaignId: $campaign->id,
+                        notes: 'Factura validada y punto acreditado.',
+                        meta: [
+                            'source' => 'invoice',
+                            'phase_id' => TournamentPhase::query()
+                                ->where('slug', 'fase-grupos')
+                                ->orderBy('stage_order')
+                                ->value('id'),
+                            'rule_code' => 'invoice_goal_awarded',
+                            'rule_label' => 'Factura aprobada mayor al minimo',
+                            'rule_snapshot' => [
+                                'minimum_amount' => $minimumAmount,
+                                'max_invoice_age_days' => $maxInvoiceAgeDays,
+                                'goal_value' => (int) $pointsAwarded,
+                                'validation_mode' => $settings?->validation_mode ?? 'api',
+                            ],
+                            'invoice' => [
+                                'invoice_number' => $invoice->invoice_number,
+                                'cufe' => $invoice->cufe,
+                                'purchase_amount' => (float) $invoice->purchase_amount,
+                                'validation_status' => $invoice->validation_status,
+                            ],
+                        ],
                     );
                     $this->fraudDetection->inspectApprovedInvoice($user, $invoice, $request);
                 }

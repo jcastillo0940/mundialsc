@@ -16,8 +16,6 @@ use Illuminate\Validation\ValidationException;
 
 class ClientTournamentController extends Controller
 {
-    private const GROUP_STAGE_SLUG = 'fase-grupos';
-
     public function __construct(
         private readonly PromotionRankingService $rankingService,
     ) {
@@ -101,7 +99,6 @@ class ClientTournamentController extends Controller
     {
         return TournamentPhase::query()
             ->where('is_active', true)
-            ->where('slug', self::GROUP_STAGE_SLUG)
             ->orderBy('stage_order');
     }
 }

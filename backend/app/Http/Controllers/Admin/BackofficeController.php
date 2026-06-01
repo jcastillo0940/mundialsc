@@ -23,6 +23,7 @@ use App\Models\TournamentPhase;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\LiveScoreSyncService;
+use App\Support\PointsAuditService;
 use App\Support\PromotionRankingService;
 use App\Support\TournamentScoring;
 use Illuminate\Http\RedirectResponse;
@@ -40,6 +41,7 @@ class BackofficeController extends Controller
         private readonly TournamentScoring $scoring,
         private readonly LiveScoreSyncService $liveScoreSync,
         private readonly PromotionRankingService $rankingService,
+        private readonly PointsAuditService $pointsAuditService,
     ) {
     }
 
@@ -308,6 +310,28 @@ class BackofficeController extends Controller
         ]);
     }
 
+    public function pointsAudit(Request $request): View
+    {
+        $filters = [
+            'query' => trim((string) $request->query('query', '')),
+            'source' => (string) $request->query('source', 'all'),
+            'phase_id' => (string) $request->query('phase_id', ''),
+            'impact' => (string) $request->query('impact', 'all'),
+            'rule_code' => trim((string) $request->query('rule_code', '')),
+            'date_from' => (string) $request->query('date_from', ''),
+            'date_to' => (string) $request->query('date_to', ''),
+        ];
+
+        $report = $this->pointsAuditService->report($filters);
+
+        return view('admin.points-audit', [
+            'rows' => $report['rows'],
+            'summary' => $report['summary'],
+            'filters' => $filters,
+            'phases' => TournamentPhase::query()->orderBy('stage_order')->get(),
+        ]);
+    }
+
     public function updatePhase(Request $request, TournamentPhase $phase): RedirectResponse
     {
         $data = $request->validate([
@@ -382,7 +406,8 @@ class BackofficeController extends Controller
 
     public function winners(): View
     {
-        $phase = $this->rankingService->groupStagePhase();
+        $phaseId = request()->integer('phase_id') ?: null;
+        $phase = $this->rankingService->activeRankingPhase($phaseId);
         $winnerSlots = $this->rankingService->winnerSlots();
         $leaderboard = $phase ? $this->rankingService->leaderboardForPhase($phase->id, $winnerSlots)->all() : [];
         $winners = $phase
@@ -409,6 +434,7 @@ class BackofficeController extends Controller
 
         return view('admin.winners', [
             'phase' => $phase,
+            'phases' => TournamentPhase::query()->where('is_active', true)->orderBy('stage_order')->get(),
             'leaderboard' => $leaderboard,
             'winners' => $winners,
             'winnerSlots' => $winnerSlots,
@@ -419,7 +445,8 @@ class BackofficeController extends Controller
 
     public function winnersActa(): View
     {
-        $phase = $this->rankingService->groupStagePhase();
+        $phaseId = request()->integer('phase_id') ?: null;
+        $phase = $this->rankingService->activeRankingPhase($phaseId);
         $winners = $phase
             ? PromoWinner::query()
                 ->with(['user', 'prizeToken'])
@@ -448,7 +475,8 @@ class BackofficeController extends Controller
 
     public function generateWinners(Request $request): RedirectResponse
     {
-        $phase = $this->rankingService->groupStagePhase();
+        $phaseId = $request->integer('phase_id') ?: null;
+        $phase = $this->rankingService->activeRankingPhase($phaseId);
         abort_if(! $phase, 404);
 
         $existingActive = PromoWinner::query()

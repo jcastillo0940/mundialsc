@@ -5,16 +5,25 @@
 
 <div class="card">
     <h2>Resumen de la promo</h2>
+    <form method="get" action="{{ route('admin.winners') }}" class="row" style="margin-bottom:16px">
+        <select name="phase_id">
+            @foreach($phases as $phaseOption)
+                <option value="{{ $phaseOption->id }}" @selected($phase && $phaseOption->id === $phase->id)>{{ $phaseOption->name }}</option>
+            @endforeach
+        </select>
+        <button type="submit" class="ghost">Cambiar fase</button>
+    </form>
     @if($phase)
         <p><strong>Fase activa:</strong> {{ $phase->name }}</p>
         <p><strong>Max_Premios:</strong> {{ $winnerSlots }} | La tabla oficial se corta estrictamente en ese limite.</p>
-        <p><a href="{{ route('admin.winners.acta') }}" target="_blank">Abrir acta general de ganadores</a></p>
+        <p><a href="{{ route('admin.winners.acta', ['phase_id' => $phase->id]) }}" target="_blank">Abrir acta general de ganadores</a></p>
         <form method="post" action="{{ route('admin.winners.generate') }}">
             @csrf
+            <input type="hidden" name="phase_id" value="{{ $phase->id }}">
             <button type="submit">Generar seleccion inicial</button>
         </form>
     @else
-        <p>No hay fase de grupos activa configurada.</p>
+        <p>No hay una fase activa configurada para ganadores.</p>
     @endif
 </div>
 

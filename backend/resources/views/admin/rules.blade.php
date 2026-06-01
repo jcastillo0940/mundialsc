@@ -23,7 +23,7 @@
         </select>
         <button type="submit">Guardar</button>
     </form>
-    <p><small>Regla actual de la promo: factura mayor a $25 sin ITBMS, máximo 1 día de antigüedad y 1 punto por factura aprobada.</small></p>
+    <p><small>Regla oficial vigente: factura mayor a USD 25.00 sin ITBMS, emitida dentro del último día calendario y con 1 punto por factura aprobada.</small></p>
 </div>
 
 @foreach($phases as $phase)
@@ -41,7 +41,9 @@
             <button type="submit">Actualizar fase</button>
         </form>
         @if($phase->slug === 'fase-grupos')
-            <p><small>La Polla Super Carnes usa esta lógica fija en fase de grupos: 1 punto favorito, 2 empate, 3 no favorito y 3 puntos extra por marcador exacto.</small></p>
+            <p><small>En fase de grupos la lógica oficial es fija: 1 punto por favorito, 2 por empate, 3 por no favorito y 3 puntos extra por marcador exacto.</small></p>
+        @else
+            <p><small>Esta fase también forma parte de la promoción oficial. Revisa fechas, activación y premios antes de publicar ganadores.</small></p>
         @endif
     </div>
 @endforeach

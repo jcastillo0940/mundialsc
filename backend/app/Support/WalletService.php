@@ -30,12 +30,13 @@ class WalletService
         ?int $resourceId = null,
         ?int $campaignId = null,
         ?string $notes = null,
+        ?array $meta = null,
     ): void {
         if ($amount <= 0) {
             return;
         }
 
-        DB::transaction(function () use ($user, $amount, $type, $resourceType, $resourceId, $campaignId, $notes): void {
+        DB::transaction(function () use ($user, $amount, $type, $resourceType, $resourceId, $campaignId, $notes, $meta): void {
             $wallet = Wallet::query()
                 ->where('user_id', $user->id)
                 ->lockForUpdate()
@@ -54,6 +55,7 @@ class WalletService
                 'goals_delta'   => $amount,
                 'shots_delta'   => 0,
                 'notes'         => $notes,
+                'meta'          => $meta,
                 'created_at'    => now(),
             ]);
         });
