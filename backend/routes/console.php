@@ -12,3 +12,5 @@ Schedule::command('supercarnes:expire-coupons')->everyMinute();
 Schedule::command('livescore:sync-live')->everyMinute();
 Schedule::command('livescore:sync-commentary')->everyMinute();
 Schedule::command('livescore:sync-fixtures')->hourly();
+Schedule::command('contest:reverify-invoices')->weekly();
+Schedule::command('contest:expire-unresponsive-winners')->everyMinute();

@@ -25,6 +25,7 @@
     .btn-finalize:disabled{opacity:.4;cursor:not-allowed}
     .status-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
     .status-badge.final{background:#1f3d2a;color:#2ecc71;border:1px solid #1f6f45}
+    .status-badge.void{background:#3d1f1f;color:#ff9c8a;border:1px solid #6f2a1f}
     .status-badge.locked{background:#2d2a10;color:#f0c040;border:1px solid #5a4f10}
     .status-badge.scheduled{background:#20313a;color:var(--muted);border:1px solid var(--line)}
     .score-display{font-size:22px;font-weight:700;margin-right:8px}
@@ -68,6 +69,38 @@
         <button type="submit">Guardar partido</button>
     </form>
 </div>
+
+@if(($pendingApprovals ?? collect())->count())
+<div class="card" style="margin-bottom:18px;border-color:#8a6a18">
+    <h2 style="margin-top:0">Marcadores pendientes de aprobacion dual</h2>
+    <p class="muted">Regla de los 4 ojos: un administrador propone el marcador y otro administrador debe aprobarlo.</p>
+    <table>
+        <thead><tr><th>Partido</th><th>Marcador propuesto</th><th>Propuesto por</th><th>Accion</th></tr></thead>
+        <tbody>
+        @foreach($pendingApprovals as $approval)
+            <tr>
+                <td>{{ $approval->match->homeTeam->name }} vs {{ $approval->match->awayTeam->name }}</td>
+                <td>{{ $approval->home_score }} - {{ $approval->away_score }}</td>
+                <td>{{ $approval->proposer?->name ?? 'N/D' }}</td>
+                <td>
+                    <div class="row">
+                        <form method="post" action="{{ route('admin.matches.approvals.approve', $approval) }}">
+                            @csrf
+                            <button type="submit">Aprobar</button>
+                        </form>
+                        <form method="post" action="{{ route('admin.matches.approvals.reject', $approval) }}">
+                            @csrf
+                            <input name="notes" placeholder="Motivo de rechazo">
+                            <button type="submit" class="danger">Rechazar</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table>
+</div>
+@endif
 
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px">
     <h2 style="margin:0">Partidos ({{ $matches->count() }})</h2>
@@ -154,6 +187,7 @@
                             <option value="scheduled" @selected($match->status === 'scheduled')>scheduled</option>
                             <option value="locked" @selected($match->status === 'locked')>locked</option>
                             <option value="final" @selected($match->status === 'final')>final</option>
+                            <option value="void" @selected($match->status === 'void')>void</option>
                         </select>
                     </div>
                     <div>
@@ -166,6 +200,10 @@
                     </div>
                 </div>
                 <button type="submit" class="ghost">Guardar ajuste</button>
+            </form>
+            <form method="post" action="{{ route('admin.matches.void', $match) }}" style="margin-top:10px">
+                @csrf
+                <button type="submit" class="danger">Partido anulado / walkover sin puntos</button>
             </form>
             <details>
                 <summary>Info API</summary>

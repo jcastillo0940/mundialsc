@@ -39,6 +39,7 @@
                 <th>Puntos</th>
                 <th>Exactos</th>
                 <th>Facturas</th>
+                <th>Token de premio</th>
                 <th>Estado</th>
                 <th>Razón de selección</th>
             </tr>
@@ -54,6 +55,7 @@
                 <td>{{ number_format((float) $winner->total_points, 2) }}</td>
                 <td>{{ $winner->exact_hits }}</td>
                 <td>{{ $winner->invoice_count }}</td>
+                <td>{{ $winner->prizeToken?->token_code ?? 'sin token' }}</td>
                 <td>{{ $winner->status }}</td>
                 <td>{{ $winner->selection_reason }}</td>
             </tr>

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\RegisteredInvoice;
-use App\Support\Audit;
 use App\Support\ContestInvoiceRegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,19 +39,14 @@ class InvoiceController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'qr_raw_text' => ['required', 'string'],
+            'qr_raw_text' => ['required', 'string', 'max:2048'],
             'purchase_amount' => ['required', 'numeric', 'min:0.01'],
             'branch_id' => ['nullable', 'integer'],
             'invoice_number' => ['nullable', 'string', 'max:80'],
             'issued_at' => ['nullable', 'date'],
         ]);
 
-        $result = $this->registrationService->register($request->user(), $data);
-
-        Audit::log('invoice.registered', 'registered_invoice', $result['invoice']->id, $request->user(), $request, [
-            'cufe' => $result['invoice']->cufe,
-            'validation_status' => $result['invoice']->validation_status,
-        ]);
+        $result = $this->registrationService->register($request->user(), $data, $request);
 
         return response()->json([
             'message' => $result['message'],

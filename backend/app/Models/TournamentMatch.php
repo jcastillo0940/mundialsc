@@ -65,4 +65,9 @@ class TournamentMatch extends Model
     {
         return $this->hasMany(MatchPrediction::class, 'match_id');
     }
+
+    public function resultApprovals(): HasMany
+    {
+        return $this->hasMany(MatchResultApproval::class, 'tournament_match_id');
+    }
 }

@@ -39,7 +39,7 @@ class ContestInvoiceVerifier
 
         if (! $response->successful() || $apiError) {
             throw ValidationException::withMessages([
-                'cufe' => $apiError ?? 'No fue posible consultar la factura en este momento.',
+                'cufe' => $apiError ? 'La factura no pudo ser validada por DGI.' : 'No fue posible consultar la factura en este momento.',
             ]);
         }
 
@@ -51,6 +51,7 @@ class ContestInvoiceVerifier
             'invoice_number'   => strtoupper((string) ($datos['cufe'] ?? $cufe)),
             'purchase_amount'  => round((float) ($datos['total_pagado'] ?? 0), 2),
             'issued_at'        => $this->parseInvoiceDate((string) ($datos['fecha_autorizacion'] ?? '')),
+            'issuer_ruc'        => (string) ($datos['emisor_ruc'] ?? $datos['ruc_emisor'] ?? $datos['ruc'] ?? ''),
             'issuer_name'      => (string) ($datos['emisor_nombre'] ?? ''),
             'payload'          => $body,
         ];
@@ -62,10 +63,10 @@ class ContestInvoiceVerifier
         $validationMode = $settings?->validation_mode ?? 'manual';
         $endpoint = config('contest.dgi_verifier_url');
 
-        if ($validationMode === 'manual' || ! $endpoint) {
+        if ($validationMode !== 'api' || ! $endpoint) {
             return [
-                'status' => 'approved',
-                'notes' => 'Factura aprobada con validacion interna. La integracion DGI queda desacoplada por ahora.',
+                'status' => 'rejected',
+                'notes' => 'La validacion oficial exige confirmacion directa contra DGI.',
                 'canonical_cufe' => $payload['cufe'],
                 'payload' => null,
             ];
@@ -86,34 +87,33 @@ class ContestInvoiceVerifier
 
         $body = $resolved['payload'];
         $canonicalCufe = (string) $resolved['cufe'];
+        $status = strtolower((string) data_get($body, 'status', data_get($body, 'datos.status', '')));
+        $isValid = data_get($body, 'valid', data_get($body, 'datos.valid'));
+        $ownerMatches = data_get($body, 'owner_matches', data_get($body, 'datos.owner_matches'));
+        $notes = (string) (data_get($body, 'notes') ?? data_get($body, 'datos.notes') ?? 'Factura validada contra DGI.');
 
-        if ($canonicalCufe !== '') {
+        if (in_array($status, ['invalid', 'rejected', 'failed'], true) || ($isValid !== null && ! filter_var($isValid, FILTER_VALIDATE_BOOL))) {
             return [
-                'status' => 'approved',
-                'notes' => 'Factura validada contra DGI.',
-                'canonical_cufe' => strtoupper($canonicalCufe),
-                'payload' => $body,
-            ];
-        }
-
-        $status = strtolower((string) ($body['status'] ?? ''));
-        $isValid = filter_var($body['valid'] ?? false, FILTER_VALIDATE_BOOL);
-        $ownerMatches = ! array_key_exists('owner_matches', $body)
-            || filter_var($body['owner_matches'], FILTER_VALIDATE_BOOL);
-
-        if (! $isValid) {
-            return [
-                'status' => 'rejected',
-                'notes' => (string) ($body['notes'] ?? 'DGI marco el CUFE como invalido.'),
+                'status' => 'disqualify',
+                'notes' => $notes !== 'Factura validada contra DGI.' ? $notes : 'DGI marco el CUFE como invalido.',
                 'canonical_cufe' => $payload['cufe'],
                 'payload' => $body,
             ];
         }
 
-        if (! $ownerMatches || $status === 'mismatch') {
+        if ($status === 'mismatch' || ($ownerMatches !== null && ! filter_var($ownerMatches, FILTER_VALIDATE_BOOL))) {
             return [
                 'status' => 'disqualify',
-                'notes' => (string) ($body['notes'] ?? 'La factura no pertenece al participante registrado.'),
+                'notes' => $notes !== 'Factura validada contra DGI.' ? $notes : 'La factura no pertenece al participante registrado.',
+                'canonical_cufe' => $payload['cufe'],
+                'payload' => $body,
+            ];
+        }
+
+        if ($canonicalCufe === '') {
+            return [
+                'status' => 'pending',
+                'notes' => 'DGI no devolvio un CUFE canonico para confirmar la factura.',
                 'canonical_cufe' => $payload['cufe'],
                 'payload' => $body,
             ];
@@ -121,8 +121,8 @@ class ContestInvoiceVerifier
 
         return [
             'status' => 'approved',
-            'notes' => (string) ($body['notes'] ?? 'Factura validada contra DGI.'),
-            'canonical_cufe' => $payload['cufe'],
+            'notes' => $notes,
+            'canonical_cufe' => strtoupper($canonicalCufe),
             'payload' => $body,
         ];
     }
@@ -133,7 +133,9 @@ class ContestInvoiceVerifier
         $trimmed = trim($rawDate);
 
         if ($trimmed === '') {
-            return now($timezone)->toImmutable();
+            throw ValidationException::withMessages([
+                'issued_at' => 'DGI no devolvio una fecha de emision valida para la factura.',
+            ]);
         }
 
         $formats = ['d/m/Y H:i:s', 'Y-m-d H:i:s', DATE_ATOM];

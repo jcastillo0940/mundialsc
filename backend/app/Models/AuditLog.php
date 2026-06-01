@@ -17,6 +17,8 @@ class AuditLog extends Model
         'ip_address',
         'user_agent',
         'payload',
+        'previous_hash',
+        'entry_hash',
         'created_at',
     ];
 

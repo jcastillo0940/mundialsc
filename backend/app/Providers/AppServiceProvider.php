@@ -25,6 +25,30 @@ class AppServiceProvider extends ServiceProvider
     {
         Authenticate::redirectUsing(fn (Request $request) => route('admin.login'));
 
+        RateLimiter::for('auth-login', function (Request $request) {
+            $identity = strtolower((string) ($request->input('email') ?: $request->input('cedula') ?: 'anonymous'));
+            $identityHash = sha1(substr($identity, 0, 150));
+
+            return [
+                Limit::perMinute(5)->by('login-user:'.$identityHash.'|'.$request->ip()),
+                Limit::perMinute(20)->by('login-ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('auth-register', function (Request $request) {
+            return [
+                Limit::perMinute(3)->by('register-ip:'.$request->ip()),
+                Limit::perHour(20)->by('register-hour-ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('auth-google', function (Request $request) {
+            return [
+                Limit::perMinute(10)->by('google-ip:'.$request->ip()),
+                Limit::perMinute(5)->by('google-session:'.sha1((string) $request->input('credential')).'|'.$request->ip()),
+            ];
+        });
+
         RateLimiter::for('invoice-scan', function (Request $request) {
             $key = $request->user()?->id ? 'user:'.$request->user()->id : 'ip:'.$request->ip();
 

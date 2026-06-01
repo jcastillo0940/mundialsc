@@ -26,6 +26,8 @@ const CONTEST_NAME = 'Polla Mundialista Super Carnes 2026'
 const REGISTRATION_DEADLINE = '10 de junio de 2026'
 const WINNERS_ANNOUNCEMENT = '10 de julio de 2026'
 const PANAMA_TIMEZONE = 'America/Panama'
+const DEFAULT_AUTH_BG_YOUTUBE_ID = import.meta.env.VITE_AUTH_BG_YOUTUBE_ID ?? 'O9diw9_5pys'
+const DEFAULT_AUTH_LOGO_URL = import.meta.env.VITE_AUTH_LOGO_URL ?? ''
 const STADIUM_IMAGE_URL =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBEx-hRFUMZ710fF7EatYLLO_SftyRg0ww2GvBNKWHSjPObe2Hu17fXzKDy8LOFbxMv93SOa0IWNTCINLfrcTI4Gv7Fb8T-KRHOU6iyLxekm6vci5QI1h6h-jtqFVtscsl4aPJJld2V-TOyhBaZNKlPweuhcxfvNwlUxFNiz07sFuBIttiDysG-4NIdDsaDGIygvIgQn-m1chePGiwL3D2k8IOl-CypudZp6J8U6ve38WWsbNyTIdWbQWlJlq2K7BKdk_nqv4a5KH8'
 
@@ -33,6 +35,11 @@ type AuthMode = 'login' | 'register'
 type MainView = 'cancha' | 'reglas' | 'facturas' | 'perfil' | 'cuenta'
 type PredictionMode = 'pending' | 'mine'
 type InvoiceEntryMode = 'scan' | 'manual'
+
+interface ParticipantBrand {
+  name: string
+  logo_url?: string
+}
 
 const CLIENT_VIEW_PATHS: Record<MainView, string> = {
   cancha: '/cancha',
@@ -137,7 +144,6 @@ interface CanvasCropBounds {
   heightRatio: number
 }
 
-const DGI_QR_URL_PREFIX = 'http://35.188.24.113/api/verificar?cufe='
 const QR_READER_ELEMENT_ID = 'dgi-qr-reader'
 const INVOICE_SCANNER_FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
@@ -340,7 +346,7 @@ function normalizeIdentityNumber(documentType: AuthFormState['document_type'], v
   const trimmed = value.trim().toUpperCase()
 
   if (documentType === 'cedula') {
-    return trimmed.replace(/[^0-9-]/g, '')
+    return trimmed.replace(/[^A-Z0-9-]/g, '')
   }
 
   return trimmed.replace(/[^A-Z0-9-]/g, '')
@@ -353,7 +359,7 @@ function documentNumberLabel(documentType: AuthFormState['document_type']) {
 }
 
 function documentNumberPlaceholder(documentType: AuthFormState['document_type']) {
-  if (documentType === 'cedula') return 'Ej: 8-864-1164'
+  if (documentType === 'cedula') return 'Ej: 8-864-1164, PE-123-456'
   if (documentType === 'residente') return 'Ej: E-123456 o PE-123-456'
   return 'Ej: PA1234567'
 }
@@ -366,8 +372,8 @@ function validateDocumentNumber(documentType: AuthFormState['document_type'], va
   }
 
   if (documentType === 'cedula') {
-    if (!/^\d{1,2}-\d{1,4}-\d{1,6}$/.test(normalized)) {
-      return 'La cedula debe usar formato de Panama, por ejemplo 8-864-1164, 9-150-523 o 7-23-111.'
+    if (!/^(\d{1,2}-\d{1,4}-\d{1,6}|PE-\d{1,4}-\d{1,6}|E-\d{1,4}-\d{1,6}|N-\d{1,4}-\d{1,6})$/.test(normalized)) {
+      return 'La cedula debe usar formato de Panama, por ejemplo 8-864-1164, PE-123-456, E-123-456 o N-123-456.'
     }
 
     return null
@@ -421,6 +427,30 @@ function normalizeError(rawError: unknown): string {
 
   const firstError = candidate.response?.data?.errors ? Object.values(candidate.response.data.errors)[0]?.[0] : null
   return firstError ?? candidate.response?.data?.message ?? fallback
+}
+
+function normalizePanamaPhone(value: string) {
+  const digits = value.replace(/\D/g, '')
+  const localDigits = digits.startsWith('507') ? digits.slice(3, 11) : digits.slice(0, 8)
+  return localDigits ? `+507${localDigits}` : ''
+}
+
+function validatePanamaPhone(value: string) {
+  return /^\+507\d{8}$/.test(value)
+}
+
+function parseParticipantBrands(value?: string | null): ParticipantBrand[] {
+  if (!value) return []
+
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name, logoUrl] = line.split('|').map((part) => part.trim())
+      return { name, logo_url: logoUrl || undefined }
+    })
+    .filter((brand) => Boolean(brand.name))
 }
 
 function formatUpperDate(dateValue: string) {
@@ -502,11 +532,11 @@ function normalizeInvoiceQrPayload(value: string) {
   }
 
   if (/^cufe=/i.test(trimmedValue)) {
-    return `${DGI_QR_URL_PREFIX}${extractInvoiceCufe(trimmedValue)}`
+    return `cufe=${extractInvoiceCufe(trimmedValue)}`
   }
 
   const extractedCufe = extractInvoiceCufe(trimmedValue)
-  return extractedCufe ? `${DGI_QR_URL_PREFIX}${extractedCufe}` : trimmedValue
+  return extractedCufe ? `cufe=${extractedCufe}` : trimmedValue
 }
 
 function extractInvoiceCufeFromOcrText(value: string) {
@@ -819,6 +849,46 @@ function currentViewFromPath(pathname: string): MainView {
   return 'cancha'
 }
 
+const OFFICIAL_TERMS_TEXT = `TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
+
+1. GENERALIDADES DEL CONCURSO
+La promoción comercial denominada "Polla Mundialista Super Carnes" (en adelante, "El Concurso") es organizada por Super Carnes. El objetivo es premiar la fidelidad y el conocimiento futbolístico de nuestros clientes durante la Fase de Grupos de la Copa Mundial de la FIFA 2026.
+
+2. PREMIOS
+Se premiará a los participantes que acumulen la mayor cantidad de puntos al finalizar la Fase de Grupos. Cada ganador recibirá un premio definido por Super Carnes para esta promoción. Los premios no son transferibles ni canjeables por dinero en efectivo.
+
+3. ELEGIBILIDAD Y PARTICIPACIÓN
+Podrán participar personas naturales, mayores de 18 años, residentes en Panamá, que posean Cédula de Identidad Personal o Pasaporte vigente.
+No podrán participar empleados directos de Super Carnes.
+Para participar, el usuario debe registrarse en la plataforma a más tardar el día 10 de junio de 2026, proporcionando: nombre completo, cédula o pasaporte, correo electrónico, teléfono de contacto y su pronóstico del total de goles de la fase de grupos.
+
+4. SISTEMA DE PUNTUACIÓN
+Los participantes acumularán puntos según la precisión de sus pronósticos en los partidos de la Fase de Grupos, bajo la siguiente estructura:
+1 punto: Por acertar la victoria del equipo "Favorito".
+Nota aclaratoria sobre el favoritismo: se considerará como equipo "Favorito" en un partido a la selección nacional que ocupe la mejor posición, es decir, el número más bajo, en el Ranking Mundial Masculino de la FIFA vigente a la fecha de lanzamiento de esta promoción. Esta clasificación será la única fuente oficial para determinar los puntos de victoria y no se alterará durante la fase de grupos, independientemente de actualizaciones posteriores del ranking de la FIFA.
+2 puntos: Por acertar que el resultado final del partido será un empate.
+3 puntos: Por acertar la victoria del equipo "No Favorito".
+3 puntos adicionales: Por acertar el marcador o resultado exacto del partido.
+1 punto adicional por compras: Por ingresar en la plataforma el CUFE, Código Único de Facturación Electrónica, de una factura de compra realizada en Super Carnes por un monto mayor a $25.00, sin incluir ITBMS. La factura debe tener fecha de emisión de máximo un día anterior a la fecha en que se registra en la plataforma.
+
+5. CRITERIOS DE DESEMPATE
+En caso de que dos o más participantes culminen la Fase de Grupos con la misma puntuación total, afectando la selección de los ganadores, se aplicarán los siguientes filtros en estricto orden hasta obtener un ganador único:
+Mayor cantidad de resultados exactos.
+Mayor volumen de facturas válidas.
+Mayor valor de compras acumulado en dólares entre todas las facturas válidas registradas.
+Acierto global de goles: quien haya acertado o se haya acercado más, por exceso o defecto, a la cantidad total de goles anotados en toda la Fase de Grupos, según la predicción hecha al momento de registrarse.
+Registro de tiempo: el participante que haya enviado y completado su registro de pronósticos primero, validado por la fecha, hora, minuto y segundo en el sistema de la plataforma.
+
+6. NOTIFICACIÓN Y ENTREGA DEL PREMIO
+Los ganadores oficiales serán anunciados el día 10 de julio de 2026 a través de las redes sociales oficiales de Super Carnes.
+Los ganadores serán contactados vía correo electrónico y llamada telefónica. Si un potencial ganador no responde a los intentos de contacto en un plazo de 24 horas, perderá automáticamente el derecho al premio y Super Carnes adjudicará el mismo al siguiente participante en la tabla de posiciones.
+
+7. PROTECCIÓN DE DATOS Y ACEPTACIÓN
+Al registrarse, el participante acepta estos términos y condiciones, y autoriza a Super Carnes al uso de sus datos personales exclusivamente para fines de este concurso y contacto comercial, en cumplimiento de las leyes de protección de datos vigentes.
+
+8. VALIDACIÓN DE FACTURAS (CUFE)
+Toda factura ingresada para obtener puntos adicionales o para ser utilizada como criterio de desempate será verificada estrictamente contra el sistema de la Dirección General de Ingresos (DGI). Solo serán válidos los Códigos Únicos de Facturación Electrónica (CUFE) legítimos, que no hayan sido registrados previamente por otro participante, y que cumplan con los montos y fechas estipuladas. El intento de registro de un CUFE falso, alterado o perteneciente a otra persona resultará en la descalificación inmediata del participante.`
+
 export function App() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -859,7 +929,11 @@ export function App() {
   const [loading, setLoading] = useState(false)
   const [authBootstrapping, setAuthBootstrapping] = useState<boolean>(Boolean(localStorage.getItem(TOKEN_KEY)))
   const [registerStep, setRegisterStep] = useState(1)
-  const [authBgVideoId, setAuthBgVideoId] = useState('')
+  const [authBgVideoId, setAuthBgVideoId] = useState(DEFAULT_AUTH_BG_YOUTUBE_ID)
+  const [authLogoUrl, setAuthLogoUrl] = useState(DEFAULT_AUTH_LOGO_URL)
+  const [participantBrands, setParticipantBrands] = useState<ParticipantBrand[]>([])
+  const [termsText, setTermsText] = useState(OFFICIAL_TERMS_TEXT)
+  const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('')
   const [termsModalOpen, setTermsModalOpen] = useState(false)
   const [termsScrolledEnd, setTermsScrolledEnd] = useState(false)
   const [savingPredictionIds, setSavingPredictionIds] = useState<number[]>([])
@@ -885,6 +959,16 @@ export function App() {
   const currentView = currentViewFromPath(location.pathname)
   const isAuthRoute = location.pathname === '/login'
   const currentViewLabel = CLIENT_VIEW_LABELS[currentView]
+  const authCarouselBrands = participantBrands.length > 0
+    ? [...participantBrands, ...participantBrands]
+    : [
+        { name: 'Super Carnes' },
+        { name: 'Importadora Virzi' },
+        { name: 'Marcas participantes' },
+        { name: 'Super Carnes' },
+        { name: 'Importadora Virzi' },
+        { name: 'Marcas participantes' },
+      ]
 
   useEffect(() => {
     if (!registrationAvatarFile) {
@@ -899,10 +983,27 @@ export function App() {
   }, [registrationAvatarFile])
 
   useEffect(() => {
-    api.get<{ auth_bg_youtube_id: string }>('/public/settings')
-      .then((res) => { if (res.data.auth_bg_youtube_id) setAuthBgVideoId(res.data.auth_bg_youtube_id) })
+    api.get<{ auth_bg_youtube_id: string; auth_logo_url?: string; participant_brands?: string; terms_and_conditions?: string; recaptcha_site_key?: string }>('/public/settings')
+      .then((res) => {
+        if (res.data.auth_bg_youtube_id) setAuthBgVideoId(res.data.auth_bg_youtube_id)
+        if (res.data.auth_logo_url) setAuthLogoUrl(res.data.auth_logo_url)
+        if (res.data.terms_and_conditions?.trim()) setTermsText(res.data.terms_and_conditions)
+        if (res.data.recaptcha_site_key) setRecaptchaSiteKey(res.data.recaptcha_site_key)
+        setParticipantBrands(parseParticipantBrands(res.data.participant_brands))
+      })
       .catch(() => null)
   }, [])
+
+  useEffect(() => {
+    if (!recaptchaSiteKey || document.querySelector('script[data-recaptcha="v3"]')) return
+
+    const script = document.createElement('script')
+    script.src = `https://www.google.com/recaptcha/api.js?render=${recaptchaSiteKey}`
+    script.async = true
+    script.defer = true
+    script.dataset.recaptcha = 'v3'
+    document.head.appendChild(script)
+  }, [recaptchaSiteKey])
 
   useEffect(() => {
     setApiToken(token)
@@ -1515,6 +1616,15 @@ export function App() {
               payload.append('password', authForm.password)
               payload.append('password_confirmation', authForm.password_confirmation)
               payload.append('avatar', registrationAvatarFile)
+              const recaptcha = (window as unknown as { grecaptcha?: { ready: (cb: () => void) => void; execute: (key: string, opts: { action: string }) => Promise<string> } }).grecaptcha
+              if (recaptchaSiteKey && recaptcha) {
+                const recaptchaToken = await new Promise<string>((resolve) => {
+                  recaptcha.ready(() => {
+                    recaptcha.execute(recaptchaSiteKey, { action: 'register' }).then(resolve)
+                  })
+                })
+                payload.append('recaptcha_token', recaptchaToken)
+              }
 
               return api.post(endpoint, payload, {
                 headers: {
@@ -2070,56 +2180,7 @@ export function App() {
     )
   }
 
-  const TERMS_TEXT = `TÉRMINOS Y CONDICIONES
-MUNDIALISTA SUPER CARNES 2026
-
-1. ORGANIZA
-La presente promoción es organizada por Super Carnes S.A. e Importadora Virzi S.A. y sus empresas afiliadas (en adelante, "los Organizadores").
-
-2. VIGENCIA
-La promoción está vigente del 10 de junio de 2026 al 10 de julio de 2026, o hasta agotar los premios disponibles.
-
-3. PARTICIPANTES ELEGIBLES
-Podrán participar personas naturales que cumplan todos los siguientes requisitos:
-• Ser mayor de 18 años de edad.
-• Ser residente en la República de Panamá.
-• NO ser empleado directo, contratista directo ni familiar de primer grado de Super Carnes S.A., Importadora Virzi S.A. ni de ninguna de sus empresas afiliadas o subsidiarias.
-• No haber sido descalificado previamente de esta u otras promociones de los Organizadores.
-
-4. MECÁNICA DE PARTICIPACIÓN
-4.1. El participante deberá registrarse en la plataforma digital proporcionando datos verídicos y completos.
-4.2. Deberá registrar sus facturas de compra emitidas en las tiendas participantes de Super Carnes durante la vigencia de la promoción.
-4.3. Cada factura válida genera puntos ("goles") acumulables en la cuenta del participante.
-4.4. El participante deberá completar sus pronósticos de resultados para los partidos del Mundial FIFA 2026 dentro de los plazos establecidos.
-4.5. El pronóstico de goles totales en la fase de grupos, registrado al momento del registro, servirá como criterio de desempate.
-
-5. PREMIOS
-Los premios serán anunciados en la plataforma y/o en los puntos de venta participantes durante la vigencia de la promoción. Los Organizadores se reservan el derecho de modificar los premios sin previo aviso, siempre que el valor total no sea inferior al anunciado.
-
-6. DETERMINACIÓN DE GANADORES
-Al finalizar la fase de grupos del Mundial FIFA 2026, el participante con mayor puntaje acumulado será el ganador. En caso de empate, se utilizará el pronóstico de goles totales. Si el empate persiste, los Organizadores realizarán un sorteo entre los empatados.
-
-7. VERACIDAD DE LA INFORMACIÓN
-Al registrarse y participar, el participante declara y garantiza que:
-• Toda la información proporcionada es verdadera, exacta y completa.
-• Cumple con todos los requisitos de elegibilidad descritos en el numeral 3.
-• No es empleado directo, contratista ni familiar de primer grado de los Organizadores ni de ninguna empresa afiliada.
-La participación con información falsa o engañosa será motivo de descalificación inmediata y podrá conllevar acciones legales.
-
-8. PROTECCIÓN DE DATOS PERSONALES
-Los datos personales recopilados serán utilizados exclusivamente para la administración y ejecución de esta promoción, conforme a lo establecido en la Ley 81 de 2019 de Protección de Datos Personales de la República de Panamá. El participante autoriza expresamente a los Organizadores a usar su nombre e imagen con fines publicitarios relacionados con la promoción, sin remuneración adicional.
-
-9. LIMITACIÓN DE RESPONSABILIDAD
-Los Organizadores no serán responsables por fallas técnicas, interrupciones del servicio, errores de transmisión de datos ni cualquier otro factor fuera de su control razonable que pudiera afectar la participación.
-
-10. MODIFICACIÓN Y CANCELACIÓN
-Los Organizadores se reservan el derecho de modificar, suspender o cancelar esta promoción en cualquier momento, notificando a los participantes a través de los canales oficiales.
-
-11. LEY APLICABLE
-Esta promoción se rige por las leyes de la República de Panamá. Cualquier controversia será sometida a la jurisdicción de los tribunales competentes de la ciudad de Panamá.
-
-12. ACEPTACIÓN
-Al marcar "Acepto los términos y condiciones", el participante declara haber leído, comprendido y aceptado plenamente e incondicionalmente todos los términos aquí descritos, incluyendo la declaración expresa de no ser empleado, contratista ni familiar de primer grado de los Organizadores ni de sus empresas afiliadas.`
+  const TERMS_TEXT = termsText.trim() ? termsText : OFFICIAL_TERMS_TEXT
 
   return (
     <div className="marea-app-shell">
@@ -2173,22 +2234,49 @@ Al marcar "Acepto los términos y condiciones", el participante declara haber le
 
       {!user ? (
         <section className="auth-shell">
+          <div className="auth-ambient" aria-hidden="true" />
+          {authBgVideoId ? (
+            <div className="auth-hero-video">
+              <iframe
+                src={`https://www.youtube.com/embed/${authBgVideoId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${authBgVideoId}&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1`}
+                allow="autoplay; encrypted-media"
+                frameBorder={0}
+                title="Video de fondo de la promocion"
+              />
+            </div>
+          ) : null}
+          <div className="auth-top-logo">
+            {authLogoUrl ? <img alt="Logo de la promocion" src={authLogoUrl} /> : <span>Super Carnes</span>}
+          </div>
           <div className="auth-hero">
-            {authBgVideoId ? (
-              <div className="auth-hero-video">
-                <iframe
-                  src={`https://www.youtube.com/embed/${authBgVideoId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${authBgVideoId}&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0`}
-                  allow="autoplay; encrypted-media"
-                  frameBorder={0}
-                  title="Fondo"
-                />
-              </div>
-            ) : null}
             <div className="auth-hero-overlay" />
             <div className="auth-hero-content">
-              <p className="auth-kicker">MUNDIALISTA · SUPER CARNES 2026</p>
-              <h1>{CONTEST_NAME}</h1>
-              <p>Registro para mayores de edad residentes en Panamá.</p>
+              <p className="auth-kicker">PROMOCION SUPER CARNES 2026</p>
+              <h1 className="auth-campaign-title">
+                <span>Panama va</span>
+                <span>al Mundial</span>
+                <span>y tu ganas</span>
+              </h1>
+              <p>Registra tus facturas, pronostica partidos y participa por premios durante la ruta mundialista.</p>
+              <div className="auth-hero-chips" aria-label="Beneficios de la promocion">
+                <span>Facturas</span>
+                <span>Pronosticos</span>
+                <span>Premios</span>
+              </div>
+              <div className="auth-promo-strip">
+                <article>
+                  <span>01</span>
+                  <strong>Compra</strong>
+                </article>
+                <article>
+                  <span>02</span>
+                  <strong>Registra</strong>
+                </article>
+                <article>
+                  <span>03</span>
+                  <strong>Gana</strong>
+                </article>
+              </div>
             </div>
           </div>
 
@@ -2200,6 +2288,16 @@ Al marcar "Acepto los términos y condiciones", el participante declara haber le
               <button className={authMode === 'register' ? 'active' : ''} type="button" onClick={() => { setAuthMode('register'); setRegisterStep(1) }}>
                 Registrarse
               </button>
+            </div>
+
+            <div className="auth-panel-header">
+              <p>{authMode === 'login' ? 'Acceso privado' : 'Nuevo participante'}</p>
+              <h2>{authMode === 'login' ? 'Entra a la promo' : 'Unete a la promocion'}</h2>
+              <span>
+                {authMode === 'login'
+                  ? 'Continua registrando facturas y jugando tus predicciones.'
+                  : 'Completa tus datos para participar por premios de Super Carnes.'}
+              </span>
             </div>
 
             {authMode === 'register' ? (
@@ -2266,9 +2364,9 @@ Al marcar "Acepto los términos y condiciones", el participante declara haber le
                         Teléfono *
                         <input
                           required
-                          placeholder="Ej: 6000-0000"
+                          placeholder="+50761234567"
                           value={authForm.phone}
-                          onChange={(event) => setAuthForm({ ...authForm, phone: event.target.value })}
+                          onChange={(event) => setAuthForm({ ...authForm, phone: normalizePanamaPhone(event.target.value) })}
                         />
                       </label>
                     </div>
@@ -2467,6 +2565,7 @@ Al marcar "Acepto los términos y condiciones", el participante declara haber le
                         if (!registrationAvatarFile) { setError('Debes subir tu foto de perfil.'); return }
                         if (!authForm.full_name.trim()) { setError('Debes ingresar tu nombre completo.'); return }
                         if (!authForm.phone.trim()) { setError('Debes ingresar tu número de teléfono.'); return }
+                        if (!validatePanamaPhone(authForm.phone)) { setError('El telefono debe usar formato panameno +507 seguido de 8 digitos.'); return }
                       }
                       if (registerStep === 2) {
                         const docError = validateDocumentNumber(authForm.document_type, authForm.cedula)
@@ -2485,7 +2584,7 @@ Al marcar "Acepto los términos y condiciones", el participante declara haber le
                     <span className="material-symbols-outlined">arrow_forward</span>
                   </button>
                 ) : (
-                  <button className="auth-submit auth-submit-step" disabled={loading} type="submit">
+                  <button className="auth-submit auth-submit-step" disabled={loading || !isAtLeast18(authForm.birthdate)} type="submit">
                     {loading ? 'Procesando...' : 'Completar registro'}
                   </button>
                 )}
@@ -2501,6 +2600,25 @@ Al marcar "Acepto los términos y condiciones", el participante declara haber le
               {authMode === 'register' ? `Registro hasta el ${REGISTRATION_DEADLINE}` : 'Mundialista · Super Carnes 2026'}
             </p>
           </form>
+          <div className="auth-football-ticker" aria-hidden="true">
+            <div className="auth-brand-track">
+              {authCarouselBrands.map((brand, index) => (
+                <span className="auth-brand-item" key={`${brand.name}-${index}`}>
+                  {brand.logo_url ? <img alt="" src={brand.logo_url} /> : null}
+                  <strong>{brand.name}</strong>
+                </span>
+            ))}
+            </div>
+          </div>
+          <footer className="auth-footer">
+            <strong>Mundialista 2026</strong>
+            <nav aria-label="Legal">
+              <button type="button" onClick={() => { setTermsScrolledEnd(false); setTermsModalOpen(true) }}>Terminos y Condiciones</button>
+              <span>Privacidad</span>
+              <span>Contacto</span>
+            </nav>
+            <small>Super Carnes</small>
+          </footer>
         </section>
       ) : (
         <div className="client-shell bg-background text-on-background font-body-lg min-h-screen">

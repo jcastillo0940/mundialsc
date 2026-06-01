@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DailyInvoiceGoal;
+use App\Models\FraudFlag;
 use App\Models\InvoiceGoalSetting;
 use App\Models\LiveScoreCommentaryEvent;
 use App\Models\LiveScoreSetting;
 use App\Models\LiveScoreSyncRun;
 use App\Models\MatchPrediction;
+use App\Models\MatchResultApproval;
 use App\Models\PhasePrize;
+use App\Models\PrizeToken;
 use App\Models\PromoWinner;
 use App\Models\PromoWinnerContact;
 use App\Models\RegisteredInvoice;
@@ -26,8 +29,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackofficeController extends Controller
 {
@@ -45,7 +50,7 @@ class BackofficeController extends Controller
             'matchesCount' => TournamentMatch::query()->count(),
             'predictionsCount' => MatchPrediction::query()->count(),
             'invoiceGoalsCount' => RegisteredInvoice::query()->count(),
-            'winnersCount' => PromoWinner::query()->whereIn('status', ['selected', 'contacting', 'confirmed'])->count(),
+            'winnersCount' => PromoWinner::query()->whereIn('status', ['selected', 'contacting', 'confirmed', 'delivered'])->count(),
             'usersCount' => User::query()->where('role', 'client')->count(),
             'disqualifiedUsersCount' => User::query()->whereNotNull('disqualified_at')->count(),
         ]);
@@ -55,6 +60,11 @@ class BackofficeController extends Controller
     {
         return view('admin.matches', [
             'matches' => TournamentMatch::query()->with(['phase', 'homeTeam', 'awayTeam'])->orderBy('kickoff_at')->get(),
+            'pendingApprovals' => MatchResultApproval::query()
+                ->with(['match.homeTeam', 'match.awayTeam', 'proposer'])
+                ->where('status', 'pending')
+                ->latest('id')
+                ->get(),
             'phases' => TournamentPhase::query()->orderBy('stage_order')->get(),
             'teams' => Team::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
@@ -104,7 +114,12 @@ class BackofficeController extends Controller
             }
 
             if ($teams->has($code)) {
-                $teams[$code]->update(['ranking_fifa' => $ranking]);
+                $payload = ['ranking_fifa' => $ranking];
+                if (! $teams[$code]->frozen_ranking_fifa) {
+                    $payload['frozen_ranking_fifa'] = $ranking;
+                    $payload['ranking_frozen_at'] = now();
+                }
+                $teams[$code]->update($payload);
                 $updated++;
             } else {
                 $skipped[] = $code;
@@ -146,16 +161,22 @@ class BackofficeController extends Controller
         $data = $request->validate([
             'home_score' => ['nullable', 'integer', 'min:0', 'max:20'],
             'away_score' => ['nullable', 'integer', 'min:0', 'max:20'],
-            'status' => ['required', 'in:scheduled,locked,final'],
+            'status' => ['required', 'in:scheduled,locked,final,void'],
             'favorite_side' => ['required', 'in:home,away,none'],
         ]);
 
+        if ($data['status'] === 'final') {
+            if ($data['home_score'] === null || $data['away_score'] === null) {
+                throw ValidationException::withMessages([
+                    'score' => 'Debes ingresar ambos marcadores para solicitar finalizacion.',
+                ]);
+            }
+
+            return $this->requestMatchResultApproval($request, $match, (int) $data['home_score'], (int) $data['away_score']);
+        }
+
         $match->update($data);
         $this->liveScoreSync->refreshFavoriteSidesFromRankings();
-
-        if ($match->status === 'final' && $match->home_score !== null && $match->away_score !== null) {
-            $this->scoring->recalculateForMatch($match->fresh('phase', 'predictions'));
-        }
 
         return back()->with('status', 'Partido actualizado.');
     }
@@ -167,17 +188,82 @@ class BackofficeController extends Controller
             'away_score' => ['required', 'integer', 'min:0', 'max:20'],
         ]);
 
+        return $this->requestMatchResultApproval($request, $match, (int) $data['home_score'], (int) $data['away_score']);
+    }
+    public function approveMatchResult(Request $request, MatchResultApproval $approval): RedirectResponse
+    {
+        if ($approval->status !== 'pending') {
+            return back()->withErrors(['approval' => 'Esta solicitud ya fue procesada.']);
+        }
+
+        if ((int) $approval->proposed_by_user_id === (int) $request->user()->id) {
+            return back()->withErrors(['approval' => 'La regla de 4 ojos requiere que otro administrador apruebe el marcador.']);
+        }
+
+        $match = $approval->match()->with('phase')->firstOrFail();
         $match->update([
-            'home_score' => $data['home_score'],
-            'away_score' => $data['away_score'],
+            'home_score' => $approval->home_score,
+            'away_score' => $approval->away_score,
             'status' => 'final',
         ]);
 
+        $this->ensureOfficialFavoriteForFinal($match->fresh('phase'));
         $this->scoring->recalculateForMatch($match->fresh('phase', 'predictions'));
-
         $affected = $match->predictions()->count();
 
-        return back()->with('status', "Partido finalizado con {$data['home_score']}-{$data['away_score']}. Puntos recalculados para {$affected} predicción(es).");
+        $approval->update([
+            'status' => 'approved',
+            'approved_by_user_id' => $request->user()->id,
+            'approved_at' => now(),
+        ]);
+
+        Audit::log('match.result.approved', 'match_result_approval', $approval->id, $request->user(), $request, [
+            'match_id' => $match->id,
+            'home_score' => $approval->home_score,
+            'away_score' => $approval->away_score,
+        ]);
+
+        return back()->with('status', "Marcador aprobado con regla de 4 ojos. Puntos recalculados para {$affected} prediccion(es).");
+    }
+
+    public function voidMatch(Request $request, TournamentMatch $match): RedirectResponse
+    {
+        $match->update([
+            'home_score' => null,
+            'away_score' => null,
+            'status' => 'void',
+        ]);
+
+        MatchPrediction::query()
+            ->where('match_id', $match->id)
+            ->update([
+                'points_awarded' => 0,
+                'result_type' => 'void',
+            ]);
+
+        Audit::log('match.voided', 'tournament_match', $match->id, $request->user(), $request);
+
+        return back()->with('status', 'Partido anulado. Todas las predicciones de ese encuentro quedaron en 0 puntos.');
+    }
+
+    public function rejectMatchResult(Request $request, MatchResultApproval $approval): RedirectResponse
+    {
+        $data = $request->validate([
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $approval->update([
+            'status' => 'rejected',
+            'approved_by_user_id' => $request->user()->id,
+            'approved_at' => now(),
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        Audit::log('match.result.rejected', 'match_result_approval', $approval->id, $request->user(), $request, [
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        return back()->with('status', 'Solicitud de marcador rechazada.');
     }
 
     public function recalculateAllScores(): RedirectResponse
@@ -190,6 +276,7 @@ class BackofficeController extends Controller
             ->get();
 
         foreach ($matches as $match) {
+            $this->ensureOfficialFavoriteForFinal($match);
             $this->scoring->recalculateForMatch($match);
         }
 
@@ -201,6 +288,11 @@ class BackofficeController extends Controller
         $data = $request->validate([
             'ranking_fifa' => ['nullable', 'integer', 'min:1', 'max:999'],
         ]);
+
+        if (! $team->frozen_ranking_fifa && ! empty($data['ranking_fifa'])) {
+            $data['frozen_ranking_fifa'] = $data['ranking_fifa'];
+            $data['ranking_frozen_at'] = now();
+        }
 
         $team->update($data);
         $this->liveScoreSync->refreshFavoriteSidesFromRankings();
@@ -239,7 +331,7 @@ class BackofficeController extends Controller
             'min_purchase_amount' => ['required', 'numeric', 'min:0'],
             'max_invoice_age_days' => ['required', 'integer', 'min:0', 'max:7'],
             'one_invoice_per_day' => ['required', 'boolean'],
-            'validation_mode' => ['required', 'in:manual,external_db,api'],
+            'validation_mode' => ['required', 'in:api'],
         ]);
 
         $settings->update($data);
@@ -291,19 +383,26 @@ class BackofficeController extends Controller
     public function winners(): View
     {
         $phase = $this->rankingService->groupStagePhase();
-        $leaderboard = $phase ? $this->rankingService->leaderboardForPhase($phase->id)->all() : [];
+        $winnerSlots = $this->rankingService->winnerSlots();
+        $leaderboard = $phase ? $this->rankingService->leaderboardForPhase($phase->id, $winnerSlots)->all() : [];
         $winners = $phase
             ? PromoWinner::query()
-                ->with(['user', 'contacts'])
+                ->with(['user', 'contacts', 'prizeToken'])
                 ->where('phase_id', $phase->id)
                 ->orderBy('leaderboard_position')
                 ->orderBy('id')
                 ->get()
             : collect();
+        $prizeTokens = $phase
+            ? PrizeToken::query()
+                ->where('phase_id', $phase->id)
+                ->orderBy('token_code')
+                ->get()
+            : collect();
 
         $excludedUserIds = $winners->pluck('user_id')->all();
-        $activeWinnersCount = $winners->whereIn('status', ['selected', 'contacting', 'confirmed'])->count();
-        $remainingSlots = max(PromotionRankingService::WINNER_SLOTS - $activeWinnersCount, 0);
+        $activeWinnersCount = $winners->whereIn('status', ['selected', 'contacting', 'confirmed', 'delivered'])->count();
+        $remainingSlots = max($winnerSlots - $activeWinnersCount, 0);
         $tieContext = $phase && $remainingSlots > 0
             ? $this->rankingService->tieContextForPhase($phase->id, $remainingSlots, $excludedUserIds)
             : ['requires_draw' => false, 'auto_selected' => [], 'tied_candidates' => [], 'remaining_slots' => 0];
@@ -312,7 +411,8 @@ class BackofficeController extends Controller
             'phase' => $phase,
             'leaderboard' => $leaderboard,
             'winners' => $winners,
-            'winnerSlots' => PromotionRankingService::WINNER_SLOTS,
+            'winnerSlots' => $winnerSlots,
+            'prizeTokens' => $prizeTokens,
             'tieContext' => $tieContext,
         ]);
     }
@@ -322,7 +422,7 @@ class BackofficeController extends Controller
         $phase = $this->rankingService->groupStagePhase();
         $winners = $phase
             ? PromoWinner::query()
-                ->with('user')
+                ->with(['user', 'prizeToken'])
                 ->where('phase_id', $phase->id)
                 ->orderBy('leaderboard_position')
                 ->orderBy('id')
@@ -338,7 +438,7 @@ class BackofficeController extends Controller
 
     public function winnerCommunicationsActa(PromoWinner $winner): View
     {
-        $winner->loadMissing(['phase', 'user', 'contacts']);
+        $winner->loadMissing(['phase', 'user', 'contacts', 'prizeToken']);
 
         return view('admin.winner-communications-acta', [
             'winner' => $winner,
@@ -353,69 +453,37 @@ class BackofficeController extends Controller
 
         $existingActive = PromoWinner::query()
             ->where('phase_id', $phase->id)
-            ->whereIn('status', ['selected', 'contacting', 'confirmed'])
+            ->whereIn('status', ['selected', 'contacting', 'confirmed', 'delivered'])
             ->exists();
 
         if ($existingActive) {
             return back()->with('status', 'Ya existe una selección activa de ganadores para esta fase.');
         }
 
-        $context = $this->rankingService->tieContextForPhase($phase->id, PromotionRankingService::WINNER_SLOTS);
+        $winnerSlots = $this->rankingService->winnerSlots();
+        $this->ensurePrizeTokensForPhase($phase->id, $winnerSlots);
+        $rows = $this->rankingService->leaderboardForPhase($phase->id, $winnerSlots);
 
-        foreach ($context['auto_selected'] as $row) {
-            $this->createWinnerFromRow($phase->id, $row, 'rank', $request->user()->id);
-        }
+        DB::transaction(function () use ($rows, $phase, $request): void {
+            foreach ($rows as $row) {
+                $this->createWinnerFromRow($phase->id, $row, 'rank', $request->user()->id);
+            }
+        });
 
         Audit::log('promo.winners.generated', 'promo_winner', null, $request->user(), $request, [
             'phase_id' => $phase->id,
-            'auto_selected_count' => count($context['auto_selected']),
-            'requires_draw' => $context['requires_draw'],
+            'auto_selected_count' => $rows->count(),
+            'limit' => $winnerSlots,
         ]);
 
-        if ($context['requires_draw']) {
-            return back()->with('status', 'Selección inicial creada. Hay empate técnico y debes resolverlo por sorteo.');
-        }
-
-        return back()->with('status', 'Ganadores iniciales generados.');
+        return back()->with('status', "Ganadores iniciales generados con limite estricto de {$winnerSlots} token(es) de premio.");
     }
 
     public function resolveDraw(Request $request): RedirectResponse
     {
-        $phase = $this->rankingService->groupStagePhase();
-        abort_if(! $phase, 404);
-
-        $data = $request->validate([
-            'slots' => ['required', 'integer', 'min:1', 'max:3'],
-            'candidate_user_ids' => ['required', 'array', 'min:1'],
-            'candidate_user_ids.*' => ['integer'],
+        throw ValidationException::withMessages([
+            'draw' => 'El sorteo manual esta deshabilitado. El sistema resuelve empates por cascada y timestamp de servidor.',
         ]);
-
-        $candidateIds = collect($data['candidate_user_ids'])->map(fn ($id) => (int) $id)->all();
-        $excluded = PromoWinner::query()->where('phase_id', $phase->id)->pluck('user_id')->all();
-        $eligibleRows = $this->rankingService->leaderboardForPhase($phase->id)
-            ->filter(fn (array $row) => in_array($row['user_id'], $candidateIds, true) && ! in_array($row['user_id'], $excluded, true))
-            ->values();
-
-        if ($eligibleRows->count() < $data['slots']) {
-            throw ValidationException::withMessages([
-                'draw' => 'No hay suficientes candidatos elegibles para resolver el sorteo.',
-            ]);
-        }
-
-        $selectedRows = $eligibleRows->shuffle()->take($data['slots']);
-
-        DB::transaction(function () use ($selectedRows, $phase, $request): void {
-            foreach ($selectedRows as $row) {
-                $this->createWinnerFromRow($phase->id, $row, 'draw', $request->user()->id);
-            }
-        });
-
-        Audit::log('promo.winners.draw_resolved', 'promo_winner', null, $request->user(), $request, [
-            'phase_id' => $phase->id,
-            'selected_user_ids' => $selectedRows->pluck('user_id')->all(),
-        ]);
-
-        return back()->with('status', 'Sorteo resuelto y ganadores asignados.');
     }
 
     public function logWinnerContact(Request $request, PromoWinner $winner): RedirectResponse
@@ -452,6 +520,11 @@ class BackofficeController extends Controller
 
     public function confirmWinner(Request $request, PromoWinner $winner): RedirectResponse
     {
+        if ($winner->status === 'delivered' || $winner->prize_delivered_at) {
+            return back()->withErrors(['winner' => 'Este premio ya fue entregado y la cuenta esta bloqueada para nuevos premios.']);
+        }
+
+
         $winner->update([
             'status' => 'confirmed',
             'responded_at' => now(),
@@ -471,6 +544,60 @@ class BackofficeController extends Controller
         return back()->with('status', 'Ganador confirmado.');
     }
 
+    public function deliverWinner(Request $request, PromoWinner $winner): RedirectResponse
+    {
+        DB::transaction(function () use ($winner, $request): void {
+            $winner->loadMissing('prizeToken');
+
+            if (! $winner->prizeToken) {
+                throw ValidationException::withMessages([
+                    'prize_token' => 'Este ganador no tiene token de premio asignado.',
+                ]);
+            }
+
+            if (PromoWinner::query()
+                ->where('user_id', $winner->user_id)
+                ->where('id', '!=', $winner->id)
+                ->where(function ($query): void {
+                    $query->where('status', 'delivered')->orWhereNotNull('prize_delivered_at');
+                })
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'winner' => 'Esta cedula/pasaporte ya tiene un premio entregado.',
+                ]);
+            }
+
+            $winner->update([
+                'status' => 'delivered',
+                'responded_at' => $winner->responded_at ?? now(),
+                'prize_delivered_at' => now(),
+            ]);
+
+            $winner->prizeToken->update([
+                'status' => 'delivered',
+                'current_promo_winner_id' => $winner->id,
+                'assigned_user_id' => $winner->user_id,
+                'delivered_at' => now(),
+            ]);
+
+            PromoWinnerContact::query()->create([
+                'promo_winner_id' => $winner->id,
+                'contact_type' => 'other',
+                'contact_status' => 'confirmed',
+                'contacted_at' => now(),
+                'notes' => 'Premio entregado. Cuenta bloqueada para recibir otro premio.',
+                'created_by' => $request->user()->id,
+            ]);
+
+            Audit::log('promo.winner.prize_delivered', 'promo_winner', $winner->id, $request->user(), $request, [
+                'prize_token_id' => $winner->prize_token_id,
+                'token_code' => $winner->prizeToken->token_code,
+            ]);
+        });
+
+        return back()->with('status', 'Premio entregado. La cuenta queda bloqueada para recibir otro premio.');
+    }
+
     public function updateWinner(Request $request, PromoWinner $winner): RedirectResponse
     {
         $data = $request->validate([
@@ -478,10 +605,22 @@ class BackofficeController extends Controller
             'total_points' => ['required', 'numeric', 'min:0'],
             'exact_hits' => ['required', 'integer', 'min:0'],
             'invoice_count' => ['required', 'integer', 'min:0'],
-            'status' => ['required', 'in:selected,contacting,confirmed,disqualified'],
+            'status' => ['required', 'in:selected,contacting,confirmed,delivered,disqualified'],
             'selection_reason' => ['required', 'in:rank,draw,replacement,manual'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        if ($data['status'] === 'delivered' && PromoWinner::query()
+            ->where('user_id', $winner->user_id)
+            ->where('id', '!=', $winner->id)
+            ->where(function ($query): void {
+                $query->where('status', 'delivered')->orWhereNotNull('prize_delivered_at');
+            })
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'winner' => 'Esta cedula/pasaporte ya tiene un premio entregado.',
+            ]);
+        }
 
         $winner->update([
             'leaderboard_position' => $data['leaderboard_position'],
@@ -492,8 +631,19 @@ class BackofficeController extends Controller
             'selection_reason' => $data['selection_reason'],
             'notes' => $data['notes'] ?? null,
             'disqualified_at' => $data['status'] === 'disqualified' ? ($winner->disqualified_at ?? now()) : null,
-            'responded_at' => $data['status'] === 'confirmed' ? ($winner->responded_at ?? now()) : $winner->responded_at,
+            'responded_at' => in_array($data['status'], ['confirmed', 'delivered'], true) ? ($winner->responded_at ?? now()) : $winner->responded_at,
+            'prize_delivered_at' => $data['status'] === 'delivered' ? ($winner->prize_delivered_at ?? now()) : $winner->prize_delivered_at,
         ]);
+
+        if ($data['status'] === 'delivered') {
+            $winner->loadMissing('prizeToken');
+            $winner->prizeToken?->update([
+                'status' => 'delivered',
+                'current_promo_winner_id' => $winner->id,
+                'assigned_user_id' => $winner->user_id,
+                'delivered_at' => $winner->prize_delivered_at ?? now(),
+            ]);
+        }
 
         Audit::log('promo.winner.updated', 'promo_winner', $winner->id, $request->user(), $request, Arr::only($data, [
             'leaderboard_position',
@@ -509,26 +659,43 @@ class BackofficeController extends Controller
 
     public function disqualifyWinner(Request $request, PromoWinner $winner): RedirectResponse
     {
+        if ($winner->status === 'delivered' || $winner->prize_delivered_at) {
+            throw ValidationException::withMessages([
+                'winner' => 'No se puede reasignar un premio ya entregado.',
+            ]);
+        }
+
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $winner->update([
-            'status' => 'disqualified',
-            'notes' => $data['reason'],
-            'disqualified_at' => now(),
-        ]);
+        $replacement = DB::transaction(function () use ($winner, $request, $data): ?array {
+            $winner->loadMissing('prizeToken');
 
-        PromoWinnerContact::query()->create([
-            'promo_winner_id' => $winner->id,
-            'contact_type' => 'other',
-            'contact_status' => 'discarded',
-            'contacted_at' => now(),
-            'notes' => $data['reason'],
-            'created_by' => $request->user()->id,
-        ]);
+            $winner->update([
+                'status' => 'disqualified',
+                'prize_token_id' => null,
+                'notes' => $data['reason'],
+                'disqualified_at' => now(),
+            ]);
 
-        $replacement = $this->promoteNextWinner($winner, $request->user()->id);
+            $winner->prizeToken?->update([
+                'status' => 'reassigned',
+                'current_promo_winner_id' => null,
+                'reassigned_from_promo_winner_id' => $winner->id,
+            ]);
+
+            PromoWinnerContact::query()->create([
+                'promo_winner_id' => $winner->id,
+                'contact_type' => 'other',
+                'contact_status' => 'discarded',
+                'contacted_at' => now(),
+                'notes' => $data['reason'],
+                'created_by' => $request->user()->id,
+            ]);
+
+            return $this->promoteNextWinner($winner, $request->user()->id, $winner->prizeToken);
+        });
 
         Audit::log('promo.winner.disqualified', 'promo_winner', $winner->id, $request->user(), $request, [
             'reason' => $data['reason'],
@@ -634,6 +801,89 @@ class BackofficeController extends Controller
         return back()->with('status', 'Estado del usuario actualizado.');
     }
 
+    public function fraud(): View
+    {
+        return view('admin.fraud', [
+            'flags' => FraudFlag::query()
+                ->with(['user', 'invoice', 'reviewer'])
+                ->latest('id')
+                ->limit(200)
+                ->get(),
+            'summary' => [
+                'open' => FraudFlag::query()->whereIn('status', ['open', 'reviewing'])->count(),
+                'critical' => FraudFlag::query()->where('severity', 'critical')->whereIn('status', ['open', 'reviewing'])->count(),
+                'resolved' => FraudFlag::query()->whereIn('status', ['resolved', 'dismissed'])->count(),
+            ],
+        ]);
+    }
+
+    public function updateFraudFlag(Request $request, FraudFlag $flag): RedirectResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'in:open,reviewing,resolved,dismissed'],
+            'resolution_notes' => ['nullable', 'string', 'max:1500'],
+            'disqualify_user' => ['required', 'boolean'],
+        ]);
+
+        $flag->update([
+            'status' => $data['status'],
+            'resolution_notes' => $data['resolution_notes'] ?? null,
+            'reviewed_by_user_id' => $request->user()->id,
+            'reviewed_at' => now(),
+        ]);
+
+        if ((bool) $data['disqualify_user']) {
+            $flag->user?->update([
+                'is_active' => false,
+                'disqualified_at' => $flag->user->disqualified_at ?? now(),
+                'disqualification_reason' => $data['resolution_notes'] ?: $flag->title,
+            ]);
+        }
+
+        Audit::log('fraud.flag.reviewed', 'fraud_flag', $flag->id, $request->user(), $request, [
+            'status' => $flag->status,
+            'disqualified_user' => (bool) $data['disqualify_user'],
+        ]);
+
+        return back()->with('status', 'Caso antifraude actualizado.');
+    }
+
+    public function exportFraudFlags(): StreamedResponse
+    {
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="fraud-flags.csv"',
+        ];
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['id', 'fecha', 'estado', 'severidad', 'tipo', 'usuario', 'cedula', 'email', 'cufe', 'titulo', 'descripcion']);
+
+            FraudFlag::query()
+                ->with(['user', 'invoice'])
+                ->orderBy('id')
+                ->chunk(200, function ($flags) use ($handle): void {
+                    foreach ($flags as $flag) {
+                        fputcsv($handle, [
+                            $flag->id,
+                            optional($flag->created_at)?->toDateTimeString(),
+                            $flag->status,
+                            $flag->severity,
+                            $flag->flag_type,
+                            $flag->user?->name,
+                            $flag->user?->cedula,
+                            $flag->user?->email,
+                            $flag->invoice?->cufe,
+                            $flag->title,
+                            $flag->description,
+                        ]);
+                    }
+                });
+
+            fclose($handle);
+        }, 'fraud-flags.csv', $headers);
+    }
+
     public function site(): View
     {
         return view('admin.site', [
@@ -645,6 +895,8 @@ class BackofficeController extends Controller
     {
         $data = $request->validate([
             'auth_bg_youtube_id' => ['nullable', 'string', 'max:20'],
+            'auth_logo_url' => ['nullable', 'url', 'max:255'],
+            'participant_brands' => ['nullable', 'string'],
             'hero_video_url' => ['nullable', 'url', 'max:255'],
             'seo_site_title' => ['nullable', 'string', 'max:120'],
             'seo_meta_description' => ['nullable', 'string', 'max:255'],
@@ -683,6 +935,8 @@ class BackofficeController extends Controller
     {
         $keys = [
             'auth_bg_youtube_id',
+            'auth_logo_url',
+            'participant_brands',
             'hero_video_url',
             'seo_site_title',
             'seo_meta_description',
@@ -702,14 +956,30 @@ class BackofficeController extends Controller
         return $settings;
     }
 
-    private function createWinnerFromRow(int $phaseId, array $row, string $reason, ?int $createdBy = null, ?int $replacementForWinnerId = null): PromoWinner
+    private function createWinnerFromRow(
+        int $phaseId,
+        array $row,
+        string $reason,
+        ?int $createdBy = null,
+        ?int $replacementForWinnerId = null,
+        ?PrizeToken $forcedToken = null,
+    ): PromoWinner
     {
-        return PromoWinner::query()->updateOrCreate(
+        $token = $forcedToken ?? $this->nextAvailablePrizeToken($phaseId, (int) $row['position']);
+
+        if (! $token) {
+            throw ValidationException::withMessages([
+                'prize_inventory' => 'No hay tokens fisicos de premio disponibles para asignar mas ganadores.',
+            ]);
+        }
+
+        $winner = PromoWinner::query()->updateOrCreate(
             [
                 'phase_id' => $phaseId,
                 'user_id' => $row['user_id'],
             ],
             [
+                'prize_token_id' => $token->id,
                 'leaderboard_position' => $row['position'],
                 'total_points' => $row['goals'],
                 'exact_hits' => $row['exact_hits'],
@@ -724,9 +994,145 @@ class BackofficeController extends Controller
                 'created_by' => $createdBy,
             ],
         );
+
+        $token->update([
+            'status' => 'awaiting_claim',
+            'current_promo_winner_id' => $winner->id,
+            'assigned_user_id' => $winner->user_id,
+            'assigned_at' => now(),
+            'reassigned_from_promo_winner_id' => $replacementForWinnerId,
+        ]);
+
+        return $winner;
     }
 
-    private function promoteNextWinner(PromoWinner $winner, ?int $createdBy = null): ?array
+    private function ensurePrizeTokensForPhase(int $phaseId, int $requiredTokens): void
+    {
+        $existingTokens = PrizeToken::query()->where('phase_id', $phaseId)->count();
+
+        if ($existingTokens >= $requiredTokens) {
+            return;
+        }
+
+        $phasePrizes = PhasePrize::query()
+            ->where('phase_id', $phaseId)
+            ->orderBy('ranking_from')
+            ->get();
+
+        if ($phasePrizes->isEmpty()) {
+            for ($index = $existingTokens + 1; $index <= $requiredTokens; $index++) {
+                PrizeToken::query()->firstOrCreate(
+                    ['token_code' => sprintf('FASE_%d_PREMIO_TV_%d', $phaseId, $index)],
+                    [
+                        'phase_id' => $phaseId,
+                        'prize_title' => 'Televisor',
+                        'prize_type' => 'TV',
+                        'status' => 'available',
+                    ],
+                );
+            }
+
+            return;
+        }
+
+        foreach ($phasePrizes as $phasePrize) {
+            for ($index = 1; $index <= max((int) $phasePrize->stock, 0); $index++) {
+                PrizeToken::query()->firstOrCreate(
+                    ['token_code' => $this->prizeTokenCode($phasePrize, $index)],
+                    [
+                        'phase_id' => $phaseId,
+                        'phase_prize_id' => $phasePrize->id,
+                        'prize_title' => $phasePrize->prize_title,
+                        'prize_type' => $phasePrize->prize_type,
+                        'status' => 'available',
+                    ],
+                );
+            }
+        }
+
+        if (PrizeToken::query()->where('phase_id', $phaseId)->count() < $requiredTokens) {
+            throw ValidationException::withMessages([
+                'prize_inventory' => "El inventario fisico no alcanza el maximo de {$requiredTokens} premio(s).",
+            ]);
+        }
+    }
+
+    private function nextAvailablePrizeToken(int $phaseId, int $leaderboardPosition): ?PrizeToken
+    {
+        $phasePrizeIds = PhasePrize::query()
+            ->where('phase_id', $phaseId)
+            ->where('ranking_from', '<=', $leaderboardPosition)
+            ->where('ranking_to', '>=', $leaderboardPosition)
+            ->pluck('id')
+            ->all();
+
+        return PrizeToken::query()
+            ->where('phase_id', $phaseId)
+            ->where('status', 'available')
+            ->when($phasePrizeIds !== [], fn ($query) => $query->whereIn('phase_prize_id', $phasePrizeIds))
+            ->orderBy('token_code')
+            ->lockForUpdate()
+            ->first()
+            ?? PrizeToken::query()
+                ->where('phase_id', $phaseId)
+                ->where('status', 'available')
+                ->orderBy('token_code')
+                ->lockForUpdate()
+                ->first();
+    }
+
+    private function prizeTokenCode(PhasePrize $phasePrize, int $index): string
+    {
+        $base = Str::upper(Str::slug($phasePrize->prize_type ?: $phasePrize->prize_title, '_')) ?: 'PREMIO';
+
+        return sprintf('FASE_%d_%s_%d', $phasePrize->phase_id, $base, $index);
+    }
+
+    private function requestMatchResultApproval(Request $request, TournamentMatch $match, int $homeScore, int $awayScore): RedirectResponse
+    {
+        $candidate = $match->replicate();
+        $candidate->home_score = $homeScore;
+        $candidate->away_score = $awayScore;
+        $candidate->setRelation('phase', $match->phase);
+        $this->ensureOfficialFavoriteForFinal($candidate->loadMissing('phase'));
+
+        $approval = MatchResultApproval::query()->create([
+            'tournament_match_id' => $match->id,
+            'proposed_by_user_id' => $request->user()->id,
+            'home_score' => $homeScore,
+            'away_score' => $awayScore,
+            'status' => 'pending',
+        ]);
+
+        Audit::log('match.result.proposed', 'match_result_approval', $approval->id, $request->user(), $request, [
+            'match_id' => $match->id,
+            'home_score' => $homeScore,
+            'away_score' => $awayScore,
+        ]);
+
+        return back()->with('status', 'Marcador enviado a aprobacion dual. Otro administrador debe aprobarlo para recalcular puntos.');
+    }
+
+    private function ensureOfficialFavoriteForFinal(TournamentMatch $match): void
+    {
+        if ($match->phase?->slug !== 'fase-grupos') {
+            return;
+        }
+
+        if ($match->home_score === $match->away_score) {
+            return;
+        }
+
+        if ($match->favorite_side !== 'none') {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'favorite_side' => 'No se puede finalizar o recalcular un partido con ganador sin ranking FIFA oficial para ambos equipos.',
+        ]);
+    }
+
+    private function promoteNextWinner(PromoWinner $winner, ?int $createdBy = null, ?PrizeToken $token = null): ?array
     {
         $excludedUserIds = PromoWinner::query()
             ->where('phase_id', $winner->phase_id)
@@ -739,7 +1145,7 @@ class BackofficeController extends Controller
             return null;
         }
 
-        $this->createWinnerFromRow($winner->phase_id, $next, 'replacement', $createdBy, $winner->id);
+        $this->createWinnerFromRow($winner->phase_id, $next, 'replacement', $createdBy, $winner->id, $token);
 
         return $next;
     }

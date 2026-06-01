@@ -35,11 +35,11 @@ class DailyInvoiceGoalController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'qr_raw_text' => ['required', 'string'],
+            'qr_raw_text' => ['required', 'string', 'max:2048'],
             'branch_id' => ['nullable', 'integer'],
         ]);
 
-        $result = $this->registrationService->register($request->user(), $data);
+        $result = $this->registrationService->register($request->user(), $data, $request);
 
         return response()->json([
             'message' => $result['message'],
@@ -50,7 +50,7 @@ class DailyInvoiceGoalController extends Controller
     public function resolve(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'qr_raw_text' => ['required', 'string'],
+            'qr_raw_text' => ['required', 'string', 'max:2048'],
         ]);
 
         $result = $this->registrationService->resolveInvoiceData($data['qr_raw_text']);

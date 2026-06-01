@@ -10,6 +10,7 @@ class PromoWinner extends Model
 {
     protected $fillable = [
         'phase_id',
+        'prize_token_id',
         'user_id',
         'leaderboard_position',
         'total_points',
@@ -25,6 +26,7 @@ class PromoWinner extends Model
         'selected_at',
         'last_contact_at',
         'responded_at',
+        'prize_delivered_at',
         'disqualified_at',
         'created_by',
     ];
@@ -39,6 +41,7 @@ class PromoWinner extends Model
             'selected_at' => 'datetime',
             'last_contact_at' => 'datetime',
             'responded_at' => 'datetime',
+            'prize_delivered_at' => 'datetime',
             'disqualified_at' => 'datetime',
         ];
     }
@@ -56,6 +59,11 @@ class PromoWinner extends Model
     public function contacts(): HasMany
     {
         return $this->hasMany(PromoWinnerContact::class, 'promo_winner_id');
+    }
+
+    public function prizeToken(): BelongsTo
+    {
+        return $this->belongsTo(PrizeToken::class, 'prize_token_id');
     }
 
     public function replacementFor(): BelongsTo

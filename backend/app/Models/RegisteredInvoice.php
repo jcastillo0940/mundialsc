@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class RegisteredInvoice extends Model
 {
@@ -16,6 +17,8 @@ class RegisteredInvoice extends Model
         'cufe',
         'qr_raw_text',
         'invoice_number',
+        'issuer_ruc',
+        'issuer_name',
         'fiscal_document_type',
         'issued_at',
         'purchase_amount',
@@ -27,6 +30,7 @@ class RegisteredInvoice extends Model
         'validation_status',
         'validation_notes',
         'dgi_checked_at',
+        'last_reverified_at',
         'dgi_response_payload',
     ];
 
@@ -38,6 +42,7 @@ class RegisteredInvoice extends Model
             'daily_points_capped' => 'boolean',
             'daily_invoice_limit_hit' => 'boolean',
             'dgi_checked_at' => 'datetime',
+            'last_reverified_at' => 'datetime',
             'dgi_response_payload' => 'array',
         ];
     }
@@ -50,5 +55,10 @@ class RegisteredInvoice extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function fraudFlags(): HasMany
+    {
+        return $this->hasMany(FraudFlag::class);
     }
 }

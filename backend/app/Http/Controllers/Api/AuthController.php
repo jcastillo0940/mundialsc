@@ -37,7 +37,7 @@ class AuthController extends Controller
             'document_type' => ['required', 'in:cedula,passport,residente'],
             'cedula' => ['required', 'string', 'max:40', 'unique:users,cedula'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => ['required', 'string', 'max:12', 'regex:/^\+507[0-9]{8}$/', 'unique:users,phone'],
             'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'birthdate' => ['required', 'date', 'before_or_equal:'.now('America/Panama')->subYears(18)->toDateString()],
             'resides_in_panama' => ['required', 'accepted'],
@@ -45,7 +45,11 @@ class AuthController extends Controller
             'accepted_terms' => ['required', 'accepted'],
             'group_stage_goal_prediction' => ['required', 'integer', 'min:0', 'max:300'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
+            'recaptcha_token' => ['nullable', 'string'],
         ]);
+
+        $this->verifyCaptcha($request);
+        $this->verifyPanamaIp($request);
 
         $data['cedula'] = $this->normalizeIdentityNumber($data['document_type'], $data['cedula']);
         $this->validateIdentityNumber($data['document_type'], $data['cedula']);
@@ -56,7 +60,20 @@ class AuthController extends Controller
             ]);
         }
 
+        $employeeDenylist = array_filter(array_map(
+            fn (string $value) => Str::upper(trim($value)),
+            explode(',', (string) config('contest.employee_identity_denylist', '')),
+        ));
+
+        if (in_array($data['cedula'], $employeeDenylist, true)) {
+            throw ValidationException::withMessages([
+                'cedula' => 'Este documento no es elegible para participar en la promocion.',
+            ]);
+        }
+
         $avatarPath = $request->file('avatar')?->store('avatars', 'public');
+
+        $registrationNow = now();
 
         $user = User::query()->create([
             'name' => $data['full_name'],
@@ -67,12 +84,13 @@ class AuthController extends Controller
             'avatar_path' => $avatarPath,
             'role' => 'client',
             'password' => Hash::make($data['password']),
-            'is_active' => 1,
+            'is_active' => true,
             'birthdate' => $data['birthdate'],
             'resides_in_panama' => true,
             'is_employee' => false,
             'accepted_terms_at' => now(),
-            'registration_completed_at' => now(),
+            'registration_completed_at' => $registrationNow,
+            'registration_order_key' => $registrationNow->format('Uu').'-'.Str::random(8),
             'group_stage_goal_prediction' => $data['group_stage_goal_prediction'],
         ]);
 
@@ -135,7 +153,7 @@ class AuthController extends Controller
 
         if (! $user->is_active) {
             throw ValidationException::withMessages([
-                'account' => 'La cuenta esta inactiva.',
+                'account' => 'La cuenta esta pendiente de verificacion OTP.',
             ]);
         }
 
@@ -254,7 +272,7 @@ class AuthController extends Controller
 
         $data = $request->validate([
             'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:12', 'regex:/^\+507[0-9]{8}$/', Rule::unique('users', 'phone')->ignore($user->id)],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
@@ -340,6 +358,56 @@ class AuthController extends Controller
         return $payload;
     }
 
+    private function verifyCaptcha(Request $request): void
+    {
+        $secret = (string) config('contest.recaptcha_secret', '');
+
+        if ($secret === '') {
+            return;
+        }
+
+        $token = (string) $request->input('recaptcha_token', '');
+
+        if ($token === '') {
+            throw ValidationException::withMessages([
+                'recaptcha_token' => 'No fue posible validar el CAPTCHA.',
+            ]);
+        }
+
+        $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
+            'secret' => $secret,
+            'response' => $token,
+            'remoteip' => $request->ip(),
+        ]);
+
+        $body = $response->json() ?? [];
+
+        if (! $response->successful() || ! (bool) ($body['success'] ?? false) || (float) ($body['score'] ?? 0) < 0.5) {
+            throw ValidationException::withMessages([
+                'recaptcha_token' => 'La validacion CAPTCHA no fue aprobada.',
+            ]);
+        }
+    }
+
+    private function verifyPanamaIp(Request $request): void
+    {
+        if (! config('contest.block_non_panama_ip')) {
+            return;
+        }
+
+        $country = strtoupper((string) (
+            $request->header('CF-IPCountry')
+            ?: $request->header('X-Vercel-IP-Country')
+            ?: $request->header('X-IP-Country')
+        ));
+
+        if ($country !== '' && $country !== 'PA') {
+            throw ValidationException::withMessages([
+                'country' => 'El registro esta habilitado solo para conexiones desde Panama.',
+            ]);
+        }
+    }
+
     private function buildGoogleCedula(string $googleId): string
     {
         return Str::limit('google-'.$googleId, 40, '');
@@ -350,7 +418,7 @@ class AuthController extends Controller
         $normalized = Str::upper(trim($value));
 
         if ($documentType === 'cedula') {
-            return preg_replace('/[^0-9-]/', '', $normalized) ?? '';
+            return preg_replace('/[^A-Z0-9-]/', '', $normalized) ?? '';
         }
 
         return preg_replace('/[^A-Z0-9-]/', '', $normalized) ?? '';
@@ -359,9 +427,9 @@ class AuthController extends Controller
     private function validateIdentityNumber(string $documentType, string $identityNumber): void
     {
         if ($documentType === 'cedula') {
-            if (! preg_match('/^\d{1,2}-\d{1,4}-\d{1,6}$/', $identityNumber)) {
+            if (! preg_match('/^(\d{1,2}-\d{1,4}-\d{1,6}|PE-\d{1,4}-\d{1,6}|E-\d{1,4}-\d{1,6}|N-\d{1,4}-\d{1,6})$/', $identityNumber)) {
                 throw ValidationException::withMessages([
-                    'cedula' => 'La cedula debe usar formato de Panama, por ejemplo 8-864-1164, 9-150-523 o 7-23-111.',
+                    'cedula' => 'La cedula debe usar formato de Panama, por ejemplo 8-864-1164, PE-123-456, E-123-456 o N-123-456.',
                 ]);
             }
 

@@ -76,7 +76,7 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::post('/login', [AdminAuthController::class, 'login'])->name('admin.login.submit');
     });
 
-    Route::middleware('auth')->group(function (): void {
+    Route::middleware(['auth', 'role:admin'])->group(function (): void {
         Route::get('/', [BackofficeController::class, 'dashboard'])->name('admin.dashboard');
         Route::get('/teams', [BackofficeController::class, 'teams'])->name('admin.teams');
         Route::put('/teams/{team}/ranking', [BackofficeController::class, 'updateTeamRanking'])->name('admin.teams.ranking');
@@ -85,6 +85,9 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::post('/matches', [BackofficeController::class, 'storeMatch'])->name('admin.matches.store');
         Route::put('/matches/{match}', [BackofficeController::class, 'updateMatch'])->name('admin.matches.update');
         Route::post('/matches/{match}/finalize', [BackofficeController::class, 'finalizeMatch'])->name('admin.matches.finalize');
+        Route::post('/matches/{match}/void', [BackofficeController::class, 'voidMatch'])->name('admin.matches.void');
+        Route::post('/matches/approvals/{approval}/approve', [BackofficeController::class, 'approveMatchResult'])->name('admin.matches.approvals.approve');
+        Route::post('/matches/approvals/{approval}/reject', [BackofficeController::class, 'rejectMatchResult'])->name('admin.matches.approvals.reject');
         Route::post('/matches/recalculate-all', [BackofficeController::class, 'recalculateAllScores'])->name('admin.matches.recalculate-all');
         Route::get('/rules', [BackofficeController::class, 'rules'])->name('admin.rules');
         Route::put('/rules/phases/{phase}', [BackofficeController::class, 'updatePhase'])->name('admin.rules.phase');
@@ -100,6 +103,7 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::get('/winners/{winner}/acta-comunicaciones', [BackofficeController::class, 'winnerCommunicationsActa'])->name('admin.winners.communications-acta');
         Route::post('/winners/{winner}/contact', [BackofficeController::class, 'logWinnerContact'])->name('admin.winners.contact');
         Route::post('/winners/{winner}/confirm', [BackofficeController::class, 'confirmWinner'])->name('admin.winners.confirm');
+        Route::post('/winners/{winner}/deliver', [BackofficeController::class, 'deliverWinner'])->name('admin.winners.deliver');
         Route::post('/winners/{winner}/disqualify', [BackofficeController::class, 'disqualifyWinner'])->name('admin.winners.disqualify');
         Route::put('/winners/{winner}', [BackofficeController::class, 'updateWinner'])->name('admin.winners.update');
         Route::get('/integrations', [BackofficeController::class, 'integrations'])->name('admin.integrations');
@@ -109,6 +113,9 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::post('/integrations/live-score/sync-commentary', [BackofficeController::class, 'syncCommentary'])->name('admin.integrations.live-score.sync-commentary');
         Route::get('/users', [BackofficeController::class, 'users'])->name('admin.users');
         Route::put('/users/{user}', [BackofficeController::class, 'updateUserStatus'])->name('admin.users.update');
+        Route::get('/fraud', [BackofficeController::class, 'fraud'])->name('admin.fraud');
+        Route::get('/fraud/export', [BackofficeController::class, 'exportFraudFlags'])->name('admin.fraud.export');
+        Route::put('/fraud/{flag}', [BackofficeController::class, 'updateFraudFlag'])->name('admin.fraud.update');
         Route::get('/site', [BackofficeController::class, 'site'])->name('admin.site');
         Route::put('/site', [BackofficeController::class, 'updateSiteSettings'])->name('admin.site.update');
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');

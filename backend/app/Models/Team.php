@@ -14,6 +14,8 @@ class Team extends Model
         'name',
         'code',
         'ranking_fifa',
+        'frozen_ranking_fifa',
+        'ranking_frozen_at',
         'group_label',
         'flag_emoji',
         'provider_logo_url',
@@ -25,6 +27,8 @@ class Team extends Model
     {
         return [
             'ranking_fifa' => 'integer',
+            'frozen_ranking_fifa' => 'integer',
+            'ranking_frozen_at' => 'datetime',
             'is_active' => 'boolean',
         ];
     }

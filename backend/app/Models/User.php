@@ -35,11 +35,15 @@ class User extends Authenticatable
         'is_employee',
         'accepted_terms_at',
         'registration_completed_at',
+        'registration_order_key',
         'predictions_completed_at',
         'group_stage_goal_prediction',
         'disqualified_at',
         'disqualification_reason',
         'email_verified_at',
+        'email_otp_code_hash',
+        'email_otp_expires_at',
+        'email_otp_verified_at',
         'last_login_at',
     ];
 
@@ -52,6 +56,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'email_otp_expires_at' => 'datetime',
+            'email_otp_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
             'birthdate' => 'date',
@@ -83,6 +89,11 @@ class User extends Authenticatable
     public function invoices(): HasMany
     {
         return $this->hasMany(RegisteredInvoice::class);
+    }
+
+    public function fraudFlags(): HasMany
+    {
+        return $this->hasMany(FraudFlag::class);
     }
 
     public function coupons(): HasMany

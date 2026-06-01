@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('teams') || ! Schema::hasTable('tournament_matches') || ! Schema::hasTable('live_score_settings')) {
+            return;
+        }
+
         Schema::table('teams', function (Blueprint $table): void {
             if (! Schema::hasColumn('teams', 'external_country_id')) {
                 $table->unsignedBigInteger('external_country_id')->nullable()->after('external_team_id');
@@ -51,6 +55,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('teams') || ! Schema::hasTable('tournament_matches') || ! Schema::hasTable('live_score_settings')) {
+            return;
+        }
+
         Schema::table('live_score_settings', function (Blueprint $table): void {
             if (Schema::hasColumn('live_score_settings', 'season')) {
                 $table->dropColumn('season');

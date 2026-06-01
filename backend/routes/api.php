@@ -18,9 +18,9 @@ use App\Http\Controllers\Api\PublicSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
-    Route::post('register', [AuthController::class, 'register']);
-    Route::post('login', [AuthController::class, 'login']);
-    Route::post('google', [AuthController::class, 'google']);
+    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:auth-register');
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
+    Route::post('google', [AuthController::class, 'google'])->middleware('throttle:auth-google');
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('me', [AuthController::class, 'me']);
@@ -40,8 +40,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('client/invoices', [DailyInvoiceGoalController::class, 'index'])->middleware('role:client');
     Route::get('client/predictions', [PredictionController::class, 'index'])->middleware('role:client');
     Route::post('client/matches/{match}/predict', [PredictionController::class, 'store'])->middleware('role:client');
-    Route::post('client/invoices/resolve', [DailyInvoiceGoalController::class, 'resolve'])->middleware('role:client');
-    Route::post('client/invoices', [DailyInvoiceGoalController::class, 'store'])->middleware('role:client');
+    Route::post('client/invoices/resolve', [DailyInvoiceGoalController::class, 'resolve'])->middleware(['role:client', 'throttle:invoice-scan']);
+    Route::post('client/invoices', [DailyInvoiceGoalController::class, 'store'])->middleware(['role:client', 'throttle:invoice-scan']);
 
     Route::get('dashboard', [DashboardController::class, 'show']);
     Route::get('wallet', [DashboardController::class, 'wallet']);
@@ -81,4 +81,4 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
 // Configuración pública (sin autenticación)
 Route::get('public/settings', [PublicSettingsController::class, 'index']);
-Route::middleware('auth:sanctum')->post('admin/settings/youtube', [PublicSettingsController::class, 'updateYoutubeId']);
+Route::middleware(['auth:sanctum', 'role:admin'])->post('admin/settings/youtube', [PublicSettingsController::class, 'updateYoutubeId']);

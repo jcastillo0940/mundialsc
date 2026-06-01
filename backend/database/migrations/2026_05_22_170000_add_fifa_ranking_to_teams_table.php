@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('teams')) {
+            return;
+        }
+
         Schema::table('teams', function (Blueprint $table): void {
             if (! Schema::hasColumn('teams', 'ranking_fifa')) {
                 $table->unsignedInteger('ranking_fifa')->nullable()->after('code');
@@ -18,6 +22,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('teams')) {
+            return;
+        }
+
         Schema::table('teams', function (Blueprint $table): void {
             if (Schema::hasColumn('teams', 'ranking_fifa')) {
                 $table->dropIndex('idx_teams_ranking_fifa');

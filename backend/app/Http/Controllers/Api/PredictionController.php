@@ -26,6 +26,12 @@ class PredictionController extends Controller
 
     public function store(Request $request, TournamentMatch $match): JsonResponse
     {
+        if (now('America/Panama')->greaterThan(\Carbon\CarbonImmutable::parse((string) config('contest.registration_deadline'), 'America/Panama'))) {
+            throw ValidationException::withMessages([
+                'prediction' => 'El periodo para enviar pronosticos cerro el 10 de junio de 2026.',
+            ]);
+        }
+
         if ($request->user()->disqualified_at) {
             throw ValidationException::withMessages([
                 'account' => 'Tu cuenta fue descalificada y no puede seguir enviando pronosticos.',
@@ -57,17 +63,24 @@ class PredictionController extends Controller
             'predicted_away_score' => ['required', 'integer', 'min:0', 'max:20'],
         ]);
 
-        $prediction = MatchPrediction::query()->updateOrCreate(
-            [
-                'match_id' => $match->id,
-                'user_id' => $request->user()->id,
-            ],
-            [
-                'phase_id' => $match->phase_id,
-                'predicted_home_score' => $data['predicted_home_score'],
-                'predicted_away_score' => $data['predicted_away_score'],
-            ],
-        );
+        $existingPrediction = MatchPrediction::query()
+            ->where('match_id', $match->id)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if ($existingPrediction) {
+            throw ValidationException::withMessages([
+                'prediction' => 'Este pronostico ya fue guardado y no puede modificarse.',
+            ]);
+        }
+
+        $prediction = MatchPrediction::query()->create([
+            'match_id' => $match->id,
+            'user_id' => $request->user()->id,
+            'phase_id' => $match->phase_id,
+            'predicted_home_score' => $data['predicted_home_score'],
+            'predicted_away_score' => $data['predicted_away_score'],
+        ]);
 
         $this->markPredictionsCompletedIfNeeded($request->user()->id);
 

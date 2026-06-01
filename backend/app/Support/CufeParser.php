@@ -6,6 +6,10 @@ class CufeParser
 {
     public function extract(string $rawText): ?string
     {
+        if (strlen($rawText) > 2048) {
+            return null;
+        }
+
         $decoded = urldecode($rawText);
         $bare    = strtoupper(trim($decoded));
 

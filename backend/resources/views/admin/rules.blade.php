@@ -19,8 +19,6 @@
             <option value="0" @selected(! $invoiceSettings?->one_invoice_per_day)>Múltiples</option>
         </select>
         <select name="validation_mode">
-            <option value="manual" @selected($invoiceSettings?->validation_mode === 'manual')>manual</option>
-            <option value="external_db" @selected($invoiceSettings?->validation_mode === 'external_db')>external_db</option>
             <option value="api" @selected($invoiceSettings?->validation_mode === 'api')>api</option>
         </select>
         <button type="submit">Guardar</button>

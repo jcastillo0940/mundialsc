@@ -48,6 +48,7 @@
             <a href="{{ route('admin.winners') }}">Ganadores</a>
             <a href="{{ route('admin.integrations') }}">Integraciones</a>
             <a href="{{ route('admin.users') }}">Usuarios</a>
+            <a href="{{ route('admin.fraud') }}">Antifraude</a>
             <a href="{{ route('admin.site') }}">Sitio y SEO</a>
         </nav>
         <form method="post" action="{{ route('admin.logout') }}">

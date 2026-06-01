@@ -7,7 +7,7 @@
     <h2>Resumen de la promo</h2>
     @if($phase)
         <p><strong>Fase activa:</strong> {{ $phase->name }}</p>
-        <p><strong>Cupos de ganadores:</strong> {{ $winnerSlots }}</p>
+        <p><strong>Max_Premios:</strong> {{ $winnerSlots }} | La tabla oficial se corta estrictamente en ese limite.</p>
         <p><a href="{{ route('admin.winners.acta') }}" target="_blank">Abrir acta general de ganadores</a></p>
         <form method="post" action="{{ route('admin.winners.generate') }}">
             @csrf
@@ -18,37 +18,8 @@
     @endif
 </div>
 
-@if($tieContext['requires_draw'] ?? false)
-    <div class="card">
-        <h2>Empate tecnico pendiente</h2>
-        <p>Se detecto un empate total en puntos, exactos y facturas. Debes resolverlo por sorteo para completar los {{ $tieContext['remaining_slots'] }} cupos pendientes.</p>
-        <table>
-            <thead><tr><th>Posicion</th><th>Participante</th><th>Puntos</th><th>Exactos</th><th>Facturas</th></tr></thead>
-            <tbody>
-            @foreach($tieContext['tied_candidates'] as $candidate)
-                <tr>
-                    <td>{{ $candidate['position'] }}</td>
-                    <td>{{ $candidate['full_name'] }}</td>
-                    <td>{{ $candidate['goals'] }}</td>
-                    <td>{{ $candidate['exact_hits'] }}</td>
-                    <td>{{ $candidate['invoice_count'] }}</td>
-                </tr>
-            @endforeach
-            </tbody>
-        </table>
-        <form method="post" action="{{ route('admin.winners.resolve-draw') }}" class="grid">
-            @csrf
-            <input type="hidden" name="slots" value="{{ $tieContext['remaining_slots'] }}">
-            @foreach($tieContext['tied_candidates'] as $candidate)
-                <input type="hidden" name="candidate_user_ids[]" value="{{ $candidate['user_id'] }}">
-            @endforeach
-            <button type="submit">Resolver por sorteo</button>
-        </form>
-    </div>
-@endif
-
 <div class="card">
-    <h2>Ranking oficial</h2>
+    <h2>Ranking oficial limitado</h2>
     <table>
         <thead><tr><th>Posicion</th><th>Participante</th><th>Puntos</th><th>Exactos</th><th>Facturas</th><th>Rol</th></tr></thead>
         <tbody>
@@ -72,6 +43,25 @@
 </div>
 
 <div class="card">
+    <h2>Tokens fisicos de premio</h2>
+    <table>
+        <thead><tr><th>Token</th><th>Premio</th><th>Estado</th><th>Asignado a</th></tr></thead>
+        <tbody>
+        @forelse($prizeTokens as $token)
+            <tr>
+                <td>{{ $token->token_code }}</td>
+                <td>{{ $token->prize_title }} / {{ $token->prize_type }}</td>
+                <td>{{ $token->status }}</td>
+                <td>{{ $token->assigned_user_id ?: 'sin asignar' }}</td>
+            </tr>
+        @empty
+            <tr><td colspan="4">Los tokens se crean automaticamente desde el inventario al generar ganadores.</td></tr>
+        @endforelse
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
     <h2>Ganadores seleccionados</h2>
     @forelse($winners as $winner)
         <div class="card">
@@ -79,7 +69,7 @@
                 <div>
                     <strong>{{ $winner->user->full_name }}</strong><br>
                     <small>Puesto #{{ $winner->leaderboard_position }} | {{ number_format((float) $winner->total_points, 2) }} pts | exactos: {{ $winner->exact_hits }} | facturas: {{ $winner->invoice_count }}</small><br>
-                    <small>Estado: {{ $winner->status }} | razon: {{ $winner->selection_reason }}</small>
+                    <small>Estado: {{ $winner->status }} | razon: {{ $winner->selection_reason }} | token: {{ $winner->prizeToken?->token_code ?? 'sin token' }}</small>
                 </div>
                 <div>
                     <strong>Contacto</strong><br>
@@ -104,6 +94,7 @@
                             <option value="selected" @selected($winner->status === 'selected')>selected</option>
                             <option value="contacting" @selected($winner->status === 'contacting')>contacting</option>
                             <option value="confirmed" @selected($winner->status === 'confirmed')>confirmed</option>
+                            <option value="delivered" @selected($winner->status === 'delivered')>premio entregado</option>
                             <option value="disqualified" @selected($winner->status === 'disqualified')>disqualified</option>
                         </select>
                         <select name="selection_reason" required>
@@ -142,6 +133,10 @@
                     <form method="post" action="{{ route('admin.winners.confirm', $winner) }}">
                         @csrf
                         <button type="submit">Confirmar ganador</button>
+                    </form>
+                    <form method="post" action="{{ route('admin.winners.deliver', $winner) }}">
+                        @csrf
+                        <button type="submit">Premio entregado</button>
                     </form>
                     <form method="post" action="{{ route('admin.winners.disqualify', $winner) }}" class="row">
                         @csrf

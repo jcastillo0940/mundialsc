@@ -13,8 +13,15 @@
             <h3>Hero media</h3>
             <div class="row">
                 <input name="auth_bg_youtube_id" value="{{ $settings['auth_bg_youtube_id'] }}" placeholder="YouTube ID para auth / hero">
+                <input name="auth_logo_url" value="{{ $settings['auth_logo_url'] }}" placeholder="URL del logo para login publico">
                 <input name="hero_video_url" value="{{ $settings['hero_video_url'] }}" placeholder="URL MP4/WebM del video hero">
             </div>
+        </div>
+
+        <div class="card">
+            <h3>Marcas participantes</h3>
+            <p><small>Una marca por linea. Formato: Nombre|URL del logo. Si no tienes logo, escribe solo el nombre.</small></p>
+            <textarea name="participant_brands" placeholder="Super Carnes|https://.../logo.png&#10;Importadora Virzi|https://.../logo.png">{{ $settings['participant_brands'] }}</textarea>
         </div>
 
         <div class="card">

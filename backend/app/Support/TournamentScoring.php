@@ -77,8 +77,9 @@ class TournamentScoring
 
         $points = match ($actualOutcome) {
             'draw' => 2,
-            'home' => $favoriteSide === 'none' ? 1 : ($favoriteSide === 'home' ? 1 : 3),
-            'away' => $favoriteSide === 'none' ? 1 : ($favoriteSide === 'away' ? 1 : 3),
+            'home', 'away' => $favoriteSide === 'none'
+                ? throw new \RuntimeException('No se puede calcular puntos sin ranking FIFA oficial para definir favorito.')
+                : ($actualOutcome === $favoriteSide ? 1 : 3),
             default => 0,
         };
 

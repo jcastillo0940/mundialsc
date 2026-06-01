@@ -30,11 +30,11 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        if (! in_array($request->user()->role, ['admin', 'cashier'], true)) {
+        if ($request->user()->role !== 'admin') {
             Auth::logout();
 
             return back()->withErrors([
-                'email' => 'Tu cuenta no tiene acceso al backoffice.',
+                'email' => 'Tu cuenta no tiene acceso administrativo al backoffice.',
             ]);
         }
 

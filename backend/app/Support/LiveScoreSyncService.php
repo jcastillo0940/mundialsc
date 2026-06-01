@@ -190,7 +190,7 @@ class LiveScoreSyncService
                         'pos_y' => $event['pos_y'] ?? null,
                         'side' => $event['side'] ?? null,
                         'external_team_id' => $event['team']['id'] ?? null,
-                        'team_name' => $event['team']['name'] ?? null,
+                        'team_name' => $this->translateCountryName($event['team']['name'] ?? null),
                         'external_player_id' => $event['player']['id'] ?? null,
                         'player_name' => $event['player']['name'] ?? null,
                         'external_player_2_id' => $event['player_2']['id'] ?? null,
@@ -355,8 +355,9 @@ class LiveScoreSyncService
     private function upsertTeam(array $providerTeam, ?array $participant = null, ?array $group = null): Team
     {
         $externalId = isset($providerTeam['id']) ? (int) $providerTeam['id'] : null;
-        $name = (string) ($providerTeam['name'] ?? 'Equipo');
+        $providerName = (string) ($providerTeam['name'] ?? 'Equipo');
         $code = $this->resolveTeamCode($providerTeam, $participant);
+        $name = $this->translateCountryName($providerName, $code);
         $team = $externalId
             ? Team::query()->where('external_team_id', $externalId)->first()
             : null;
@@ -366,7 +367,10 @@ class LiveScoreSyncService
         }
 
         if (! $team) {
-            $team = Team::query()->where('name', $name)->first();
+            $team = Team::query()
+                ->where('name', $name)
+                ->orWhere('name', $providerName)
+                ->first();
         }
 
         $payload = array_filter([
@@ -377,7 +381,7 @@ class LiveScoreSyncService
             'group_label' => $this->resolveGroupLabel($participant ?? $providerTeam, $group),
             'provider_logo_url' => $providerTeam['logo'] ?? $participant['logo'] ?? null,
             'provider_flag_path' => $participant['flag'] ?? null,
-            'flag_emoji' => $this->resolveFlagEmoji($participant['fifa_code'] ?? null, $name),
+            'flag_emoji' => $this->resolveFlagEmoji($participant['fifa_code'] ?? null, $providerName),
             'is_active' => true,
         ], fn ($value) => $value !== null && $value !== '');
 
@@ -498,27 +502,23 @@ class LiveScoreSyncService
 
     private function resolveFavoriteSide(Team $homeTeam, Team $awayTeam, array $item = []): string
     {
-        if ($homeTeam->ranking_fifa && $awayTeam->ranking_fifa) {
-            if ($homeTeam->ranking_fifa === $awayTeam->ranking_fifa) {
+        $homeRanking = $homeTeam->frozen_ranking_fifa ?: $homeTeam->ranking_fifa;
+        $awayRanking = $awayTeam->frozen_ranking_fifa ?: $awayTeam->ranking_fifa;
+
+        if ($homeRanking && $awayRanking) {
+            if ($homeRanking === $awayRanking) {
                 return 'none';
             }
 
-            return $homeTeam->ranking_fifa < $awayTeam->ranking_fifa ? 'home' : 'away';
+            return $homeRanking < $awayRanking ? 'home' : 'away';
         }
 
-        if ($homeTeam->ranking_fifa && ! $awayTeam->ranking_fifa) {
+        if ($homeRanking && ! $awayRanking) {
             return 'home';
         }
 
-        if ($awayTeam->ranking_fifa && ! $homeTeam->ranking_fifa) {
+        if ($awayRanking && ! $homeRanking) {
             return 'away';
-        }
-
-        $homeOdds = $item['odds']['pre']['1'] ?? null;
-        $awayOdds = $item['odds']['pre']['2'] ?? null;
-
-        if (is_numeric($homeOdds) && is_numeric($awayOdds)) {
-            return (float) $homeOdds < (float) $awayOdds ? 'home' : 'away';
         }
 
         return 'none';
@@ -528,6 +528,21 @@ class LiveScoreSyncService
     {
         $normalized = trim((string) $value);
         return $normalized !== '' ? $normalized : null;
+    }
+
+    private function translateCountryName(mixed $name, ?string $fifaCode = null): ?string
+    {
+        $normalizedName = $this->stringOrNull($name);
+        if (! $normalizedName) {
+            return null;
+        }
+
+        $normalizedCode = strtoupper((string) $fifaCode);
+        if ($normalizedCode !== '' && isset($this->countryNamesByFifaCode()[$normalizedCode])) {
+            return $this->countryNamesByFifaCode()[$normalizedCode];
+        }
+
+        return $this->countryNamesByEnglishName()[Str::lower($normalizedName)] ?? $normalizedName;
     }
 
     private function resolveFlagEmoji(?string $fifaCode, string $teamName): ?string
@@ -640,6 +655,110 @@ class LiveScoreSyncService
             'Uruguay' => 'UY',
             'USA' => 'US',
             'Uzbekistan' => 'UZ',
+        ];
+    }
+
+    private function countryNamesByFifaCode(): array
+    {
+        return [
+            'ALG' => 'Argelia',
+            'ARG' => 'Argentina',
+            'AUS' => 'Australia',
+            'AUT' => 'Austria',
+            'BEL' => 'Bélgica',
+            'BRA' => 'Brasil',
+            'CAN' => 'Canadá',
+            'CIV' => 'Costa de Marfil',
+            'COL' => 'Colombia',
+            'CPV' => 'Cabo Verde',
+            'CRC' => 'Costa Rica',
+            'CRO' => 'Croacia',
+            'CUW' => 'Curazao',
+            'ECU' => 'Ecuador',
+            'EGY' => 'Egipto',
+            'ENG' => 'Inglaterra',
+            'ESP' => 'España',
+            'FRA' => 'Francia',
+            'GER' => 'Alemania',
+            'GHA' => 'Ghana',
+            'HAI' => 'Haití',
+            'IRN' => 'Irán',
+            'JOR' => 'Jordania',
+            'JPN' => 'Japón',
+            'KOR' => 'Corea del Sur',
+            'KSA' => 'Arabia Saudita',
+            'MAR' => 'Marruecos',
+            'MEX' => 'México',
+            'NED' => 'Países Bajos',
+            'NOR' => 'Noruega',
+            'NZL' => 'Nueva Zelanda',
+            'PAN' => 'Panamá',
+            'PAR' => 'Paraguay',
+            'POR' => 'Portugal',
+            'QAT' => 'Catar',
+            'RSA' => 'Sudáfrica',
+            'SCO' => 'Escocia',
+            'SEN' => 'Senegal',
+            'SUI' => 'Suiza',
+            'TUN' => 'Túnez',
+            'URU' => 'Uruguay',
+            'USA' => 'Estados Unidos',
+            'UZB' => 'Uzbekistán',
+        ];
+    }
+
+    private function countryNamesByEnglishName(): array
+    {
+        return [
+            'algeria' => 'Argelia',
+            'argentina' => 'Argentina',
+            'australia' => 'Australia',
+            'austria' => 'Austria',
+            'belgium' => 'Bélgica',
+            'brazil' => 'Brasil',
+            'canada' => 'Canadá',
+            'cape verde' => 'Cabo Verde',
+            'colombia' => 'Colombia',
+            'costa rica' => 'Costa Rica',
+            'croatia' => 'Croacia',
+            'curacao' => 'Curazao',
+            'côte d’ivoire' => 'Costa de Marfil',
+            'côte d\'ivoire' => 'Costa de Marfil',
+            'ecuador' => 'Ecuador',
+            'egypt' => 'Egipto',
+            'england' => 'Inglaterra',
+            'france' => 'Francia',
+            'germany' => 'Alemania',
+            'ghana' => 'Ghana',
+            'haiti' => 'Haití',
+            'iran' => 'Irán',
+            'ir iran' => 'Irán',
+            'ivory coast' => 'Costa de Marfil',
+            'japan' => 'Japón',
+            'jordan' => 'Jordania',
+            'korea republic' => 'Corea del Sur',
+            'mexico' => 'México',
+            'morocco' => 'Marruecos',
+            'netherlands' => 'Países Bajos',
+            'new zealand' => 'Nueva Zelanda',
+            'norway' => 'Noruega',
+            'panama' => 'Panamá',
+            'paraguay' => 'Paraguay',
+            'portugal' => 'Portugal',
+            'qatar' => 'Catar',
+            'republic of korea' => 'Corea del Sur',
+            'saudi arabia' => 'Arabia Saudita',
+            'scotland' => 'Escocia',
+            'senegal' => 'Senegal',
+            'south africa' => 'Sudáfrica',
+            'spain' => 'España',
+            'switzerland' => 'Suiza',
+            'tunisia' => 'Túnez',
+            'united states' => 'Estados Unidos',
+            'united states of america' => 'Estados Unidos',
+            'uruguay' => 'Uruguay',
+            'usa' => 'Estados Unidos',
+            'uzbekistan' => 'Uzbekistán',
         ];
     }
 }

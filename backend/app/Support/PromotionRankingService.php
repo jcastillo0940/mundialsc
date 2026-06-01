@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\MatchPrediction;
+use App\Models\PromoWinner;
 use App\Models\RegisteredInvoice;
 use App\Models\TournamentMatch;
 use App\Models\TournamentPhase;
@@ -18,8 +19,20 @@ class PromotionRankingService
     ) {
     }
 
-    public function leaderboardForPhase(int $phaseId, int $limit = 100): Collection
+    public function winnerSlots(): int
     {
+        return $this->contestRules->winnerSlots() ?: self::WINNER_SLOTS;
+    }
+
+    public function leaderboardForPhase(int $phaseId, ?int $limit = null): Collection
+    {
+        $limit ??= $this->winnerSlots();
+        $deliveredPrizeUserIds = PromoWinner::query()
+            ->whereIn('status', ['delivered'])
+            ->orWhereNotNull('prize_delivered_at')
+            ->pluck('user_id')
+            ->all();
+
         $predictionTotals = MatchPrediction::query()
             ->selectRaw("
                 user_id,
@@ -49,6 +62,7 @@ class PromotionRankingService
             ->leftJoinSub($invoiceTotals, 'invoice_totals', fn ($join) => $join->on('users.id', '=', 'invoice_totals.user_id'))
             ->where('users.role', 'client')
             ->whereNull('users.disqualified_at')
+            ->when($deliveredPrizeUserIds !== [], fn ($query) => $query->whereNotIn('users.id', $deliveredPrizeUserIds))
             ->selectRaw("
                 users.id,
                 users.name,
@@ -56,6 +70,7 @@ class PromotionRankingService
                 users.phone,
                 users.group_stage_goal_prediction,
                 users.registration_completed_at,
+                users.registration_order_key,
                 users.predictions_completed_at,
                 users.created_at,
                 COALESCE(prediction_totals.prediction_points, 0) + COALESCE(invoice_totals.invoice_points, 0) as total_points,
@@ -70,6 +85,7 @@ class PromotionRankingService
                 $rankingTimestamp = $row->predictions_completed_at
                     ?? $row->registration_completed_at
                     ?? $row->created_at;
+                $rankingOrderKey = $row->registration_order_key ?: (string) ($rankingTimestamp ?? $row->created_at);
 
                 return [
                     'user_id' => (int) $row->id,
@@ -84,6 +100,7 @@ class PromotionRankingService
                     'group_stage_goal_prediction' => $goalPrediction,
                     'goal_prediction_delta' => $goalPredictionDelta,
                     'ranking_timestamp' => $rankingTimestamp,
+                    'ranking_order_key' => $rankingOrderKey,
                 ];
             })
             ->sort(function (array $left, array $right) {
@@ -93,8 +110,7 @@ class PromotionRankingService
                     $right['invoice_count'] <=> $left['invoice_count'],
                     $right['invoice_total_amount'] <=> $left['invoice_total_amount'],
                     $left['goal_prediction_delta'] <=> $right['goal_prediction_delta'],
-                    strcmp((string) $left['ranking_timestamp'], (string) $right['ranking_timestamp']),
-                    strcmp((string) $left['full_name'], (string) $right['full_name']), // full_name proviene de users.name
+                    strcmp((string) $left['ranking_order_key'], (string) $right['ranking_order_key']),
                 ] as $comparison) {
                     if ($comparison !== 0) {
                         return $comparison;
@@ -115,7 +131,7 @@ class PromotionRankingService
 
     public function tieContextForPhase(int $phaseId, int $slots = null, array $excludedUserIds = []): array
     {
-        $slots ??= $this->contestRules->winnerSlots() ?: self::WINNER_SLOTS;
+        $slots ??= $this->winnerSlots();
 
         $rows = $this->leaderboardForPhase($phaseId)
             ->reject(fn (array $row) => in_array($row['user_id'], $excludedUserIds, true))
@@ -174,7 +190,7 @@ class PromotionRankingService
 
     public function nextEligibleCandidate(int $phaseId, array $excludedUserIds): ?array
     {
-        return $this->leaderboardForPhase($phaseId)
+        return $this->leaderboardForPhase($phaseId, 1000)
             ->first(fn (array $row) => ! in_array($row['user_id'], $excludedUserIds, true));
     }
 
@@ -185,7 +201,7 @@ class PromotionRankingService
             && $left['invoice_count'] === $right['invoice_count']
             && $left['invoice_total_amount'] === $right['invoice_total_amount']
             && $left['goal_prediction_delta'] === $right['goal_prediction_delta']
-            && (string) $left['ranking_timestamp'] === (string) $right['ranking_timestamp'];
+            && (string) $left['ranking_order_key'] === (string) $right['ranking_order_key'];
     }
 
     private function footballRole(int $index): string
