@@ -720,9 +720,9 @@ a {
   grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
   overflow: hidden;
   background:
-    radial-gradient(circle at 18% 18%, rgba(255, 209, 102, 0.18), transparent 28%),
-    radial-gradient(circle at 78% 8%, rgba(255, 255, 255, 0.1), transparent 25%),
-    linear-gradient(135deg, #250205, #7f0a16 48%, #120104);
+    radial-gradient(circle at 18% 18%, rgba(0, 122, 255, 0.4), transparent 28%),
+    radial-gradient(circle at 78% 8%, rgba(84, 63, 170, 0.4), transparent 25%),
+    linear-gradient(135deg, #0d1240, #2a1875 48%, #080e30);
 }
 
 .auth-ambient {
@@ -745,8 +745,8 @@ a {
   z-index: -1;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(84, 63, 170, 0.9), rgba(0, 122, 255, 0.45), rgba(84, 63, 170, 0.9)),
-    radial-gradient(circle at center, transparent 0 18%, rgba(84, 63, 170, 0.46) 78%);
+    linear-gradient(90deg, rgba(84, 63, 170, 0.95), rgba(0, 122, 255, 0.80), rgba(84, 63, 170, 0.95)),
+    radial-gradient(circle at center, transparent 0 18%, rgba(84, 63, 170, 0.6) 78%);
   content: '';
 }
 
@@ -759,7 +759,7 @@ a {
   justify-content: center;
   border-right: 1px solid rgba(255, 255, 255, 0.14);
   background:
-    linear-gradient(135deg, rgba(0, 122, 255, 0.18), rgba(84, 63, 170, 0.42)),
+    linear-gradient(135deg, rgba(0, 122, 255, 0.45), rgba(84, 63, 170, 0.65)),
     #08090f;
 }
 
@@ -777,8 +777,8 @@ a {
 
 .auth-hero-overlay {
   background:
-    linear-gradient(180deg, rgba(84, 63, 170, 0.18) 0%, rgba(0, 122, 255, 0.55) 48%, rgba(84, 63, 170, 0.9) 100%),
-    linear-gradient(90deg, rgba(0, 122, 255, 0.26), transparent 56%);
+    linear-gradient(180deg, rgba(84, 63, 170, 0.5) 0%, rgba(0, 122, 255, 0.75) 48%, rgba(84, 63, 170, 0.95) 100%),
+    linear-gradient(90deg, rgba(0, 122, 255, 0.5), transparent 56%);
 }
 
 .auth-hero-content {
