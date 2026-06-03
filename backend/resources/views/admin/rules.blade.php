@@ -23,7 +23,7 @@
         </select>
         <button type="submit">Guardar</button>
     </form>
-    <p><small>Regla oficial vigente: factura mayor a USD 25.00 sin ITBMS, emitida dentro del último día calendario y con 1 punto por factura aprobada.</small></p>
+    <p><small>Regla oficial vigente: factura mayor a USD 25.00 sin ITBMS, emitida el mismo día del registro o el día calendario inmediatamente anterior, y con 1 punto por factura aprobada.</small></p>
 </div>
 
 @foreach($phases as $phase)

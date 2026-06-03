@@ -12,7 +12,7 @@ class ExpireUnresponsiveWinnersCommand extends Command
 {
     protected $signature = 'contest:expire-unresponsive-winners';
 
-    protected $description = 'Descalifica ganadores sin respuesta despues de 24 horas y promueve al siguiente elegible.';
+    protected $description = 'Descalifica ganadores sin respuesta despues de 5 dias y promueve al siguiente elegible.';
 
     public function handle(PromotionRankingService $ranking): int
     {
@@ -21,7 +21,7 @@ class ExpireUnresponsiveWinnersCommand extends Command
         PromoWinner::query()
             ->whereIn('status', ['selected', 'contacting'])
             ->whereNotNull('last_contact_at')
-            ->where('last_contact_at', '<=', now()->subHours(24))
+            ->where('last_contact_at', '<=', now()->subDays(5))
             ->with('prizeToken')
             ->get()
             ->each(function (PromoWinner $winner) use ($ranking, &$expired): void {
@@ -31,7 +31,7 @@ class ExpireUnresponsiveWinnersCommand extends Command
                     $winner->update([
                         'status' => 'disqualified',
                         'prize_token_id' => null,
-                        'notes' => trim(($winner->notes ? $winner->notes."\n" : '').'Descalificado automaticamente por inactividad de 24 horas.'),
+                        'notes' => trim(($winner->notes ? $winner->notes."\n" : '').'Descalificado automaticamente por inactividad de 5 dias.'),
                         'disqualified_at' => now(),
                     ]);
 
@@ -78,7 +78,7 @@ class ExpireUnresponsiveWinnersCommand extends Command
                     return $next;
                 });
 
-                Audit::log('promo.winner.expired_24h', 'promo_winner', $winner->id, null, null, [
+                Audit::log('promo.winner.expired_5d', 'promo_winner', $winner->id, null, null, [
                     'replacement_user_id' => $next['user_id'] ?? null,
                 ]);
 

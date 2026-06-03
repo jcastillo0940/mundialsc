@@ -29,7 +29,7 @@ import type {
 const TOKEN_KEY = 'super-carnes-token'
 const CONTEST_NAME = 'Polla Mundialista Super Carnes 2026'
 const REGISTRATION_DEADLINE = '10 de junio de 2026 a las 11:59 p. m.'
-const WINNERS_ANNOUNCEMENT = '29 de junio y 20 de julio de 2026'
+const WINNERS_ANNOUNCEMENT = 'dentro de los 5 dias calendario siguientes al cierre de cada ronda'
 const PANAMA_TIMEZONE = 'America/Panama'
 const DEFAULT_AUTH_BG_YOUTUBE_ID = import.meta.env.VITE_AUTH_BG_YOUTUBE_ID ?? 'O9diw9_5pys'
 const DEFAULT_AUTH_LOGO_URL = import.meta.env.VITE_AUTH_LOGO_URL ?? ''
@@ -956,38 +956,46 @@ function currentViewFromPath(pathname: string): MainView {
 const OFFICIAL_TERMS_TEXT = `TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 
 1. GENERALIDADES DEL CONCURSO
-La promoción comercial denominada "Polla Mundialista Super Carnes" (en adelante, "El Concurso") es organizada por Super Carnes. El objetivo es premiar la fidelidad y el conocimiento futbolístico de nuestros clientes durante la Fase de Grupos de la Copa Mundial de la FIFA 2026.
+La promoción comercial denominada "Polla Mundialista Super Carnes 2026" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
+Super Carnes podrá modificar la vigencia por razones operativas, técnicas, regulatorias o de fuerza mayor, previa comunicación al público participante.
 
-2. PREMIOS
-Se premiará a los participantes que acumulen la mayor cantidad de puntos al finalizar la Fase de Grupos. Cada ganador recibirá un premio definido por Super Carnes para esta promoción. Los premios no son transferibles ni canjeables por dinero en efectivo.
+2. ELEGIBILIDAD
+Podrán participar únicamente personas naturales mayores de 18 años, residentes en la República de Panamá, portadoras de cédula de identidad personal o pasaporte vigente, que completen correctamente el proceso de registro.
+No podrán participar colaboradores directos de Super Carnes, personas vinculadas directa o indirectamente con la organización, administración o auditoría de la promoción, ni sus familiares dentro del cuarto grado de consanguinidad y segundo de afinidad.
 
-3. ELEGIBILIDAD Y PARTICIPACIÓN
-Podrán participar personas naturales, mayores de 18 años, residentes en Panamá, que posean Cédula de Identidad Personal o Pasaporte vigente.
-No podrán participar empleados directos de Super Carnes.
-Para participar, el usuario debe registrarse en la plataforma a más tardar el día 10 de junio de 2026, proporcionando: nombre completo, cédula o pasaporte, correo electrónico, teléfono de contacto y su pronóstico del total de goles de la fase de grupos.
+3. MECÁNICA DE PARTICIPACIÓN
+La promoción premia el conocimiento y habilidad de los participantes respecto a los resultados deportivos de los partidos habilitados en la plataforma oficial.
+La primera ronda de pronósticos estará habilitada desde el 4 de junio de 2026 hasta el 10 de junio de 2026 a las 11:59 p. m.
+La segunda ronda de pronósticos estará habilitada desde el 28 de junio de 2026 hasta el 29 de junio de 2026, una vez definidos los clasificados al cierre de la fase de grupos del 27 de junio de 2026.
+Cada participante deberá completar correctamente su registro en la plataforma oficial con nombre, documento, correo y teléfono, además de registrar sus pronósticos dentro de las fechas habilitadas para cada ronda.
 
-4. SISTEMA DE PUNTUACIÓN
-Los participantes acumularán puntos según la precisión de sus pronósticos en los partidos de la Fase de Grupos, bajo la siguiente estructura:
-1 punto: Por acertar la victoria del equipo "Favorito".
-Nota aclaratoria sobre el favoritismo: se considerará como equipo "Favorito" en un partido a la selección nacional que ocupe la mejor posición, es decir, el número más bajo, en el Ranking Mundial Masculino de la FIFA vigente a la fecha de lanzamiento de esta promoción. Esta clasificación será la única fuente oficial para determinar los puntos de victoria y no se alterará durante la fase de grupos, independientemente de actualizaciones posteriores del ranking de la FIFA.
-2 puntos: Por acertar que el resultado final del partido será un empate.
-3 puntos: Por acertar la victoria del equipo "No Favorito".
-3 puntos adicionales: Por acertar el marcador o resultado exacto del partido.
-1 punto adicional por compras: Por ingresar en la plataforma el CUFE, Código Único de Facturación Electrónica, de una factura de compra realizada en Super Carnes por un monto mayor a $25.00, sin incluir ITBMS. La factura debe tener fecha de emisión de máximo un día anterior a la fecha en que se registra en la plataforma.
+4. NATURALEZA DEL CONCURSO
+La promoción constituye un concurso basado en habilidad, conocimiento, análisis y destreza deportiva. La asignación de premios se determina exclusivamente conforme al sistema de puntuación establecido en estos términos y condiciones.
 
-5. CRITERIOS DE DESEMPATE
-En caso de que dos o más participantes culminen la Fase de Grupos con la misma puntuación total, afectando la selección de los ganadores, se aplicarán los siguientes filtros en estricto orden hasta obtener un ganador único:
-Mayor cantidad de resultados exactos.
-Mayor volumen de facturas válidas.
-Mayor valor de compras acumulado en dólares entre todas las facturas válidas registradas.
-Acierto global de goles: quien haya acertado o se haya acercado más, por exceso o defecto, a la cantidad total de goles anotados en toda la Fase de Grupos, según la predicción hecha al momento de registrarse.
-Registro de tiempo: el participante que haya enviado y completado su registro de pronósticos primero, validado por la fecha, hora, minuto y segundo en el sistema de la plataforma.
+5. SISTEMA DE PUNTUACIÓN
+Los participantes acumularán puntos conforme a la precisión de sus pronósticos en los partidos habilitados en cada ronda:
+1 punto: Por acertar la victoria del equipo Favorito.
+2 puntos: Por acertar que el partido finalizará en empate.
+3 puntos: Por acertar la victoria del equipo No Favorito.
+3 puntos adicionales: Por acertar el marcador exacto.
+Para efectos exclusivos de la promoción, se considerará Favorito al equipo que ocupe la mejor posición en el Ranking Mundial Masculino de la FIFA vigente al inicio de la promoción.
+1 punto adicional por compras: Por ingresar en la plataforma el CUFE de una factura de compra realizada en Super Carnes por un monto mayor a USD 25.00, sin incluir ITBMS. La factura debe haber sido emitida el mismo día del registro o el día calendario inmediatamente anterior.
 
-6. NOTIFICACIÓN Y ENTREGA DEL PREMIO
-Los ganadores oficiales serán anunciados el día 10 de julio de 2026 a través de las redes sociales oficiales de Super Carnes.
-Los ganadores serán contactados vía correo electrónico y llamada telefónica. Si un potencial ganador no responde a los intentos de contacto en un plazo de 24 horas, perderá automáticamente el derecho al premio y Super Carnes adjudicará el mismo al siguiente participante en la tabla de posiciones.
+6. PREMIOS
+Los premios de cada ronda se otorgarán de manera independiente.
+Primera ronda: los participantes ubicados entre las posiciones 1 y 10 de la tabla de puntuación recibirán 1 televisor nuevo de 50 pulgadas cada uno.
+Primera ronda: los participantes ubicados entre las posiciones 11 y 110 de la tabla de puntuación recibirán 1 balón original cada uno.
+Segunda ronda: los 20 participantes con mayor cantidad de puntos recibirán 1 tarjeta de regalo para compras en Super Carnes por USD 200.00 cada uno.
+Los premios no son transferibles ni canjeables por dinero en efectivo.
 
-7. PROTECCIÓN DE DATOS Y ACEPTACIÓN
+7. CRITERIOS DE DESEMPATE
+En caso de empate, se aplicarán en este orden: mayor cantidad de marcadores exactos acertados, mayor cantidad de facturas válidas registradas, mayor monto acumulado en compras válidas, mayor aproximación al total de goles anotados en la primera ronda y fecha y hora de registro más temprana.
+
+8. NOTIFICACIÓN Y ENTREGA DEL PREMIO
+Los ganadores oficiales de cada ronda serán anunciados dentro de los cinco días calendario siguientes al cierre de la ronda correspondiente a través de las redes sociales oficiales de Super Carnes.
+Los ganadores serán contactados vía correo electrónico y llamada telefónica. Si un potencial ganador no responde a los intentos de contacto dentro de los cinco días calendario siguientes al primer intento, perderá el derecho al premio y Super Carnes podrá adjudicarlo al siguiente participante en la tabla de posiciones.
+
+9. PROTECCIÓN DE DATOS Y ACEPTACIÓN
 Al registrarse, el participante acepta estos términos y condiciones, y autoriza a Super Carnes al uso de sus datos personales exclusivamente para fines de este concurso y contacto comercial, en cumplimiento de las leyes de protección de datos vigentes.
 
 8. VALIDACIÓN DE FACTURAS (CUFE)
@@ -996,7 +1004,7 @@ Toda factura ingresada para obtener puntos adicionales o para ser utilizada como
 const OFFICIAL_TERMS_TEXT_V2 = `TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 
 1. GENERALIDADES DEL CONCURSO
-La promoción comercial denominada "Polla Mundialista Super Carnes 2026" es organizada por Super Carnes y tendrá vigencia desde el 11 de junio de 2026 hasta el 20 de julio de 2026, correspondiente al período oficial de la FIFA de Grupos y de Eliminatoria de la Copa Mundial de la FIFA 2026.
+La promoción comercial denominada "Polla Mundialista Super Carnes 2026" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
 Super Carnes podrá modificar la vigencia por razones operativas, técnicas, regulatorias o de fuerza mayor, previa comunicación al público participante.
 
 2. ELEGIBILIDAD
@@ -1004,42 +1012,45 @@ Podrán participar únicamente personas naturales mayores de 18 años, residente
 No podrán participar colaboradores directos de Super Carnes, personas vinculadas directa o indirectamente con la organización, administración o auditoría de la promoción, ni sus familiares dentro del cuarto grado de consanguinidad y segundo de afinidad.
 
 3. MECÁNICA DE PARTICIPACIÓN
-La promoción premia el conocimiento y habilidad de los participantes respecto a los resultados deportivos de la Copa Mundial de la FIFA 2026, incluyendo la Fase de Grupos y la Fase Eliminatoria.
-Cada participante deberá registrarse en la plataforma oficial antes del inicio del primer partido de la Fase de Grupos, con fecha límite el 10 de junio de 2026 a las 11:59 p. m., completando nombre, documento, correo, teléfono, pronósticos de partidos y predicción del total de goles anotados durante la Fase de Grupos.
+La promoción premia el conocimiento y habilidad de los participantes respecto a los resultados deportivos de los partidos habilitados en la plataforma oficial.
+La primera ronda de pronósticos estará habilitada desde el 4 de junio de 2026 hasta el 10 de junio de 2026 a las 11:59 p. m.
+La segunda ronda de pronósticos estará habilitada desde el 28 de junio de 2026 hasta el 29 de junio de 2026, una vez definidos los clasificados al cierre de la fase de grupos del 27 de junio de 2026.
+Cada participante deberá completar correctamente su registro en la plataforma oficial con nombre, documento, correo y teléfono, además de registrar sus pronósticos dentro de las fechas habilitadas para cada ronda.
 
 4. NATURALEZA DEL CONCURSO
 La promoción constituye un concurso basado en habilidad, conocimiento, análisis y destreza deportiva. La asignación de premios se determina exclusivamente conforme al sistema de puntuación establecido en estos términos y condiciones.
 
 5. SISTEMA DE PUNTUACIÓN
-Los participantes acumularán puntos conforme a la precisión de sus pronósticos en los partidos de la Fase de Grupos:
+Los participantes acumularán puntos conforme a la precisión de sus pronósticos en los partidos habilitados en cada ronda:
 - 1 punto por acertar la victoria del equipo Favorito.
 - 2 puntos por acertar que el partido finalizará en empate.
 - 3 puntos por acertar la victoria del equipo No Favorito.
 - 3 puntos adicionales por acertar el marcador exacto.
-Para efectos exclusivos de la promoción, se considerará Favorito al equipo que ocupe la mejor posición en el Ranking Mundial Masculino de la FIFA vigente al inicio de la promoción. Esa clasificación permanecerá fija durante toda la Fase de Grupos.
-Además, el participante podrá acumular 1 punto adicional por cada factura válida registrada en la plataforma, siempre que la compra sea en Super Carnes, supere USD 25.00 sin ITBMS, haya sido emitida dentro del día calendario previo al registro y el CUFE sea válido.
+Para efectos exclusivos de la promoción, se considerará Favorito al equipo que ocupe la mejor posición en el Ranking Mundial Masculino de la FIFA vigente al inicio de la promoción.
+Además, el participante podrá acumular 1 punto adicional por cada factura válida registrada en la plataforma, siempre que la compra sea en Super Carnes, supere USD 25.00 sin ITBMS, que la factura haya sido emitida el mismo día del registro o el día calendario inmediatamente anterior, y que el CUFE sea válido.
 
 6. VALIDACIÓN DE FACTURAS
 Todas las facturas registradas serán verificadas contra el sistema de la Dirección General de Ingresos (DGI). Solo serán válidas las facturas legítimas, con CUFE verificable, no registradas previamente y que cumplan con los montos y fechas requeridas.
 El intento de usar facturas falsas, alteradas, duplicadas o pertenecientes a terceros constituye causal inmediata de descalificación.
 
 7. PREMIOS
-Se premiará a los 20 participantes con mayor cantidad de puntos al finalizar la Fase de Grupos y a los 20 participantes con mayor cantidad de puntos al finalizar la Fase Eliminatoria.
-Cada ganador de la Fase de Grupos recibirá 1 televisor nuevo de 50 pulgadas, con valor comercial aproximado de B/.500.00.
-Cada ganador de la Fase Eliminatoria recibirá 1 televisor nuevo de 50 pulgadas, con valor comercial aproximado de B/.500.00, más un bono de mercancía de B/.200.00.
-Los premios no son transferibles, no son canjeables por dinero en efectivo y no podrán ser sustituidos por otros bienes o servicios. Los ganadores podrán reclamar su premio dentro de los cinco días posteriores a la finalización de cada fase en la sucursal de Super Carnes más cercana, presentando su documento de identidad.
+Los premios de cada ronda se otorgarán de manera independiente.
+Al finalizar la primera ronda, los participantes ubicados entre las posiciones 1 y 10 de la tabla de puntuación recibirán 1 televisor nuevo de 50 pulgadas cada uno.
+Al finalizar la primera ronda, los participantes ubicados entre las posiciones 11 y 110 de la tabla de puntuación recibirán 1 balón original cada uno.
+Al finalizar la segunda ronda, los 20 participantes con mayor cantidad de puntos recibirán 1 tarjeta de regalo para compras en Super Carnes por USD 200.00 cada uno.
+Los premios no son transferibles, no son canjeables por dinero en efectivo y no podrán ser sustituidos por otros bienes o servicios. Los ganadores podrán reclamar su premio dentro de los cinco días calendario posteriores al anuncio oficial de la ronda correspondiente, presentando su documento de identidad.
 
 8. CRITERIOS DE DESEMPATE
 En caso de empate, se aplicarán sucesivamente estos criterios:
 1. Mayor cantidad de marcadores exactos acertados.
 2. Mayor cantidad de facturas válidas registradas.
 3. Mayor monto acumulado en compras válidas.
-4. Mayor aproximación al total de goles anotados en la Fase de Grupos, aplicable solo para desempates de la Fase de Grupos.
+4. Mayor aproximación al total de goles anotados en la primera ronda, aplicable solo para desempates de la primera ronda.
 5. Fecha y hora de registro más temprana en el sistema oficial de la plataforma.
 
 9. NOTIFICACIÓN Y ENTREGA DE PREMIOS
-Los ganadores oficiales de la Fase de Grupos serán anunciados el 29 de junio de 2026. Los ganadores oficiales de la Fase Eliminatoria serán anunciados el 20 de julio de 2026, ambos a través de las redes sociales oficiales de Super Carnes.
-Además, serán contactados vía telefónica y/o correo electrónico. Si un ganador potencial no responde dentro de las 24 horas siguientes al primer intento de contacto, perderá el derecho al premio y Super Carnes podrá adjudicarlo al siguiente participante con mayor puntuación.
+Los ganadores oficiales de cada ronda serán anunciados dentro de los cinco días calendario siguientes al cierre de la ronda correspondiente, a través de las redes sociales oficiales de Super Carnes.
+Además, serán contactados vía telefónica y/o correo electrónico. Si un ganador potencial no responde dentro de los cinco días calendario siguientes al primer intento de contacto, perderá el derecho al premio y Super Carnes podrá adjudicarlo al siguiente participante con mayor puntuación.
 
 10. DESCALIFICACIÓN
 Super Carnes podrá descalificar inmediatamente a cualquier participante que incumpla estos términos y condiciones, proporcione información falsa o incompleta, intente manipular la plataforma o el sistema de puntuación, registre facturas fraudulentas o pertenecientes a terceros, o realice actos que afecten la transparencia o integridad de la promoción.
@@ -1050,11 +1061,27 @@ Los datos personales suministrados serán utilizados exclusivamente para la admi
 12. ACEPTACIÓN DE LOS TÉRMINOS Y CONDICIONES
 La participación en la promoción implica el conocimiento, aceptación plena e incondicional de los presentes términos y condiciones.`
 
+function normalizeBrandColor(prop: string, value: string) {
+  const normalized = value.trim().toLowerCase()
+  const legacyPrimaryReds = new Set(['#da291c', '#e3261d', '#ff3349', '#c1122a', '#8f0d1d', '#f53003', '#f61500'])
+  const legacyRedOutlines = new Set(['#5c403b', '#ac8883'])
+
+  if (prop === '--primary-container' && legacyPrimaryReds.has(normalized)) {
+    return '#007aff'
+  }
+
+  if (prop === '--outline-variant' && legacyRedOutlines.has(normalized)) {
+    return '#245d9f'
+  }
+
+  return value.trim()
+}
+
 function applyTheme(vars: Record<string, string | undefined>) {
   const root = document.documentElement
   Object.entries(vars).forEach(([prop, value]) => {
     if (value?.trim()) {
-      root.style.setProperty(prop, value.trim())
+      root.style.setProperty(prop, normalizeBrandColor(prop, value))
     }
   })
 }
@@ -2960,7 +2987,7 @@ export function App() {
 
             <div className="auth-panel-header">
               <p>{isCompletingGoogleRegistration ? 'Registro pendiente' : authMode === 'login' ? 'Acceso privado' : 'Nuevo participante'}</p>
-              <h2>{isCompletingGoogleRegistration ? 'Completa tus datos legales' : authMode === 'login' ? 'Entra a la promo' : 'Unete a la promocion'}</h2>
+              <h2>{isCompletingGoogleRegistration ? 'Completa tus datos legales' : authMode === 'login' ? 'Entra a la promo' : 'Acierta y Gana'}</h2>
               <span>
                 {isCompletingGoogleRegistration
                   ? `Tu correo de Google ya fue verificado: ${user?.email ?? authForm.email}. Solo falta completar los datos obligatorios para participar.`
@@ -3528,7 +3555,7 @@ export function App() {
                   <span className="material-symbols-outlined">settings</span>
                   <span className="font-label-caps text-label-caps">Ajustes</span>
                 </button>
-                <button className="flex items-center gap-4 text-error p-3 mx-2 hover:bg-error-container/20 transition-all" type="button" onClick={() => void handleLogout()}>
+                <button className="flex items-center gap-4 text-primary-container p-3 mx-2 hover:bg-primary-container/10 transition-all" type="button" onClick={() => void handleLogout()}>
                   <span className="material-symbols-outlined">logout</span>
                   <span className="font-label-caps text-label-caps">Cerrar Sesión</span>
                 </button>
