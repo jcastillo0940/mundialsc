@@ -20,7 +20,7 @@ class ContestInvoiceVerifier
             ]);
         }
 
-        $request = Http::acceptJson()->timeout(45)->connectTimeout(10);
+        $request = Http::acceptJson()->timeout(45)->connectTimeout(10)->withHeaders(['Connection' => 'close']);
         $token = (string) config('contest.dgi_verifier_token');
 
         if ($token !== '') {
