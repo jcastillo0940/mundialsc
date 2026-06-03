@@ -37,7 +37,7 @@ Todas las facturas registradas serán verificadas contra el sistema de la Direcc
 El intento de usar facturas falsas, alteradas, duplicadas o pertenecientes a terceros constituye causal inmediata de descalificación.
 
 7. PREMIOS
-Se premiará a los 10 participantes con mayor cantidad de puntos al finalizar la Fase de Grupos y a los 10 participantes con mayor cantidad de puntos al finalizar la Fase Eliminatoria.
+Se premiará a los 20 participantes con mayor cantidad de puntos al finalizar la Fase de Grupos y a los 20 participantes con mayor cantidad de puntos al finalizar la Fase Eliminatoria.
 Cada ganador de la Fase de Grupos recibirá 1 televisor nuevo de 50 pulgadas, con valor comercial aproximado de B/.500.00.
 Cada ganador de la Fase Eliminatoria recibirá 1 televisor nuevo de 50 pulgadas, con valor comercial aproximado de B/.500.00, más un bono de mercancía de B/.200.00.
 Los premios no son transferibles, no son canjeables por dinero en efectivo y no podrán ser sustituidos por otros bienes o servicios. Los ganadores podrán reclamar su premio dentro de los cinco días posteriores a la finalización de cada fase en la sucursal de Super Carnes más cercana, presentando su documento de identidad.
@@ -47,7 +47,7 @@ En caso de empate, se aplicarán sucesivamente estos criterios:
 - Mayor cantidad de marcadores exactos acertados.
 - Mayor cantidad de facturas válidas registradas.
 - Mayor monto acumulado en compras válidas.
-- Mayor aproximación al total de goles anotados en la Fase de Grupos.
+- Mayor aproximación al total de goles anotados en la Fase de Grupos, aplicable solo para desempates de la Fase de Grupos.
 - Fecha y hora de registro más temprana en el sistema oficial de la plataforma.
 
 9. NOTIFICACIÓN Y ENTREGA DE PREMIOS

@@ -131,9 +131,14 @@ interface PredictionsResponse {
 
 interface InvoicesResponse {
   data: RegisteredInvoice[]
-  totals?: {
-    goals?: number
-  }
+  totals?: InvoiceTotals
+}
+
+interface InvoiceTotals {
+  goals?: number
+  amount?: number
+  phase_goals?: number
+  phase_amount?: number
 }
 
 interface ClientBootstrapResponse extends ClientBootstrap {}
@@ -980,7 +985,7 @@ Todas las facturas registradas serán verificadas contra el sistema de la Direcc
 El intento de usar facturas falsas, alteradas, duplicadas o pertenecientes a terceros constituye causal inmediata de descalificación.
 
 7. PREMIOS
-Se premiará a los 10 participantes con mayor cantidad de puntos al finalizar la Fase de Grupos y a los 10 participantes con mayor cantidad de puntos al finalizar la Fase Eliminatoria.
+Se premiará a los 20 participantes con mayor cantidad de puntos al finalizar la Fase de Grupos y a los 20 participantes con mayor cantidad de puntos al finalizar la Fase Eliminatoria.
 Cada ganador de la Fase de Grupos recibirá 1 televisor nuevo de 50 pulgadas, con valor comercial aproximado de B/.500.00.
 Cada ganador de la Fase Eliminatoria recibirá 1 televisor nuevo de 50 pulgadas, con valor comercial aproximado de B/.500.00, más un bono de mercancía de B/.200.00.
 Los premios no son transferibles, no son canjeables por dinero en efectivo y no podrán ser sustituidos por otros bienes o servicios. Los ganadores podrán reclamar su premio dentro de los cinco días posteriores a la finalización de cada fase en la sucursal de Super Carnes más cercana, presentando su documento de identidad.
@@ -990,7 +995,7 @@ En caso de empate, se aplicarán sucesivamente estos criterios:
 1. Mayor cantidad de marcadores exactos acertados.
 2. Mayor cantidad de facturas válidas registradas.
 3. Mayor monto acumulado en compras válidas.
-4. Mayor aproximación al total de goles anotados en la Fase de Grupos.
+4. Mayor aproximación al total de goles anotados en la Fase de Grupos, aplicable solo para desempates de la Fase de Grupos.
 5. Fecha y hora de registro más temprana en el sistema oficial de la plataforma.
 
 9. NOTIFICACIÓN Y ENTREGA DE PREMIOS
@@ -1017,6 +1022,7 @@ export function App() {
   const [matches, setMatches] = useState<TournamentMatch[]>([])
   const [predictionsList, setPredictionsList] = useState<Prediction[]>([])
   const [invoices, setInvoices] = useState<RegisteredInvoice[]>([])
+  const [invoiceTotals, setInvoiceTotals] = useState<InvoiceTotals | null>(null)
   const [clientOverview, setClientOverview] = useState<ClientBootstrap | null>(null)
   const [dashboardSnapshot, setDashboardSnapshot] = useState<DashboardSnapshot | null>(null)
   const [walletSnapshot, setWalletSnapshot] = useState<WalletSnapshot | null>(null)
@@ -1841,6 +1847,7 @@ export function App() {
         setMatches([])
         setPredictionsList([])
         setInvoices([])
+        setInvoiceTotals(null)
         setClientOverview(null)
         setDashboardSnapshot(null)
         setWalletSnapshot(null)
@@ -1876,6 +1883,7 @@ export function App() {
       setWalletSnapshot(walletResponse.data)
       setPrizes(prizesResponse.data.data ?? [])
       setInvoices(invoicesResponse.data.data ?? [])
+      setInvoiceTotals(invoicesResponse.data.totals ?? null)
 
       const drafts = nextMatches.reduce<Record<number, PredictionDraft>>((accumulator, match) => {
         const existing = nextPredictions.find((prediction) => prediction.match_id === match.id)
@@ -2075,6 +2083,7 @@ export function App() {
     } finally {
       persistToken(null)
       setUser(null)
+      setInvoiceTotals(null)
       navigate('/login', { replace: true })
     }
   }
@@ -2519,7 +2528,15 @@ export function App() {
     )
 
     const approvedInvoices = invoices.filter((invoice) => invoice.validation_status === 'approved')
-    const totalInvoicePoints = approvedInvoices.reduce((total, invoice) => total + Number(invoice.points_awarded ?? 0), 0)
+    const activeInvoicePhase = clientOverview?.active_phase ?? null
+    const phaseInvoicePoints = approvedInvoices
+      .filter((invoice) => {
+        if (!activeInvoicePhase || !invoice.issued_at) return false
+
+        const issuedAt = new Date(invoice.issued_at).getTime()
+        return issuedAt >= new Date(activeInvoicePhase.starts_at).getTime() && issuedAt <= new Date(activeInvoicePhase.ends_at).getTime()
+      })
+      .reduce((total, invoice) => total + Number(invoice.points_awarded ?? 0), 0)
     const invoiceCards = invoices.length
       ? invoices.slice(0, 4).map((invoice) => {
           const status = invoiceStatusMeta(invoice.validation_status)
@@ -2641,7 +2658,7 @@ export function App() {
                     <h2 className="font-headline-lg text-headline-lg">HISTORIAL DE PARTIDOS</h2>
                     <div className="flex gap-2">
                       <span className="bg-primary-container/10 text-primary-container px-3 py-1 rounded-full text-[10px] font-bold border border-primary-container/20 uppercase">
-                        {totalInvoicePoints.toFixed(1)} Goles Totales
+                        {phaseInvoicePoints.toFixed(1)} Goles de Fase
                       </span>
                     </div>
                   </div>
@@ -2668,6 +2685,8 @@ export function App() {
       return (
         <VitrinaView
           invoices={invoices}
+          invoiceTotals={invoiceTotals}
+          overview={clientOverview}
           user={user!}
           walletSnapshot={walletSnapshot}
         />

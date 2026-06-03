@@ -11,8 +11,6 @@ use App\Models\TournamentPhase;
 use App\Support\PromotionRankingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class ClientTournamentController extends Controller
 {
@@ -32,7 +30,7 @@ class ClientTournamentController extends Controller
             'user' => $user->loadMissing('wallet'),
             'invoice_settings' => InvoiceGoalSetting::query()->first(),
             'active_phase' => $activePhase,
-            'phase_goals' => $activePhase ? $this->phaseGoalsForUser($user->id, $activePhase->id) : 0,
+            'phase_goals' => $activePhase ? $this->phaseGoalsForUser($user->id, $activePhase) : 0,
             'general_goals' => $this->generalGoalsForUser($user->id),
             'leaderboard' => $activePhase ? $this->rankingService->leaderboardForPhase($activePhase->id)->all() : [],
         ]);
@@ -74,12 +72,17 @@ class ClientTournamentController extends Controller
         return response()->json(['data' => $this->rankingService->leaderboardForPhase($phaseId)->all()]);
     }
 
-    private function phaseGoalsForUser(int $userId, int $phaseId): float
+    private function phaseGoalsForUser(int $userId, TournamentPhase $phase): float
     {
-        $predictionGoals = (float) MatchPrediction::query()->where('user_id', $userId)->where('phase_id', $phaseId)->sum('points_awarded');
+        $predictionGoals = (float) MatchPrediction::query()
+            ->where('user_id', $userId)
+            ->where('phase_id', $phase->id)
+            ->sum('points_awarded');
+
         $invoiceGoals = (float) RegisteredInvoice::query()
             ->where('user_id', $userId)
             ->where('validation_status', 'approved')
+            ->whereBetween('issued_at', [$phase->starts_at, $phase->ends_at])
             ->sum('points_awarded');
 
         return $predictionGoals + $invoiceGoals;
@@ -100,6 +103,9 @@ class ClientTournamentController extends Controller
     {
         return TournamentPhase::query()
             ->where('is_active', true)
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>=', now())
+            ->whereHas('matches', fn ($query) => $query->withAssignedTeams())
             ->orderBy('stage_order');
     }
 }

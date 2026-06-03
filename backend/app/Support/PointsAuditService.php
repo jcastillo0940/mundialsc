@@ -14,6 +14,11 @@ use Illuminate\Support\Str;
 
 class PointsAuditService
 {
+    public function __construct(
+        private readonly TournamentPhaseResolver $phaseResolver,
+    ) {
+    }
+
     public function report(array $filters): array
     {
         $rows = $this->walletMovementRows($filters)
@@ -81,14 +86,14 @@ class PointsAuditService
         $invoiceMap = RegisteredInvoice::query()->whereIn('id', $invoiceIds)->get()->keyBy('id');
         $couponMap = Coupon::query()->with('prize')->whereIn('id', $couponIds)->get()->keyBy('id');
         $playMap = GamePlay::query()->with('prize')->whereIn('id', $playIds)->get()->keyBy('id');
-        $groupStagePhase = TournamentPhase::query()->where('slug', 'fase-grupos')->first();
+        $phasesById = TournamentPhase::query()->get()->keyBy('id');
 
-        return $movements->map(function (WalletMovement $movement) use ($invoiceMap, $couponMap, $playMap, $groupStagePhase): array {
+        return $movements->map(function (WalletMovement $movement) use ($invoiceMap, $couponMap, $playMap, $phasesById): array {
             $source = $this->walletSource($movement);
             $invoice = $movement->resource_type === 'registered_invoice' ? $invoiceMap->get($movement->resource_id) : null;
             $coupon = $movement->resource_type === 'coupon' ? $couponMap->get($movement->resource_id) : null;
             $play = $movement->resource_type === 'game_play' ? $playMap->get($movement->resource_id) : null;
-            $detail = $this->walletMovementDetail($movement, $invoice, $coupon, $play, $groupStagePhase);
+            $detail = $this->walletMovementDetail($movement, $invoice, $coupon, $play, $phasesById);
 
             return [
                 'entry_key' => 'wallet-'.$movement->id,
@@ -239,10 +244,11 @@ class PointsAuditService
             return $phaseIdFromMeta === $phaseId;
         }
 
-        $groupStageId = (int) TournamentPhase::query()->where('slug', 'fase-grupos')->value('id');
+        if ($movement->resource_type === 'registered_invoice' && $movement->resource_id) {
+            $invoice = RegisteredInvoice::query()->find($movement->resource_id);
+            $invoicePhase = $this->phaseResolver->phaseForDate($invoice?->issued_at);
 
-        if ($movement->resource_type === 'registered_invoice' && $groupStageId > 0) {
-            return $phaseId === $groupStageId;
+            return $invoicePhase && (int) $invoicePhase->id === $phaseId;
         }
 
         return false;
@@ -269,13 +275,14 @@ class PointsAuditService
         ?RegisteredInvoice $invoice,
         ?Coupon $coupon,
         ?GamePlay $play,
-        ?TournamentPhase $groupStagePhase,
+        Collection $phasesById,
     ): array {
         $meta = is_array($movement->meta) ? $movement->meta : [];
         $ruleCode = (string) ($meta['rule_code'] ?? $movement->type);
         $ruleLabel = (string) ($meta['rule_label'] ?? $this->defaultWalletRuleLabel($movement));
         $reason = (string) ($movement->notes ?: $ruleLabel);
-        $phaseName = $groupStagePhase?->name;
+        $phase = $this->movementPhase($movement, $invoice, $phasesById);
+        $phaseName = $phase?->name;
         $reference = $movement->resource_type && $movement->resource_id
             ? sprintf('%s #%s', $movement->resource_type, $movement->resource_id)
             : 'Movimiento interno';
@@ -299,7 +306,6 @@ class PointsAuditService
 
         if ($invoice) {
             $reference = 'Factura '.($invoice->invoice_number ?: $invoice->cufe);
-            $phaseName = $groupStagePhase?->name ?? 'Fase de Grupos';
             $detail['invoice'] = [
                 'id' => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
@@ -359,6 +365,21 @@ class PointsAuditService
             'game_shot_debit' => 'Consumo de tiro en juego',
             default => Str::headline(str_replace('_', ' ', $movement->type)),
         };
+    }
+
+    private function movementPhase(WalletMovement $movement, ?RegisteredInvoice $invoice, Collection $phasesById): ?TournamentPhase
+    {
+        $phaseIdFromMeta = (int) data_get($movement->meta, 'phase_id', 0);
+
+        if ($phaseIdFromMeta > 0) {
+            return $phasesById->get($phaseIdFromMeta);
+        }
+
+        if ($invoice) {
+            return $this->phaseResolver->phaseForDate($invoice->issued_at);
+        }
+
+        return null;
     }
 
     private function predictionRuleDetail(MatchPrediction $prediction): array

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\RegisteredInvoice;
 use App\Support\ContestInvoiceRegistrationService;
+use App\Support\TournamentPhaseResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,11 +13,17 @@ class DailyInvoiceGoalController extends Controller
 {
     public function __construct(
         private readonly ContestInvoiceRegistrationService $registrationService,
+        private readonly TournamentPhaseResolver $phaseResolver,
     ) {
     }
 
     public function index(Request $request): JsonResponse
     {
+        $activePhase = $this->phaseResolver->currentPhase();
+        $invoiceTotalsQuery = RegisteredInvoice::query()
+            ->where('user_id', $request->user()->id)
+            ->where('validation_status', 'approved');
+
         return response()->json([
             'data' => RegisteredInvoice::query()
                 ->where('user_id', $request->user()->id)
@@ -24,11 +31,20 @@ class DailyInvoiceGoalController extends Controller
                 ->limit(20)
                 ->get(),
             'totals' => [
-                'goals' => (float) RegisteredInvoice::query()
-                    ->where('user_id', $request->user()->id)
-                    ->where('validation_status', 'approved')
-                    ->sum('points_awarded'),
+                'goals' => (float) (clone $invoiceTotalsQuery)->sum('points_awarded'),
+                'amount' => (float) (clone $invoiceTotalsQuery)->sum('purchase_amount'),
+                'phase_goals' => $activePhase
+                    ? (float) (clone $invoiceTotalsQuery)
+                        ->whereBetween('issued_at', [$activePhase->starts_at, $activePhase->ends_at])
+                        ->sum('points_awarded')
+                    : 0,
+                'phase_amount' => $activePhase
+                    ? (float) (clone $invoiceTotalsQuery)
+                        ->whereBetween('issued_at', [$activePhase->starts_at, $activePhase->ends_at])
+                        ->sum('purchase_amount')
+                    : 0,
             ],
+            'active_phase' => $activePhase,
         ]);
     }
 

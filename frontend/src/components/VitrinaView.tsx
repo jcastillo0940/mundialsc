@@ -1,4 +1,4 @@
-import type { RegisteredInvoice, User, WalletMovement, WalletSnapshot } from '../types'
+import type { ClientBootstrap, RegisteredInvoice, TournamentPhase, User, WalletMovement, WalletSnapshot } from '../types'
 import { InfoTooltip } from './InfoTooltip'
 
 function formatCompactNumber(value: number | string | null | undefined) {
@@ -61,21 +61,59 @@ function movementIcon(movement: WalletMovement) {
   return 'monitoring'
 }
 
+function dateInPhase(dateValue: string | null | undefined, phase: TournamentPhase | null | undefined) {
+  if (!dateValue || !phase) return false
+
+  const time = new Date(dateValue).getTime()
+  const startsAt = new Date(phase.starts_at).getTime()
+  const endsAt = new Date(phase.ends_at).getTime()
+
+  return Number.isFinite(time) && time >= startsAt && time <= endsAt
+}
+
 export function VitrinaView({
   user,
   walletSnapshot,
   invoices,
+  invoiceTotals,
+  overview,
 }: {
   user: User
   walletSnapshot: WalletSnapshot | null
   invoices: RegisteredInvoice[]
+  invoiceTotals: {
+    goals?: number
+    amount?: number
+    phase_goals?: number
+    phase_amount?: number
+  } | null
+  overview: ClientBootstrap | null
 }) {
   const wallet = walletSnapshot?.wallet ?? user.wallet ?? null
   const movements = walletSnapshot?.movements ?? []
+  const activePhase = overview?.active_phase ?? null
   const approvedInvoices = invoices.filter((invoice) => invoice.validation_status === 'approved')
-  const approvedInvoiceTotal = approvedInvoices.reduce((total, invoice) => total + Number(invoice.purchase_amount ?? 0), 0)
+  const activePhaseInvoices = approvedInvoices.filter((invoice) => dateInPhase(invoice.issued_at, activePhase))
+  const approvedInvoiceTotal = Number(
+    invoiceTotals?.phase_amount
+      ?? activePhaseInvoices.reduce((total, invoice) => total + Number(invoice.purchase_amount ?? 0), 0),
+  )
+  const historicalInvoiceTotal = Number(
+    invoiceTotals?.amount
+      ?? approvedInvoices.reduce((total, invoice) => total + Number(invoice.purchase_amount ?? 0), 0),
+  )
+  const invoiceById = new Map(approvedInvoices.map((invoice) => [invoice.id, invoice]))
+  const activePhaseMovements = movements.filter((movement) => {
+    const movementPhaseId = Number(movement.meta?.phase_id ?? 0)
+    if (activePhase && movementPhaseId > 0) return movementPhaseId === activePhase.id
+    if (movement.resource_type === 'registered_invoice' && movement.resource_id) {
+      return dateInPhase(invoiceById.get(movement.resource_id)?.issued_at, activePhase)
+    }
+    return false
+  })
   const totalGoalsWon = movements.reduce((total, movement) => total + Math.max(Number(movement.goals_delta ?? 0), 0), 0)
-  const totalGoalsSpent = movements.reduce((total, movement) => total + Math.abs(Math.min(Number(movement.goals_delta ?? 0), 0)), 0)
+  const phaseGoalsWon = Number(overview?.phase_goals ?? invoiceTotals?.phase_goals ?? 0)
+  const phaseGoalsSpent = activePhaseMovements.reduce((total, movement) => total + Math.abs(Math.min(Number(movement.goals_delta ?? 0), 0)), 0)
 
   return (
     <section className="vitrina-view">
@@ -83,21 +121,21 @@ export function VitrinaView({
         <div className="vitrina-hero-copy">
           <span className="vitrina-kicker">SUPER CARNES 2026</span>
           <h1>Vitrina de goles</h1>
-          <p>Consulta tus goles acumulados, el total de tus facturas aprobadas y cada movimiento registrado durante la promocion.</p>
+          <p>Consulta tus goles de la fase actual, el total de tus facturas aprobadas y cada movimiento registrado durante la promocion.</p>
         </div>
 
         <div className="vitrina-scoreboard">
           <article className="vitrina-scoreboard-primary">
             <span>
-              Goles acumulados
-              <InfoTooltip compact content="Suma historica de goles acreditados por facturas validadas, pronosticos acertados y otras dinamicas oficiales." />
+              Goles de fase
+              <InfoTooltip compact content="Goles que cuentan para la fase actual. Los goles de fases anteriores quedan guardados en el historial, pero no se suman aqui." />
             </span>
-            <strong>{formatCompactNumber(wallet?.lifetime_goals_earned ?? totalGoalsWon)} G</strong>
+            <strong>{formatCompactNumber(phaseGoalsWon)} G</strong>
           </article>
           <article className="vitrina-scoreboard-secondary">
             <span>
-              Total facturas
-              <InfoTooltip compact content="Monto acumulado de todas tus facturas aprobadas dentro de la promocion." />
+              Facturas de fase
+              <InfoTooltip compact content="Monto acumulado de tus facturas aprobadas emitidas dentro de la ventana de la fase actual." />
             </span>
             <strong>{formatCurrency(approvedInvoiceTotal)}</strong>
           </article>
@@ -110,14 +148,14 @@ export function VitrinaView({
             <span className="vitrina-kicker">Actividad oficial</span>
             <h2>
               Historial de cuenta
-              <InfoTooltip compact content="Aqui ves cada movimiento que afecto tus goles o tiros: ganancias por pronosticos, facturas validadas, canjes y premios." />
+              <InfoTooltip compact content={`Historico completo de movimientos. Acumulado general: ${formatCompactNumber(wallet?.lifetime_goals_earned ?? totalGoalsWon)} goles y ${formatCurrency(historicalInvoiceTotal)} en facturas aprobadas.`} />
             </h2>
           </div>
 
           <div className="vitrina-chip-row">
             <span className="vitrina-chip">{formatCompactNumber(movements.length)} movimientos</span>
-            <span className="vitrina-chip positive">+{formatCompactNumber(totalGoalsWon)} G</span>
-            <span className="vitrina-chip negative">-{formatCompactNumber(totalGoalsSpent)} G</span>
+            <span className="vitrina-chip positive">+{formatCompactNumber(phaseGoalsWon)} G fase</span>
+            <span className="vitrina-chip negative">-{formatCompactNumber(phaseGoalsSpent)} G fase</span>
           </div>
         </div>
 

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class PromotionRankingService
 {
-    public const WINNER_SLOTS = 10;
+    public const WINNER_SLOTS = 20;
 
     public function __construct(
         private readonly ContestRules $contestRules,
@@ -85,8 +85,10 @@ class PromotionRankingService
                 COALESCE(invoice_totals.invoice_total_amount, 0) as invoice_total_amount
             ")
             ->get()
-            ->map(function ($row) use ($actualGoals) {
-                $goalPrediction = $row->group_stage_goal_prediction !== null ? (int) $row->group_stage_goal_prediction : null;
+            ->map(function ($row) use ($actualGoals, $phase) {
+                $goalPrediction = $phase->slug === 'fase-grupos' && $row->group_stage_goal_prediction !== null
+                    ? (int) $row->group_stage_goal_prediction
+                    : null;
                 $goalPredictionDelta = $goalPrediction !== null ? abs($goalPrediction - $actualGoals) : PHP_INT_MAX;
                 $rankingTimestamp = $row->registration_completed_at ?? $row->created_at;
                 $rankingOrderKey = $row->registration_order_key ?: (string) ($rankingTimestamp ?? $row->created_at);

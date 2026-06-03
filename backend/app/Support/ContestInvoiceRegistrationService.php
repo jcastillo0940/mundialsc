@@ -24,6 +24,7 @@ class ContestInvoiceRegistrationService
         private readonly ContestRules $rules,
         private readonly WalletService $walletService,
         private readonly FraudDetectionService $fraudDetection,
+        private readonly TournamentPhaseResolver $phaseResolver,
     ) {
     }
 
@@ -168,9 +169,10 @@ class ContestInvoiceRegistrationService
             'issued_at' => $issuedAt,
         ], $resolvedInvoice);
         $canonicalCufe = strtoupper((string) ($verification['canonical_cufe'] ?? $canonicalCufe));
+        $invoicePhase = $this->phaseResolver->phaseForDate($issuedAt);
 
         try {
-            $invoice = DB::transaction(function () use ($user, $campaign, $data, $canonicalCufe, $purchaseAmount, $issuedAt, $verification, $resolvedInvoice, $minimumAmount, $maxInvoiceAgeDays, $settings, $request): RegisteredInvoice {
+            $invoice = DB::transaction(function () use ($user, $campaign, $data, $canonicalCufe, $purchaseAmount, $issuedAt, $verification, $resolvedInvoice, $minimumAmount, $maxInvoiceAgeDays, $settings, $request, $invoicePhase): RegisteredInvoice {
                 $status = $verification['status'] === 'approved' ? 'accepted' : ($verification['status'] === 'pending' ? 'pending_validation' : 'rejected');
                 $validationStatus = match ($verification['status']) {
                     'approved' => 'approved',
@@ -202,7 +204,7 @@ class ContestInvoiceRegistrationService
                 ]);
 
                 if ($verification['status'] === 'approved') {
-                    $this->syncDailyInvoiceGoal($user, $invoice);
+                    $this->syncDailyInvoiceGoal($user, $invoice, $invoicePhase);
                     $this->walletService->creditGoals(
                         user: $user,
                         amount: (int) $pointsAwarded,
@@ -213,10 +215,9 @@ class ContestInvoiceRegistrationService
                         notes: 'Factura validada y punto acreditado.',
                         meta: [
                             'source' => 'invoice',
-                            'phase_id' => TournamentPhase::query()
-                                ->where('slug', 'fase-grupos')
-                                ->orderBy('stage_order')
-                                ->value('id'),
+                            'phase_id' => $invoicePhase?->id,
+                            'phase_slug' => $invoicePhase?->slug,
+                            'phase_name' => $invoicePhase?->name,
                             'rule_code' => 'invoice_goal_awarded',
                             'rule_label' => 'Factura aprobada mayor al minimo',
                             'rule_snapshot' => [
@@ -328,16 +329,11 @@ class ContestInvoiceRegistrationService
         ];
     }
 
-    private function syncDailyInvoiceGoal(User $user, RegisteredInvoice $invoice): void
+    private function syncDailyInvoiceGoal(User $user, RegisteredInvoice $invoice, ?TournamentPhase $phase): void
     {
-        $phaseId = TournamentPhase::query()
-            ->where('slug', 'fase-grupos')
-            ->orderBy('stage_order')
-            ->value('id');
-
         DailyInvoiceGoal::query()->create([
             'user_id' => $user->id,
-            'phase_id' => $phaseId,
+            'phase_id' => $phase?->id,
             'invoice_number' => $invoice->invoice_number ?? $invoice->cufe,
             'purchase_amount' => $invoice->purchase_amount,
             'invoice_date' => optional($invoice->issued_at)->toDateString() ?? now()->toDateString(),
