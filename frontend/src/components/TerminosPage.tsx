@@ -44,7 +44,7 @@ export function TerminosPage({ termsText }: Props) {
 
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 24px 80px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#ff7a3d' }}>gavel</span>
+          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#007aff' }}>gavel</span>
           <div>
             <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 700 }}>Términos y Condiciones</h1>
             <p style={{ margin: '4px 0 0', color: '#9fb4b2', fontSize: '14px' }}>Polla Mundialista Super Carnes 2026</p>

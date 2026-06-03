@@ -2836,15 +2836,12 @@ export function App() {
       {predictionCelebration ? (
         <div className="prediction-celebration" role="status" aria-live="polite">
           <div className="prediction-celebration-card">
-            <div className="prediction-player" aria-hidden="true">
-              <span className="prediction-player-head" />
-              <span className="prediction-player-body" />
-              <span className="prediction-player-arm left" />
-              <span className="prediction-player-arm right" />
-              <span className="prediction-player-leg left" />
-              <span className="prediction-player-leg right" />
-            </div>
-            <div className="prediction-ball" aria-hidden="true" />
+            <img
+              className="prediction-celebration-gaby"
+              src="/gaby-torres-celebration.webp"
+              alt=""
+              aria-hidden="true"
+            />
             <p>Pronostico enviado</p>
             <strong>Panama celebra tu jugada</strong>
             <small>{predictionCelebration}</small>
@@ -2919,7 +2916,7 @@ export function App() {
               <p className="auth-kicker">PROMOCION SUPER CARNES 2026</p>
               <img
                 className="auth-campaign-slogan"
-                src="/auth-slogan.svg"
+                src="/auth-slogan.webp"
                 alt="Panama va al Mundial y tu ganas"
               />
               <p>Registra tus facturas, pronostica partidos y participa por premios durante la ruta mundialista.</p>
@@ -2945,15 +2942,15 @@ export function App() {
 
             {isRegistrationClosed && !isCompletingGoogleRegistration && (
               <div style={{
-                background: 'rgba(178,60,47,0.15)',
-                border: '1px solid rgba(178,60,47,0.4)',
+                background: 'rgba(0,122,255,0.15)',
+                border: '1px solid rgba(0,122,255,0.4)',
                 borderRadius: '12px',
                 padding: '12px 16px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
                 fontSize: '13px',
-                color: '#ffb4a8',
+                color: '#d9ecff',
                 margin: '0 0 4px',
               }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '18px', flexShrink: 0 }}>lock</span>

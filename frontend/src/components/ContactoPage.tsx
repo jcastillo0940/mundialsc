@@ -78,7 +78,7 @@ export function ContactoPage({ contactInfo }: Props) {
 
       <main style={{ maxWidth: '600px', margin: '0 auto', padding: '40px 24px 80px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#ff7a3d' }}>support_agent</span>
+          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#007aff' }}>support_agent</span>
           <div>
             <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 700 }}>Contacto</h1>
             <p style={{ margin: '4px 0 0', color: '#9fb4b2', fontSize: '14px' }}>¿Tienes preguntas sobre la Polla Mundialista?</p>
@@ -100,7 +100,7 @@ export function ContactoPage({ contactInfo }: Props) {
                   gap: '16px',
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '24px', color: '#ff7a3d', marginTop: '2px', flexShrink: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '24px', color: '#007aff', marginTop: '2px', flexShrink: 0 }}>
                   {item.icon}
                 </span>
                 <div>
