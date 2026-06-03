@@ -6155,33 +6155,13 @@ a {
   box-shadow: none;
 }
 
-.auth-campaign-title {
-  display: grid;
-  gap: 0;
-  max-width: 680px;
-  margin: 0;
-  color: #fff;
-  font: 700 clamp(56px, 7vw, 92px)/0.76 'Archivo Narrow', sans-serif;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.auth-campaign-title span {
+.auth-campaign-slogan {
   display: block;
-  text-shadow:
-    2px 0 #183b86,
-    -2px 0 #183b86,
-    0 2px #183b86,
-    3px 3px 0 rgba(255, 209, 102, 0.95);
-}
-
-.auth-campaign-title span:last-child {
-  color: #e3261d;
-  text-shadow:
-    2px 0 #190b0d,
-    -2px 0 #190b0d,
-    0 2px #190b0d,
-    3px 3px 0 rgba(5, 9, 20, 0.9);
+  width: min(680px, 92vw);
+  max-height: min(330px, 34vh);
+  object-fit: contain;
+  object-position: left center;
+  filter: drop-shadow(0 18px 26px rgba(4, 12, 45, 0.34));
 }
 
 .auth-hero-content > p {
@@ -6521,8 +6501,9 @@ a {
     grid-template-rows: 48px minmax(0, 1fr) 44px 34px;
   }
 
-  .auth-campaign-title {
-    font-size: clamp(46px, 6vw, 74px);
+  .auth-campaign-slogan {
+    width: min(560px, 90vw);
+    max-height: 230px;
   }
 
   .auth-panel {
@@ -6553,8 +6534,9 @@ a {
     padding: 0;
   }
 
-  .auth-campaign-title {
-    font-size: clamp(48px, 14vw, 72px);
+  .auth-campaign-slogan {
+    width: min(100%, 520px);
+    max-height: 240px;
   }
 
   .auth-panel {

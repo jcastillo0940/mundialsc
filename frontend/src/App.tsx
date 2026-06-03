@@ -35,6 +35,7 @@ const DEFAULT_AUTH_BG_YOUTUBE_ID = import.meta.env.VITE_AUTH_BG_YOUTUBE_ID ?? 'O
 const DEFAULT_AUTH_LOGO_URL = import.meta.env.VITE_AUTH_LOGO_URL ?? ''
 const STADIUM_IMAGE_URL =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBEx-hRFUMZ710fF7EatYLLO_SftyRg0ww2GvBNKWHSjPObe2Hu17fXzKDy8LOFbxMv93SOa0IWNTCINLfrcTI4Gv7Fb8T-KRHOU6iyLxekm6vci5QI1h6h-jtqFVtscsl4aPJJld2V-TOyhBaZNKlPweuhcxfvNwlUxFNiz07sFuBIttiDysG-4NIdDsaDGIygvIgQn-m1chePGiwL3D2k8IOl-CypudZp6J8U6ve38WWsbNyTIdWbQWlJlq2K7BKdk_nqv4a5KH8'
+const FEEDBACK_DISMISS_MS = 15_000
 
 type AuthMode = 'login' | 'register'
 type MainView = 'cancha' | 'reglas' | 'facturas' | 'perfil' | 'cuenta'
@@ -120,6 +121,26 @@ const CLIENT_VIEW_LABELS: Record<MainView, string> = {
   perfil: 'Ranking',
   reglas: 'Vitrina',
   cuenta: 'Mi Cuenta',
+}
+
+function useTimedFeedback(initialValue: string | null = null): [string | null, (value: string | null) => void] {
+  const [value, setValue] = useState<string | null>(initialValue)
+  const [version, setVersion] = useState(0)
+
+  function setTimedValue(nextValue: string | null) {
+    setValue(nextValue)
+    setVersion((current) => current + 1)
+  }
+
+  useEffect(() => {
+    if (!value) return undefined
+
+    const timeoutId = window.setTimeout(() => setValue(null), FEEDBACK_DISMISS_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [value, version])
+
+  return [value, setTimedValue]
 }
 
 interface PredictionDraft {
@@ -1047,7 +1068,7 @@ export function App() {
   })
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false)
   const [resolvedInvoiceData, setResolvedInvoiceData] = useState<ResolvedInvoiceData | null>(null)
-  const [invoiceScannerError, setInvoiceScannerError] = useState<string | null>(null)
+  const [invoiceScannerError, setInvoiceScannerError] = useTimedFeedback()
   const [invoiceScannerDebug, setInvoiceScannerDebug] = useState<InvoiceScannerDebugInfo>(() =>
     buildInvoiceScannerDebugInfo({ lastStage: 'idle' }),
   )
@@ -1058,8 +1079,8 @@ export function App() {
   const [mobileUserSidebarOpen, setMobileUserSidebarOpen] = useState(false)
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string | null>(null)
   const [predictionDrafts, setPredictionDrafts] = useState<Record<number, PredictionDraft>>({})
-  const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useTimedFeedback()
+  const [error, setError] = useTimedFeedback()
   const [profileSaving, setProfileSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [authBootstrapping, setAuthBootstrapping] = useState<boolean>(Boolean(localStorage.getItem(TOKEN_KEY)))
@@ -2783,8 +2804,8 @@ export function App() {
   return (
     <div className="marea-app-shell">
       <div className="cursor-trail" aria-hidden="true" />
-      {message ? <div className="feedback success">{message}</div> : null}
-      {error ? <div className="feedback error">{error}</div> : null}
+      {message ? <div className="feedback success" role="status" aria-live="polite">{message}</div> : null}
+      {error ? <div className="feedback error" role="alert">{error}</div> : null}
       {predictionCelebration ? (
         <div className="prediction-celebration" role="status" aria-live="polite">
           <div className="prediction-celebration-card">
@@ -2869,11 +2890,11 @@ export function App() {
             <div className="auth-hero-overlay" />
             <div className="auth-hero-content">
               <p className="auth-kicker">PROMOCION SUPER CARNES 2026</p>
-              <h1 className="auth-campaign-title">
-                <span>Panama va</span>
-                <span>al Mundial</span>
-                <span>y tu ganas</span>
-              </h1>
+              <img
+                className="auth-campaign-slogan"
+                src="/auth-slogan.svg"
+                alt="Panama va al Mundial y tu ganas"
+              />
               <p>Registra tus facturas, pronostica partidos y participa por premios durante la ruta mundialista.</p>
               <div className="auth-hero-chips" aria-label="Beneficios de la promocion">
                 <span>Facturas</span>
