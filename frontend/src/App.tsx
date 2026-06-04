@@ -36,6 +36,16 @@ const DEFAULT_AUTH_LOGO_URL = import.meta.env.VITE_AUTH_LOGO_URL ?? ''
 const STADIUM_IMAGE_URL =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBEx-hRFUMZ710fF7EatYLLO_SftyRg0ww2GvBNKWHSjPObe2Hu17fXzKDy8LOFbxMv93SOa0IWNTCINLfrcTI4Gv7Fb8T-KRHOU6iyLxekm6vci5QI1h6h-jtqFVtscsl4aPJJld2V-TOyhBaZNKlPweuhcxfvNwlUxFNiz07sFuBIttiDysG-4NIdDsaDGIygvIgQn-m1chePGiwL3D2k8IOl-CypudZp6J8U6ve38WWsbNyTIdWbQWlJlq2K7BKdk_nqv4a5KH8'
 const FEEDBACK_DISMISS_MS = 15_000
+const AUTH_REFERENCE_ASSETS = {
+  logo: '/redesign/auth-logo-super-carnes.png',
+  player: '/redesign/auth-player-left.png',
+  mascot: '/redesign/auth-mascot-center.png',
+  ball: '/redesign/auth-ball-center.png',
+  stadium: '/redesign/auth-stadium-bg.jpg',
+  crowd: '/redesign/auth-crowd-overlay.png',
+  field: '/redesign/layerback.svg',
+  confetti: '/redesign/auth-confetti-layer.svg',
+}
 
 type AuthMode = 'login' | 'register'
 type MainView = 'cancha' | 'reglas' | 'facturas' | 'perfil' | 'cuenta'
@@ -206,6 +216,22 @@ interface AuthFormState {
   branch_id: string
 }
 
+const EMPTY_AUTH_FORM: AuthFormState = {
+  full_name: '',
+  document_type: 'cedula',
+  cedula: '',
+  email: '',
+  phone: '',
+  birthdate: '',
+  resides_in_panama: true,
+  is_employee: false,
+  accepted_terms: false,
+  group_stage_goal_prediction: '',
+  password: '',
+  password_confirmation: '',
+  branch_id: '',
+}
+
 interface InvoiceFormState {
   rawInput: string
   invoice_number: string
@@ -338,7 +364,7 @@ async function startNativeBarcodeScanner(
   video.srcObject = stream
   await video.play()
 
-  // Autofocus continuo — opcional, ignorar si el dispositivo no lo soporta
+  // Autofocus continuo - opcional, ignorar si el dispositivo no lo soporta
   const track = stream.getVideoTracks()[0]
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -459,7 +485,7 @@ function documentNumberLabel(documentType: AuthFormState['document_type']) {
 }
 
 function documentNumberPlaceholder(documentType: AuthFormState['document_type']) {
-  if (documentType === 'cedula') return 'Ej: 8-864-1164, PE-123-456'
+  if (documentType === 'cedula') return '8-888-8888'
   if (documentType === 'residente') return 'Ej: E-123456 o PE-123-456'
   return 'Ej: PA1234567'
 }
@@ -1129,18 +1155,18 @@ export function App() {
   const [loading, setLoading] = useState(false)
   const [authBootstrapping, setAuthBootstrapping] = useState<boolean>(Boolean(localStorage.getItem(TOKEN_KEY)))
   const [registerStep, setRegisterStep] = useState(1)
-  const [authBgVideoId, setAuthBgVideoId] = useState(DEFAULT_AUTH_BG_YOUTUBE_ID)
+  const [, setAuthBgVideoId] = useState(DEFAULT_AUTH_BG_YOUTUBE_ID)
   const [authLogoUrl, setAuthLogoUrl] = useState(DEFAULT_AUTH_LOGO_URL)
   const [headerLogoUrl, setHeaderLogoUrl] = useState('')
   const [heroVideoUrl, setHeroVideoUrl] = useState('')
-  const [participantBrands, setParticipantBrands] = useState<ParticipantBrand[]>([])
+  const [, setParticipantBrands] = useState<ParticipantBrand[]>([])
   const [termsText, setTermsText] = useState(OFFICIAL_TERMS_TEXT_V2 || OFFICIAL_TERMS_TEXT)
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('')
   const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false)
   const [googleClientId, setGoogleClientId] = useState(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '')
   const [registrationDeadline, setRegistrationDeadline] = useState('2026-06-10T23:59:59-05:00')
   const [showScannerDebug, setShowScannerDebug] = useState(false)
-  const [showAuthTicker, setShowAuthTicker] = useState(true)
+  const [, setShowAuthTicker] = useState(true)
   const [contactInfo, setContactInfo] = useState<{ contact_email?: string; contact_phone?: string; contact_address?: string; contact_hours?: string }>({})
   const [predictionCelebration, setPredictionCelebration] = useState<string | null>(null)
   const [termsModalOpen, setTermsModalOpen] = useState(false)
@@ -1153,21 +1179,7 @@ export function App() {
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
   const mobileUserSidebarRef = useRef<HTMLDivElement | null>(null)
-  const [authForm, setAuthForm] = useState<AuthFormState>({
-    full_name: '',
-    document_type: 'cedula',
-    cedula: '',
-    email: '',
-    phone: '',
-    birthdate: '',
-    resides_in_panama: true,
-    is_employee: false,
-    accepted_terms: false,
-    group_stage_goal_prediction: '',
-    password: '',
-    password_confirmation: '',
-    branch_id: '',
-  })
+  const [authForm, setAuthForm] = useState<AuthFormState>(EMPTY_AUTH_FORM)
   const [branches, setBranches] = useState<Branch[]>([])
   const [registrationAvatarFile, setRegistrationAvatarFile] = useState<File | null>(null)
   const [registrationAvatarPreview, setRegistrationAvatarPreview] = useState<string | null>(null)
@@ -1176,21 +1188,8 @@ export function App() {
   const isPublicPage = ['/terminos', '/privacidad', '/contacto'].includes(location.pathname)
   const isRegistrationClosed = new Date() > new Date(registrationDeadline)
   const isCompletingGoogleRegistration = Boolean(token && user && !isRegistrationComplete(user))
-  const totalRegisterSteps = isCompletingGoogleRegistration ? 3 : 4
+  const totalRegisterSteps = isCompletingGoogleRegistration ? 4 : 5
   const currentViewLabel = CLIENT_VIEW_LABELS[currentView]
-  const authCarouselBrands = useMemo(() => {
-    const baseBrands = participantBrands.length > 0
-      ? participantBrands
-      : [
-          { name: 'Super Carnes' },
-          { name: 'Importadora Virzi' },
-          { name: 'Marcas participantes' },
-        ]
-    const repetitionsPerLoop = Math.max(4, Math.ceil(12 / baseBrands.length))
-    const loopBrands = Array.from({ length: repetitionsPerLoop }, () => baseBrands).flat()
-
-    return [...loopBrands, ...loopBrands]
-  }, [participantBrands])
   const registrationStepErrors = useMemo(() => {
     const errors: Record<string, string> = {}
 
@@ -1215,12 +1214,16 @@ export function App() {
     }
 
     if (registerStep === 3) {
+      if (!authForm.group_stage_goal_prediction.trim()) errors.group_stage_goal_prediction = 'Debes ingresar tu pronostico de desempate.'
       if (!authForm.branch_id) errors.branch_id = 'Debes seleccionar tu sucursal de preferencia.'
+    }
+
+    if (registerStep === 4) {
       if (!authForm.resides_in_panama) errors.resides_in_panama = 'Debes confirmar que resides en Panama.'
       if (!authForm.accepted_terms) errors.accepted_terms = 'Debes leer y aceptar los terminos y condiciones.'
     }
 
-    if (!isCompletingGoogleRegistration && registerStep === 4) {
+    if (!isCompletingGoogleRegistration && registerStep === 5) {
       const emailError = validateEmail(authForm.email)
       const passwordError = validatePassword(authForm.password)
       if (emailError) errors.email = emailError
@@ -1670,7 +1673,7 @@ export function App() {
         let nativeFormats: string[] = []
 
         if (useNative) {
-          // Ruta nativa: full-frame 1080p, autofocus, sin crop — maneja QR densos
+          // Ruta nativa: full-frame 1080p, autofocus, sin crop - maneja QR densos
           try {
             // Filtrar a formatos soportados por el dispositivo antes de construir el detector
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1713,7 +1716,7 @@ export function App() {
             invoiceScannerRef.current = nativeScanner
             nativeStarted = true
           } catch {
-            // BarcodeDetector no disponible o sin soporte suficiente — caer a html5-qrcode
+            // BarcodeDetector no disponible o sin soporte suficiente - caer a html5-qrcode
           }
         }
 
@@ -2185,6 +2188,14 @@ export function App() {
     } finally {
       persistToken(null)
       setUser(null)
+      setAuthMode('login')
+      setRegisterStep(1)
+      setAuthForm({ ...EMPTY_AUTH_FORM })
+      setRegistrationAvatarFile(null)
+      setRegistrationAvatarPreview(null)
+      setTermsScrolledEnd(false)
+      setTermsModalOpen(false)
+      setError(null)
       setInvoiceTotals(null)
       navigate('/login', { replace: true })
     }
@@ -2647,7 +2658,7 @@ export function App() {
           const iconName = status.tone === 'approved' ? 'verified' : status.tone === 'pending' ? 'update' : 'dangerous'
           const title = invoice.invoice_number ? `#${invoice.invoice_number}` : `#PAN-${String(invoice.id).padStart(6, '0')}`
           const referenceDate = invoice.issued_at ?? invoice.created_at
-          const subtitle = `${referenceDate ? formatUpperDate(referenceDate) : 'Fecha pendiente'} • ${formatCurrency(invoice.purchase_amount)}`
+          const subtitle = `${referenceDate ? formatUpperDate(referenceDate) : 'Fecha pendiente'} ⬢ ${formatCurrency(invoice.purchase_amount)}`
 
           return (
             <div
@@ -2756,7 +2767,7 @@ export function App() {
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[600px]">
-                    {invoiceCards ?? (
+                    {invoiceCards ? invoiceCards : (
                       <div className="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant text-center">
                         <div className="font-title-md text-on-surface mb-2">Sin facturas registradas todavía</div>
                         <div className="text-body-sm text-on-surface-variant">Cuando existan registros reales del cliente, aparecerán aquí sin datos de ejemplo.</div>
@@ -2923,40 +2934,58 @@ export function App() {
 
       {!user || isCompletingGoogleRegistration ? (
         <section className="auth-shell">
-          <div className="auth-ambient" aria-hidden="true" />
-          {authBgVideoId ? (
-            <div className="auth-hero-video">
-              <iframe
-                src={`https://www.youtube.com/embed/${authBgVideoId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${authBgVideoId}&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1`}
-                allow="autoplay; encrypted-media"
-                frameBorder={0}
-                title="Video de fondo de la promocion"
-              />
-            </div>
-          ) : null}
-          <div className="auth-top-logo">
-            {authLogoUrl ? <img alt="Logo de la promocion" src={authLogoUrl} /> : <span>Super Carnes</span>}
+          <div className="auth-reference-bg" aria-hidden="true">
+            <img alt="" className="auth-reference-bg-stadium" src={AUTH_REFERENCE_ASSETS.stadium} />
+            <img alt="" className="auth-reference-bg-crowd" src={AUTH_REFERENCE_ASSETS.crowd} />
+            <img alt="" className="auth-reference-bg-confetti" src={AUTH_REFERENCE_ASSETS.confetti} />
           </div>
-          <div className="auth-hero">
-            <div className="auth-hero-overlay" />
-            <div className="auth-hero-content">
-              <p className="auth-kicker">PROMOCION SUPER CARNES 2026</p>
-              <img
-                className="auth-campaign-slogan"
-                src="/auth-slogan.webp"
-                alt="Panama va al Mundial y tu ganas"
-              />
-              <p>Registra tus facturas, pronostica partidos y participa por premios durante la ruta mundialista.</p>
-              <div className="auth-hero-chips" aria-label="Beneficios de la promocion">
-                <span>Facturas</span>
-                <span>Pronosticos</span>
-                <span>Premios</span>
+          <div className="auth-top-logo auth-top-logo-reference">
+            <img alt="Logo de Super Carnes" src={authLogoUrl || AUTH_REFERENCE_ASSETS.logo} />
+          </div>
+          <div className="auth-reference-layout">
+            <div className="auth-hero auth-hero-reference">
+              <div className="auth-hero-content auth-hero-content-reference">
+                <p className="auth-kicker auth-reference-pill">PROMOCION SUPER CARNES 2026</p>
+                <div className="auth-reference-title" aria-label="¡Panamá juega y tú ganas!">
+                  <span className="auth-reference-title-line is-light">¡PANAMÁ</span>
+                  <span className="auth-reference-title-line is-light">JUEGA Y TÚ</span>
+                  <span className="auth-reference-title-line is-gold">GANAS!</span>
+                </div>
+                <p className="auth-reference-copy">Registra tus facturas, pronostica partidos y participa por premios durante la ruta mundialista.</p>
+                <div className="auth-reference-benefits" aria-label="Beneficios de la promocion">
+                  <article>
+                    <span className="material-symbols-outlined">receipt_long</span>
+                    <strong>Registra tus facturas</strong>
+                  </article>
+                  <article>
+                    <span className="material-symbols-outlined">sports_soccer</span>
+                    <strong>Pronostica los partidos</strong>
+                  </article>
+                  <article>
+                    <span className="material-symbols-outlined">emoji_events</span>
+                    <strong>Acumula puntos</strong>
+                  </article>
+                  <article>
+                    <span className="material-symbols-outlined">redeem</span>
+                    <strong>Gana premios increibles</strong>
+                  </article>
+                </div>
+              </div>
+              <div className="auth-reference-characters" aria-hidden="true">
+                <img alt="" className="auth-reference-player" src={AUTH_REFERENCE_ASSETS.player} />
+                <div className="auth-reference-mascot-stack">
+                  <img alt="" className="auth-reference-ball" src={AUTH_REFERENCE_ASSETS.ball} />
+                  <img alt="" className="auth-reference-mascot" src={AUTH_REFERENCE_ASSETS.mascot} />
+                </div>
+                <div className="auth-reference-badge">
+                  <span>!ACIERTA</span>
+                  <span>Y GANA!</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <form className="auth-panel" onSubmit={handleAuthSubmit}>
-            {isCompletingGoogleRegistration ? null : <div className="auth-tabs">
+          <form className="auth-panel auth-panel-reference" onSubmit={handleAuthSubmit}>
+            {isCompletingGoogleRegistration ? null : <div className="auth-tabs auth-tabs-reference">
               <button className={authMode === 'login' ? 'active' : ''} type="button" onClick={() => { setAuthMode('login'); setRegisterStep(1) }}>
                 Iniciar sesión
               </button>
@@ -2985,26 +3014,17 @@ export function App() {
               </div>
             )}
 
-            <div className="auth-panel-header">
-              <p>{isCompletingGoogleRegistration ? 'Registro pendiente' : authMode === 'login' ? 'Acceso privado' : 'Nuevo participante'}</p>
-              <h2>{isCompletingGoogleRegistration ? 'Completa tus datos legales' : authMode === 'login' ? 'Entra a la promo' : 'Acierta y Gana'}</h2>
+            <div className={`auth-panel-header${authMode === 'register' || isCompletingGoogleRegistration ? ' is-register' : ''}`}>
+              <p>{isCompletingGoogleRegistration ? 'Registro pendiente' : authMode === 'login' ? '' : 'Crea tu cuenta'}</p>
+              <h2>{isCompletingGoogleRegistration ? 'Completa tus datos legales' : authMode === 'login' ? '¡Bienvenido de nuevo!' : 'Regístrate'}</h2>
               <span>
                 {isCompletingGoogleRegistration
                   ? `Tu correo de Google ya fue verificado: ${user?.email ?? authForm.email}. Solo falta completar los datos obligatorios para participar.`
                   : authMode === 'login'
-                    ? 'Continua registrando facturas y jugando tus predicciones.'
+                    ? 'Ingresa tus datos para continuar'
                     : 'Completa tus datos para participar por premios de Super Carnes.'}
               </span>
             </div>
-
-            {!isCompletingGoogleRegistration && googleAuthEnabled && googleClientId ? (
-              <>
-                <div className="auth-divider">o continua con Google</div>
-                <div className={`google-button-slot${loading ? ' is-loading' : ''}`}>
-                  <div ref={googleButtonRef} />
-                </div>
-              </>
-            ) : null}
 
             {isCompletingGoogleRegistration || authMode === 'register' ? (
               <>
@@ -3019,7 +3039,7 @@ export function App() {
                   ))}
                 </div>
 
-                {/* ── Paso 1: Tu perfil ── */}
+                {/* Paso 1: Tu perfil */}
                 {registerStep === 1 ? (
                   <>
                     <div className="auth-section-label">
@@ -3067,7 +3087,7 @@ export function App() {
                         Nombre completo *
                         <input
                           required
-                          placeholder="Ej: María González"
+                          placeholder="Tu nombre completo"
                           value={authForm.full_name}
                           onChange={(event) => setAuthForm({ ...authForm, full_name: event.target.value })}
                         />
@@ -3077,7 +3097,7 @@ export function App() {
                         Teléfono *
                         <div className="auth-phone-field">
                           <button className="auth-phone-prefix" type="button">
-                            <span className="auth-phone-prefix-badge" aria-hidden="true">PA</span>
+                            <span className="auth-phone-prefix-badge" aria-hidden="true">🇵🇦</span>
                             <span>+507</span>
                             <span className="material-symbols-outlined" aria-hidden="true">arrow_drop_down</span>
                           </button>
@@ -3096,7 +3116,7 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* ── Paso 2: Documento ── */}
+                {/* Paso 2: Documento */}
                 {registerStep === 2 ? (
                   <>
                     <div className="auth-section-label">
@@ -3155,7 +3175,7 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* ── Paso 3: Pronóstico + Confirmaciones ── */}
+                {/* Paso 3: Pronóstico + sucursal */}
                 {registerStep === 3 ? (
                   <>
                     <div className="auth-section-label">
@@ -3173,7 +3193,7 @@ export function App() {
                           }))
                         }
                       >
-                        −
+                        -
                       </button>
                       <input
                         className="auth-goal-input"
@@ -3204,20 +3224,25 @@ export function App() {
                       <span>Sucursal de preferencia</span>
                     </div>
                     <label className="auth-field-label">
-                      <span>¿En qué sucursal de Super Carnes compras habitualmente?</span>
+                      <span>Sucursal</span>
                       <select
                         className={`auth-select${registrationStepErrors.branch_id ? ' is-invalid' : ''}`}
                         value={authForm.branch_id}
                         onChange={(event) => setAuthForm({ ...authForm, branch_id: event.target.value })}
                       >
-                        <option value="">— Selecciona una sucursal —</option>
+                        <option value="">Selecciona una sucursal</option>
                         {branches.map((branch) => (
                           <option key={branch.id} value={String(branch.id)}>{branch.name}</option>
                         ))}
                       </select>
                       {registrationStepErrors.branch_id ? <span className="auth-field-error">{registrationStepErrors.branch_id}</span> : null}
                     </label>
+                  </>
+                ) : null}
 
+                {/* ── Paso 4: Confirmaciones ── */}
+                {registerStep === 4 ? (
+                  <>
                     <div className="auth-section-label">
                       <span className="material-symbols-outlined">check_circle</span>
                       <span>Confirmaciones</span>
@@ -3255,8 +3280,8 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* ── Paso 4: Cuenta ── */}
-                {!isCompletingGoogleRegistration && registerStep === 4 ? (
+                {/* ── Paso 5: Cuenta ── */}
+                {!isCompletingGoogleRegistration && registerStep === 5 ? (
                   <div className="auth-section-label">
                     <span className="material-symbols-outlined">lock</span>
                     <span>Correo y contraseña</span>
@@ -3265,12 +3290,15 @@ export function App() {
               </>
             ) : null}
 
-            {/* Campos de email/contraseña: login siempre, registro solo en paso 4 */}
-            {!isCompletingGoogleRegistration && (authMode === 'login' || registerStep === 4) ? (
+            {/* Campos de email/contraseña: login siempre, registro solo en paso 5 */}
+            {!isCompletingGoogleRegistration && (authMode === 'login' || registerStep === 5) ? (
               <>
-                <label className={authMode === 'register' && registrationStepErrors.email ? 'is-invalid' : ''}>
-                  Correo *
-                  <input required type="email" value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} />
+                <label className={`auth-reference-field${authMode === 'register' && registrationStepErrors.email ? ' is-invalid' : ''}`}>
+                  <span>Correo electronico</span>
+                  <div className="auth-reference-input">
+                    <span className="material-symbols-outlined">mail</span>
+                    <input required placeholder="ejemplo@correo.com" type="email" value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} />
+                  </div>
                   {authMode === 'register' && registrationStepErrors.email ? <span className="auth-field-error">{registrationStepErrors.email}</span> : null}
                 </label>
                 <label className={authMode === 'register' && registrationStepErrors.password ? 'is-invalid' : ''}>
@@ -3322,6 +3350,10 @@ export function App() {
                         if (!isAtLeast18(authForm.birthdate)) { setError('Debes ser mayor de 18 años para participar.'); return }
                       }
                       if (registerStep === 3) {
+                        if (!authForm.group_stage_goal_prediction.trim()) { setError('Debes ingresar tu pronostico de desempate.'); return }
+                        if (!authForm.branch_id) { setError('Debes seleccionar tu sucursal de preferencia.'); return }
+                      }
+                      if (registerStep === 4) {
                         if (!authForm.resides_in_panama) { setError('Debes confirmar que resides en Panamá.'); return }
                         if (!authForm.accepted_terms) { setError('Debes leer y aceptar los términos y condiciones.'); return }
                       }
@@ -3348,41 +3380,25 @@ export function App() {
               {authMode === 'register' ? `Registro hasta el ${REGISTRATION_DEADLINE}` : 'Mundialista · Super Carnes 2026'}
             </p>
           </form>
-          <div className="auth-promo-strip" aria-label="Pasos de la promocion">
-            <article>
-              <span>01</span>
-              <strong>Regístrate</strong>
-            </article>
-            <article>
-              <span>02</span>
-              <strong>Da el marcador</strong>
-            </article>
-            <article>
-              <span>03</span>
-              <strong>Gana</strong>
-            </article>
           </div>
-          {showAuthTicker && (
-            <div className="auth-football-ticker" aria-hidden="true">
-              <div className="auth-brand-track">
-                {authCarouselBrands.map((brand, index) => (
-                  <span className="auth-brand-item" key={`${brand.name}-${index}`}>
-                    {brand.logo_url ? <img alt="" src={brand.logo_url} /> : null}
-                    <strong>{brand.name}</strong>
-                  </span>
-                ))}
-              </div>
+          <div className="auth-reference-footer" aria-label="Como participar">
+            <div className="auth-reference-footer-title">¿COMO PARTICIPAR?</div>
+            <div className="auth-reference-footer-steps">
+              {[
+                'Registrate gratis',
+                'Pronostica los resultados',
+                'Acumula puntos si aciertas',
+                'Gana los mejores premios',
+                'Revisa tu ranking y sigue sumando',
+              ].map((step, index) => (
+                <article key={step}>
+                  <span>{index + 1}</span>
+                  <strong>{step}</strong>
+                </article>
+              ))}
             </div>
-          )}
-          <footer className="auth-footer">
-            <strong>Mundialista 2026</strong>
-            <nav aria-label="Legal">
-              <button type="button" onClick={() => navigate('/terminos')}>Terminos y Condiciones</button>
-              <button type="button" onClick={() => navigate('/privacidad')}>Privacidad</button>
-              <button type="button" onClick={() => navigate('/contacto')}>Contacto</button>
-            </nav>
-            <small>Super Carnes</small>
-          </footer>
+            <p>Promocion valida del 11 de junio al 19 de julio de 2026. Aplican terminos y condiciones.</p>
+          </div>
         </section>
       ) : (
         <div className="client-shell bg-background text-on-background font-body-lg min-h-screen">
@@ -3606,3 +3622,5 @@ export function App() {
     </div>
   )
 }
+
+

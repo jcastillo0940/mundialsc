@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 620">
+  <rect width="560" height="620" rx="44" fill="#f8bd14"/>
+  <ellipse cx="280" cy="320" rx="170" ry="170" fill="#ffdb58"/>
+  <circle cx="230" cy="170" r="82" fill="#ffdb58"/>
+  <circle cx="200" cy="155" r="14" fill="#111"/>
+  <polygon points="240,180 312,202 244,232" fill="#f59e0b"/>
+  <path d="M210 88l24-48 24 44" fill="#ef4444"/>
+  <path d="M240 84l30-56 34 52" fill="#f97316"/>
+  <rect x="160" y="222" width="120" height="52" rx="14" fill="#222"/>
+  <text x="280" y="582" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#0b46b6">auth-mascot-center.svg</text>
+</svg>

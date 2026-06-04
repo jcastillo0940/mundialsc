@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => {
           key: fs.readFileSync(keyPath),
         }
       : undefined
+  const backendProxy = {
+    target: 'http://127.0.0.1:8000',
+    changeOrigin: true,
+  }
 
   return {
     plugins: [react()],
@@ -29,10 +33,14 @@ export default defineConfig(({ mode }) => {
           }
         : undefined,
       proxy: {
-        '/api': {
-          target: 'http://127.0.0.1:8000',
-          changeOrigin: true,
-        },
+        '/api': backendProxy,
+        '/adminrepus1car': backendProxy,
+      },
+    },
+    preview: {
+      proxy: {
+        '/api': backendProxy,
+        '/adminrepus1car': backendProxy,
       },
     },
   }
