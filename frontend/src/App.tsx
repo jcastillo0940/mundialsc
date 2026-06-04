@@ -60,6 +60,7 @@ interface PublicSettingsResponse {
   hero_video_url?: string
   participant_brands?: string
   terms_and_conditions?: string
+  recaptcha_enabled?: boolean
   recaptcha_site_key?: string
   allow_google_auth?: boolean
   google_client_id?: string
@@ -120,7 +121,18 @@ declare global {
     }
     grecaptcha?: {
       ready: (cb: () => void) => void
-      execute: (key: string, opts: { action: string }) => Promise<string>
+      render: (
+        container: HTMLElement,
+        parameters: {
+          sitekey: string
+          size: 'invisible'
+          callback: (token: string) => void
+          'error-callback': () => void
+          'expired-callback': () => void
+        },
+      ) => number
+      execute: (widgetId?: number) => void
+      reset: (widgetId?: number) => void
     }
   }
 }
@@ -595,16 +607,6 @@ function isRegistrationComplete(user: User | null) {
     user.group_stage_goal_prediction !== undefined &&
     user.cedula,
   )
-}
-
-async function getRecaptchaToken(recaptchaSiteKey: string, action: string) {
-  if (!recaptchaSiteKey || !window.grecaptcha) return null
-
-  return new Promise<string>((resolve) => {
-    window.grecaptcha?.ready(() => {
-      window.grecaptcha?.execute(recaptchaSiteKey, { action }).then(resolve).catch(() => resolve(''))
-    })
-  })
 }
 
 function parseParticipantBrands(value?: string | null): ParticipantBrand[] {
@@ -1161,7 +1163,9 @@ export function App() {
   const [heroVideoUrl, setHeroVideoUrl] = useState('')
   const [, setParticipantBrands] = useState<ParticipantBrand[]>([])
   const [termsText, setTermsText] = useState(OFFICIAL_TERMS_TEXT_V2 || OFFICIAL_TERMS_TEXT)
+  const [recaptchaEnabled, setRecaptchaEnabled] = useState(true)
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('')
+  const [recaptchaScriptReady, setRecaptchaScriptReady] = useState(false)
   const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false)
   const [googleClientId, setGoogleClientId] = useState(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '')
   const [registrationDeadline, setRegistrationDeadline] = useState('2026-06-10T23:59:59-05:00')
@@ -1176,6 +1180,10 @@ export function App() {
   const [now, setNow] = useState(() => Date.now())
   const invoiceScannerRef = useRef<InvoiceScannerRef | null>(null)
 
+  const recaptchaContainerRef = useRef<HTMLDivElement | null>(null)
+  const recaptchaWidgetIdRef = useRef<number | null>(null)
+  const recaptchaResolveRef = useRef<((token: string) => void) | null>(null)
+  const recaptchaRejectRef = useRef<((reason?: unknown) => void) | null>(null)
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
   const mobileUserSidebarRef = useRef<HTMLDivElement | null>(null)
@@ -1297,7 +1305,8 @@ export function App() {
         if (res.data.header_logo_url) setHeaderLogoUrl(res.data.header_logo_url)
         if (res.data.hero_video_url) setHeroVideoUrl(res.data.hero_video_url)
         if (res.data.terms_and_conditions?.trim()) setTermsText(res.data.terms_and_conditions)
-        if (res.data.recaptcha_site_key) setRecaptchaSiteKey(res.data.recaptcha_site_key)
+        setRecaptchaEnabled(res.data.recaptcha_enabled !== false)
+        setRecaptchaSiteKey(res.data.recaptcha_site_key ?? '')
         setGoogleAuthEnabled(Boolean(res.data.allow_google_auth))
         if (res.data.google_client_id?.trim()) setGoogleClientId(res.data.google_client_id)
         setParticipantBrands(parseParticipantBrands(res.data.participant_brands))
@@ -1329,15 +1338,69 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    if (!recaptchaSiteKey || document.querySelector('script[data-recaptcha="v3"]')) return
+    if (!recaptchaEnabled || !recaptchaSiteKey) return
+
+    if (window.grecaptcha) {
+      setRecaptchaScriptReady(true)
+      return
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[data-recaptcha="v2-invisible"]')
+    if (existingScript) {
+      const handleLoad = () => setRecaptchaScriptReady(true)
+      const handleError = () => setError('No se pudo cargar el CAPTCHA de seguridad.')
+
+      existingScript.addEventListener('load', handleLoad)
+      existingScript.addEventListener('error', handleError)
+
+      return () => {
+        existingScript.removeEventListener('load', handleLoad)
+        existingScript.removeEventListener('error', handleError)
+      }
+    }
 
     const script = document.createElement('script')
-    script.src = `https://www.google.com/recaptcha/api.js?render=${recaptchaSiteKey}`
+    script.src = 'https://www.google.com/recaptcha/api.js?render=explicit'
     script.async = true
     script.defer = true
-    script.dataset.recaptcha = 'v3'
+    script.dataset.recaptcha = 'v2-invisible'
+    script.addEventListener('load', () => setRecaptchaScriptReady(true))
+    script.addEventListener('error', () => setError('No se pudo cargar el CAPTCHA de seguridad.'))
     document.head.appendChild(script)
-  }, [recaptchaSiteKey])
+  }, [recaptchaEnabled, recaptchaSiteKey, setError])
+
+  useEffect(() => {
+    if (!recaptchaEnabled || !recaptchaSiteKey || !recaptchaScriptReady || !isAuthRoute || !recaptchaContainerRef.current || recaptchaWidgetIdRef.current !== null) {
+      return
+    }
+
+    window.grecaptcha?.ready(() => {
+      if (!window.grecaptcha || !recaptchaContainerRef.current || recaptchaWidgetIdRef.current !== null) return
+
+      recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaContainerRef.current, {
+        sitekey: recaptchaSiteKey,
+        size: 'invisible',
+        callback: (token) => {
+          const resolve = recaptchaResolveRef.current
+          recaptchaResolveRef.current = null
+          recaptchaRejectRef.current = null
+          resolve?.(token)
+        },
+        'error-callback': () => {
+          const reject = recaptchaRejectRef.current
+          recaptchaResolveRef.current = null
+          recaptchaRejectRef.current = null
+          reject?.(new Error('No se pudo validar el CAPTCHA de seguridad.'))
+        },
+        'expired-callback': () => {
+          const reject = recaptchaRejectRef.current
+          recaptchaResolveRef.current = null
+          recaptchaRejectRef.current = null
+          reject?.(new Error('El CAPTCHA de seguridad vencio. Intenta de nuevo.'))
+        },
+      })
+    })
+  }, [isAuthRoute, recaptchaEnabled, recaptchaScriptReady, recaptchaSiteKey])
 
   useEffect(() => {
     if (!googleAuthEnabled || !googleClientId || document.querySelector('script[data-google-identity="gsi"]')) return
@@ -1426,6 +1489,34 @@ export function App() {
       window.clearInterval(intervalId)
     }
   }, [authMode, googleAuthEnabled, googleClientId, isAuthRoute, isCompletingGoogleRegistration])
+
+  async function executeInvisibleRecaptcha() {
+    if (!recaptchaEnabled || !recaptchaSiteKey) return null
+
+    if (!window.grecaptcha || recaptchaWidgetIdRef.current === null) {
+      throw new Error('El CAPTCHA de seguridad aun no esta listo. Intenta de nuevo en unos segundos.')
+    }
+
+    if (recaptchaRejectRef.current) {
+      recaptchaRejectRef.current(new Error('Se reemplazo una validacion CAPTCHA en curso.'))
+      recaptchaResolveRef.current = null
+      recaptchaRejectRef.current = null
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      recaptchaResolveRef.current = resolve
+      recaptchaRejectRef.current = reject
+
+      try {
+        window.grecaptcha?.reset(recaptchaWidgetIdRef.current ?? undefined)
+        window.grecaptcha?.execute(recaptchaWidgetIdRef.current ?? undefined)
+      } catch {
+        recaptchaResolveRef.current = null
+        recaptchaRejectRef.current = null
+        reject(new Error('No se pudo iniciar el CAPTCHA de seguridad.'))
+      }
+    })
+  }
 
   useEffect(() => {
     const trail = document.querySelector('.cursor-trail')
@@ -2056,7 +2147,7 @@ export function App() {
         payload.append('group_stage_goal_prediction', String(Number(authForm.group_stage_goal_prediction)))
         payload.append('branch_id', authForm.branch_id)
         payload.append('avatar', registrationAvatarFile)
-        const recaptchaToken = await getRecaptchaToken(recaptchaSiteKey, 'google_complete_registration')
+        const recaptchaToken = await executeInvisibleRecaptcha()
         if (recaptchaToken) payload.append('recaptcha_token', recaptchaToken)
 
         const response = await api.post<AuthResponse>('/auth/google/complete', payload, {
@@ -2083,7 +2174,14 @@ export function App() {
       const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register'
       const response =
         authMode === 'login'
-          ? await api.post(endpoint, { email: authForm.email, password: authForm.password })
+          ? await (async () => {
+              const recaptchaToken = await executeInvisibleRecaptcha()
+              return api.post(endpoint, {
+                email: authForm.email,
+                password: authForm.password,
+                recaptcha_token: recaptchaToken || undefined,
+              })
+            })()
           : await (async () => {
               if (!registrationAvatarFile) {
                 throw new Error('Debes subir una foto para completar tu registro.')
@@ -2104,7 +2202,7 @@ export function App() {
               payload.append('password', authForm.password)
               payload.append('password_confirmation', authForm.password_confirmation)
               payload.append('avatar', registrationAvatarFile)
-              const recaptchaToken = await getRecaptchaToken(recaptchaSiteKey, 'register')
+              const recaptchaToken = await executeInvisibleRecaptcha()
               if (recaptchaToken) payload.append('recaptcha_token', recaptchaToken)
 
               return api.post(endpoint, payload, {
@@ -2151,7 +2249,7 @@ export function App() {
     setMessage(null)
 
     try {
-      const recaptchaToken = await getRecaptchaToken(recaptchaSiteKey, 'google_auth')
+      const recaptchaToken = await executeInvisibleRecaptcha()
       const response = await api.post<AuthResponse>('/auth/google', {
         credential,
         recaptcha_token: recaptchaToken || undefined,
@@ -2985,6 +3083,7 @@ export function App() {
             </div>
 
           <form className="auth-panel auth-panel-reference" onSubmit={handleAuthSubmit}>
+            <div aria-hidden="true" ref={recaptchaContainerRef} style={{ height: 0, overflow: 'hidden' }} />
             {isCompletingGoogleRegistration ? null : <div className="auth-tabs auth-tabs-reference">
               <button className={authMode === 'login' ? 'active' : ''} type="button" onClick={() => { setAuthMode('login'); setRegisterStep(1) }}>
                 Iniciar sesión

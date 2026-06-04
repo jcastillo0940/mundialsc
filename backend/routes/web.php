@@ -117,6 +117,7 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::put('/users/{user}', [BackofficeController::class, 'updateUserStatus'])->name('admin.users.update');
         Route::get('/player-points', [BackofficeController::class, 'playerPoints'])->name('admin.player-points');
         Route::get('/player-points/{user}', [BackofficeController::class, 'playerPointsDetail'])->name('admin.player-points.detail');
+        Route::post('/users/{user}/assisted-invoices', [BackofficeController::class, 'storeAssistedInvoice'])->name('admin.users.assisted-invoices.store');
         Route::get('/fraud', [BackofficeController::class, 'fraud'])->name('admin.fraud');
         Route::get('/fraud/export', [BackofficeController::class, 'exportFraudFlags'])->name('admin.fraud.export');
         Route::put('/fraud/{flag}', [BackofficeController::class, 'updateFraudFlag'])->name('admin.fraud.update');

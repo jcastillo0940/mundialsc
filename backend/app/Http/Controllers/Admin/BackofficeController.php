@@ -22,6 +22,7 @@ use App\Models\TournamentMatch;
 use App\Models\TournamentPhase;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\ContestInvoiceRegistrationService;
 use App\Support\LiveScoreSyncService;
 use App\Support\PointsAuditService;
 use App\Support\PromotionRankingService;
@@ -42,6 +43,7 @@ class BackofficeController extends Controller
         private readonly LiveScoreSyncService $liveScoreSync,
         private readonly PromotionRankingService $rankingService,
         private readonly PointsAuditService $pointsAuditService,
+        private readonly ContestInvoiceRegistrationService $invoiceRegistrationService,
     ) {
     }
 
@@ -988,6 +990,38 @@ class BackofficeController extends Controller
         }, 'fraud-flags.csv', $headers);
     }
 
+    public function storeAssistedInvoice(Request $request, User $user): RedirectResponse
+    {
+        $data = $request->validate([
+            'qr_raw_text' => ['required', 'string', 'max:2048'],
+            'branch_id' => ['nullable', 'integer'],
+            'fraud_flag_id' => ['nullable', 'integer', 'exists:fraud_flags,id'],
+            'assistance_notes' => ['required', 'string', 'max:1500'],
+        ]);
+
+        $flag = null;
+
+        if (! empty($data['fraud_flag_id'])) {
+            $flag = FraudFlag::query()->findOrFail((int) $data['fraud_flag_id']);
+
+            if ((int) $flag->user_id !== (int) $user->id) {
+                throw ValidationException::withMessages([
+                    'fraud_flag_id' => 'El caso antifraude no corresponde al participante seleccionado.',
+                ]);
+            }
+        }
+
+        $this->invoiceRegistrationService->registerAssisted(
+            targetUser: $user,
+            data: $data,
+            actor: $request->user(),
+            request: $request,
+            fraudFlag: $flag,
+        );
+
+        return back()->with('status', 'Factura asistida registrada con trazabilidad completa.');
+    }
+
     public function site(): View
     {
         return view('admin.site', [
@@ -1059,10 +1093,14 @@ class BackofficeController extends Controller
             'theme_secondary'      => ['nullable', 'string', 'max:20'],
             'theme_text_main'      => ['nullable', 'string', 'max:20'],
             'theme_outline_variant' => ['nullable', 'string', 'max:20'],
+            'recaptcha_enabled'    => ['nullable', 'boolean'],
+            'recaptcha_site_key'   => ['nullable', 'string', 'max:255'],
+            'recaptcha_secret_key' => ['nullable', 'string', 'max:255'],
         ]);
 
         $data['show_scanner_debug'] = $request->boolean('show_scanner_debug') ? '1' : '0';
         $data['show_auth_ticker']   = $request->boolean('show_auth_ticker') ? '1' : '0';
+        $data['recaptcha_enabled']  = $request->boolean('recaptcha_enabled') ? '1' : '0';
 
         foreach ($data as $key => $value) {
             SiteSetting::set($key, $value);
@@ -1117,6 +1155,9 @@ class BackofficeController extends Controller
             'theme_secondary',
             'theme_text_main',
             'theme_outline_variant',
+            'recaptcha_enabled',
+            'recaptcha_site_key',
+            'recaptcha_secret_key',
         ];
 
         $settings = [];
@@ -1393,9 +1434,24 @@ class BackofficeController extends Controller
         $phases = TournamentPhase::orderBy('stage_order')->get()->keyBy('id');
 
         $invoices = RegisteredInvoice::where('user_id', $user->id)
-            ->where('validation_status', 'approved')
             ->orderByDesc('issued_at')
-            ->get(['id', 'invoice_number', 'cufe', 'issuer_name', 'purchase_amount', 'points_awarded', 'issued_at', 'branch_id']);
+            ->with(['registeredBy', 'assistedByFraudFlag'])
+            ->get([
+                'id',
+                'invoice_number',
+                'cufe',
+                'issuer_name',
+                'purchase_amount',
+                'points_awarded',
+                'issued_at',
+                'branch_id',
+                'validation_status',
+                'registration_source',
+                'registered_by_user_id',
+                'assisted_by_fraud_flag_id',
+                'assistance_notes',
+                'created_at',
+            ]);
 
         $predictions = MatchPrediction::with(['match.homeTeam', 'match.awayTeam', 'match.phase'])
             ->where('user_id', $user->id)
@@ -1403,14 +1459,25 @@ class BackofficeController extends Controller
             ->orderByDesc('updated_at')
             ->get();
 
+        $branches = \App\Models\Branch::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $relatedFraudFlags = FraudFlag::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['open', 'reviewing'])
+            ->latest('id')
+            ->get(['id', 'title', 'flag_type', 'status']);
+
         $wallet = $user->wallet;
 
-        $invoicePoints    = $invoices->sum('points_awarded');
+        $invoicePoints    = $invoices->where('validation_status', 'approved')->sum('points_awarded');
         $predictionPoints = $predictions->sum('points_awarded');
 
         return view('admin.player-points-detail', compact(
             'user', 'wallet', 'invoices', 'predictions',
-            'invoicePoints', 'predictionPoints', 'phases'
+            'invoicePoints', 'predictionPoints', 'phases', 'branches', 'relatedFraudFlags'
         ));
     }
 }

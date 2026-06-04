@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
+use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Support\Audit;
@@ -98,7 +99,10 @@ class AuthController extends Controller
             'email' => ['required_without:cedula', 'nullable', 'email'],
             'cedula' => ['required_without:email', 'nullable', 'string', 'max:40'],
             'password' => ['required', 'string'],
+            'recaptcha_token' => ['nullable', 'string'],
         ]);
+
+        $this->verifyCaptcha($request);
 
         if (! empty($data['cedula'])) {
             $data['cedula'] = Str::upper(trim($data['cedula']));
@@ -420,7 +424,11 @@ class AuthController extends Controller
 
     private function verifyCaptcha(Request $request): void
     {
-        $secret = (string) config('contest.recaptcha_secret', '');
+        if (! $this->isCaptchaEnabled()) {
+            return;
+        }
+
+        $secret = (string) SiteSetting::getOrConfig('recaptcha_secret_key', 'contest.recaptcha_secret', '');
 
         if ($secret === '') {
             return;
@@ -442,11 +450,16 @@ class AuthController extends Controller
 
         $body = $response->json() ?? [];
 
-        if (! $response->successful() || ! (bool) ($body['success'] ?? false) || (float) ($body['score'] ?? 0) < 0.5) {
+        if (! $response->successful() || ! (bool) ($body['success'] ?? false)) {
             throw ValidationException::withMessages([
                 'recaptcha_token' => 'La validacion CAPTCHA no fue aprobada.',
             ]);
         }
+    }
+
+    private function isCaptchaEnabled(): bool
+    {
+        return SiteSetting::get('recaptcha_enabled', '1') !== '0';
     }
 
     private function verifyPanamaIp(Request $request): void

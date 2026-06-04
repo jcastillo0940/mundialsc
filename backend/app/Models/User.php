@@ -115,4 +115,24 @@ class User extends Authenticatable
     {
         return $this->role === 'client';
     }
+
+    public function whatsappNumber(): ?string
+    {
+        $phone = preg_replace('/\D+/', '', (string) $this->phone);
+
+        return $phone !== '' ? $phone : null;
+    }
+
+    public function whatsappUrl(?string $message = null): ?string
+    {
+        $phone = $this->whatsappNumber();
+
+        if (! $phone) {
+            return null;
+        }
+
+        $base = 'https://wa.me/'.$phone;
+
+        return $message ? $base.'?text='.rawurlencode($message) : $base;
+    }
 }

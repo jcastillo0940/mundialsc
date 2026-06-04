@@ -32,6 +32,10 @@ class RegisteredInvoice extends Model
         'dgi_checked_at',
         'last_reverified_at',
         'dgi_response_payload',
+        'registration_source',
+        'registered_by_user_id',
+        'assisted_by_fraud_flag_id',
+        'assistance_notes',
     ];
 
     protected function casts(): array
@@ -55,6 +59,16 @@ class RegisteredInvoice extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function registeredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'registered_by_user_id');
+    }
+
+    public function assistedByFraudFlag(): BelongsTo
+    {
+        return $this->belongsTo(FraudFlag::class, 'assisted_by_fraud_flag_id');
     }
 
     public function fraudFlags(): HasMany

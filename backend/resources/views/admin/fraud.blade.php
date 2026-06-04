@@ -36,6 +36,7 @@
                 <th>Caso</th>
                 <th>Participante</th>
                 <th>Factura</th>
+                <th>Soporte</th>
                 <th>Estado</th>
                 <th>Revision</th>
             </tr>
@@ -59,10 +60,23 @@
                 <td>
                     @if($flag->invoice)
                         <small>{{ $flag->invoice->cufe }}</small><br>
-                        <small>{{ $flag->invoice->validation_status }} | ${{ number_format((float) $flag->invoice->purchase_amount, 2) }}</small>
+                        <small>{{ $flag->invoice->validation_status }} | ${{ number_format((float) $flag->invoice->purchase_amount, 2) }}</small><br>
+                        <small>Origen: {{ $flag->invoice->registration_source === 'admin_assisted' ? 'asistida por admin' : 'cliente' }}</small>
                     @else
                         <span class="muted">Sin factura creada</span>
                     @endif
+                </td>
+                <td>
+                    @php
+                        $message = 'Hola '.($flag->user?->name ?? '').', te escribimos desde Super Carnes para ayudarte con el registro de tu factura en la promocion.';
+                        $whatsappUrl = $flag->user?->whatsappUrl($message);
+                    @endphp
+                    @if($whatsappUrl)
+                        <a class="pill" href="{{ $whatsappUrl }}" target="_blank" rel="noopener noreferrer">WhatsApp</a><br>
+                    @else
+                        <span class="muted">Sin WhatsApp</span><br>
+                    @endif
+                    <a class="pill" href="{{ route('admin.player-points.detail', $flag->user_id) }}">Ver participante</a>
                 </td>
                 <td>
                     <span class="pill">{{ $flag->status }}</span>
@@ -71,6 +85,14 @@
                     @endif
                 </td>
                 <td>
+                    <form method="post" action="{{ route('admin.users.assisted-invoices.store', $flag->user_id) }}" class="grid" style="margin-bottom:12px">
+                        @csrf
+                        <input type="hidden" name="fraud_flag_id" value="{{ $flag->id }}">
+                        <input name="qr_raw_text" placeholder="CUFE o texto del QR" value="{{ old('fraud_flag_id') == $flag->id ? old('qr_raw_text') : '' }}">
+                        <input name="branch_id" placeholder="Sucursal (opcional)" value="{{ old('fraud_flag_id') == $flag->id ? old('branch_id') : '' }}">
+                        <textarea name="assistance_notes" placeholder="Motivo y detalle del apoyo">{{ old('fraud_flag_id') == $flag->id ? old('assistance_notes') : 'Cliente asistido desde cola antifraude.' }}</textarea>
+                        <button type="submit">Registrar factura asistida</button>
+                    </form>
                     <form method="post" action="{{ route('admin.fraud.update', $flag) }}" class="grid">
                         @csrf
                         @method('put')

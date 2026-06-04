@@ -17,4 +17,21 @@ class SiteSetting extends Model
     {
         static::updateOrCreate(['key' => $key], ['value' => $value]);
     }
+
+    public static function getOrConfig(string $key, string $configKey, ?string $default = null): ?string
+    {
+        $value = static::get($key);
+
+        if ($value !== null && $value !== '') {
+            return $value;
+        }
+
+        $configValue = config($configKey);
+
+        if (is_string($configValue) && $configValue !== '') {
+            return $configValue;
+        }
+
+        return $default;
+    }
 }

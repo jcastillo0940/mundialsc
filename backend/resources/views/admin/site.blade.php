@@ -146,6 +146,31 @@
         </div>
 
         <div class="card">
+            <h3>Google y reCAPTCHA</h3>
+            <p class="muted">Pega aqui las llaves de <strong>reCAPTCHA v2 Invisible</strong> para proteger login, registro y completar registro. La site key viaja al frontend; la secret key queda solo en backend.</p>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:14px;border:1px solid var(--line);border-radius:12px;background:#0f171b;margin-top:12px">
+                <input type="checkbox" name="recaptcha_enabled" value="1"
+                       @checked(($settings['recaptcha_enabled'] ?? '1') !== '0')
+                       style="width:18px;height:18px;cursor:pointer;accent-color:var(--accent)">
+                <div>
+                    <strong>Habilitar reCAPTCHA en autenticacion</strong>
+                    <div class="muted" style="font-size:12px;margin-top:2px">Apagalo temporalmente si Google da errores y necesitas mantener login o registro operativos.</div>
+                </div>
+            </label>
+            <div class="grid" style="margin-top:12px">
+                <div>
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Site key publica de reCAPTCHA v2 Invisible</label>
+                    <input name="recaptcha_site_key" value="{{ $settings['recaptcha_site_key'] }}" placeholder="6Lc...">
+                </div>
+                <div>
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Secret key privada de reCAPTCHA v2 Invisible</label>
+                    <input name="recaptcha_secret_key" value="{{ $settings['recaptcha_secret_key'] }}" placeholder="6Lc...">
+                </div>
+            </div>
+            <p class="muted" style="margin-top:10px">La API de Google Sign-In que ya existe sigue usando su propio Client ID. Este bloque nuevo es solo para la seguridad CAPTCHA.</p>
+        </div>
+
+        <div class="card">
             <h3>Visibilidad de elementos del sitio</h3>
             <p class="muted">Activa o desactiva elementos de la interfaz sin necesidad de redesplegar.</p>
             <div class="row" style="margin-top:12px">
