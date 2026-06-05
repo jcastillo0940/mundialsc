@@ -2462,7 +2462,7 @@ export function App() {
           <div className="marea-phase-header">
             <div className="marea-headline-wrap">
               <span className="marea-kicker">SUPER CARNES 2026</span>
-              <h1>{CONTEST_NAME}</h1>
+              <h1>PRONOSTICA EL MUNDIAL Y GANA</h1>
               <p>{activePredictionPhase ? `Fase activa: ${activePredictionPhase.name}` : 'Pronosticos oficiales del torneo'}</p>
             </div>
 
@@ -3076,7 +3076,7 @@ export function App() {
                   <img alt="" className="auth-reference-mascot" src={AUTH_REFERENCE_ASSETS.mascot} />
                 </div>
                 <div className="auth-reference-badge">
-                  <span>!ACIERTA</span>
+                  <span>¡ACIERTA</span>
                   <span>Y GANA!</span>
                 </div>
               </div>

@@ -92,6 +92,11 @@
                         <input name="branch_id" placeholder="Sucursal (opcional)" value="{{ old('fraud_flag_id') == $flag->id ? old('branch_id') : '' }}">
                         <textarea name="assistance_notes" placeholder="Motivo y detalle del apoyo">{{ old('fraud_flag_id') == $flag->id ? old('assistance_notes') : 'Cliente asistido desde cola antifraude.' }}</textarea>
                         <button type="submit">Registrar factura asistida</button>
+                        @if(old('fraud_flag_id') == $flag->id && $errors->any())
+                            <div class="status" style="margin:0;background:rgba(178,60,47,.15);border:1px solid rgba(178,60,47,.45)">
+                                {{ $errors->first() }}
+                            </div>
+                        @endif
                     </form>
                     <form method="post" action="{{ route('admin.fraud.update', $flag) }}" class="grid">
                         @csrf
