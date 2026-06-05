@@ -21,7 +21,7 @@
         <button onclick="window.print()">Imprimir / Guardar PDF</button>
     </div>
 
-    <h1>Acta de Ganadores - Polla Mundialista Super Carnes</h1>
+    <h1>Acta de Ganadores - PRONOSTICA EL MUNDIAL Y GANA</h1>
     <div class="meta">
         <p><strong>Fase:</strong> {{ $phase?->name ?? 'No disponible' }}</p>
         <p><strong>Fecha de generación:</strong> {{ $generatedAt }}</p>

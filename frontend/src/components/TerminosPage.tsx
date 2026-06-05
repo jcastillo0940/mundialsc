@@ -39,7 +39,7 @@ export function TerminosPage({ termsText }: Props) {
           <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
           Volver
         </button>
-        <strong style={{ color: '#ffd27a', fontSize: '16px' }}>Super Carnes · Polla Mundialista 2026</strong>
+        <strong style={{ color: '#ffd27a', fontSize: '16px' }}>Super Carnes · PRONOSTICA EL MUNDIAL Y GANA</strong>
       </header>
 
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 24px 80px' }}>
@@ -47,7 +47,7 @@ export function TerminosPage({ termsText }: Props) {
           <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#007aff' }}>gavel</span>
           <div>
             <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 700 }}>Términos y Condiciones</h1>
-            <p style={{ margin: '4px 0 0', color: '#9fb4b2', fontSize: '14px' }}>Polla Mundialista Super Carnes 2026</p>
+            <p style={{ margin: '4px 0 0', color: '#9fb4b2', fontSize: '14px' }}>PRONOSTICA EL MUNDIAL Y GANA</p>
           </div>
         </div>
 

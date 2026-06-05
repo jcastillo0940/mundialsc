@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'name' => env('CONTEST_NAME', 'Polla Mundialista Super Carnes 2026'),
+    'name' => env('CONTEST_NAME', 'PRONOSTICA EL MUNDIAL Y GANA'),
     'registration_deadline' => env('CONTEST_REGISTRATION_DEADLINE', '2026-06-10 23:59:59'),
     'winner_announcement_date' => env('CONTEST_WINNER_ANNOUNCEMENT_DATE', '2026-07-20'),
     'winner_slots' => (int) env('CONTEST_WINNER_SLOTS', 20),

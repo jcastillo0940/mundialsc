@@ -73,7 +73,7 @@ export function ContactoPage({ contactInfo }: Props) {
           <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
           Volver
         </button>
-        <strong style={{ color: '#ffd27a', fontSize: '16px' }}>Super Carnes · Polla Mundialista 2026</strong>
+        <strong style={{ color: '#ffd27a', fontSize: '16px' }}>Super Carnes · PRONOSTICA EL MUNDIAL Y GANA</strong>
       </header>
 
       <main style={{ maxWidth: '600px', margin: '0 auto', padding: '40px 24px 80px' }}>
@@ -81,7 +81,7 @@ export function ContactoPage({ contactInfo }: Props) {
           <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#007aff' }}>support_agent</span>
           <div>
             <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 700 }}>Contacto</h1>
-            <p style={{ margin: '4px 0 0', color: '#9fb4b2', fontSize: '14px' }}>¿Tienes preguntas sobre la Polla Mundialista?</p>
+            <p style={{ margin: '4px 0 0', color: '#9fb4b2', fontSize: '14px' }}>¿Tienes preguntas sobre PRONOSTICA EL MUNDIAL Y GANA?</p>
           </div>
         </div>
 
@@ -144,7 +144,7 @@ export function ContactoPage({ contactInfo }: Props) {
           lineHeight: '1.6',
         }}>
           <strong style={{ color: '#d4e8e0' }}>Super Carnes</strong><br />
-          Para consultas sobre la promoción "Polla Mundialista 2026", puedes acercarte a cualquiera de nuestras sucursales
+          Para consultas sobre la promoción "PRONOSTICA EL MUNDIAL Y GANA", puedes acercarte a cualquiera de nuestras sucursales
           o escribirnos por los medios indicados. Atendemos con gusto.
         </div>
       </main>

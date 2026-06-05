@@ -112,7 +112,7 @@ class PublicSettingsController extends Controller
 TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 
 1. GENERALIDADES DEL CONCURSO
-La promoción comercial denominada "Polla Mundialista Super Carnes 2026" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
+La promoción comercial denominada "PRONOSTICA EL MUNDIAL Y GANA" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
 Super Carnes podrá modificar la vigencia por razones operativas, técnicas, regulatorias o de fuerza mayor, previa comunicación al público participante.
 
 2. ELEGIBILIDAD

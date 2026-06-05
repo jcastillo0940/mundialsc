@@ -27,7 +27,6 @@ import type {
 } from './types'
 
 const TOKEN_KEY = 'super-carnes-token'
-const CONTEST_NAME = 'Polla Mundialista Super Carnes 2026'
 const REGISTRATION_DEADLINE = '10 de junio de 2026 a las 11:59 p. m.'
 const WINNERS_ANNOUNCEMENT = 'dentro de los 5 dias calendario siguientes al cierre de cada ronda'
 const PANAMA_TIMEZONE = 'America/Panama'
@@ -984,7 +983,7 @@ function currentViewFromPath(pathname: string): MainView {
 const OFFICIAL_TERMS_TEXT = `TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 
 1. GENERALIDADES DEL CONCURSO
-La promoción comercial denominada "Polla Mundialista Super Carnes 2026" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
+La promoción comercial denominada "PRONOSTICA EL MUNDIAL Y GANA" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
 Super Carnes podrá modificar la vigencia por razones operativas, técnicas, regulatorias o de fuerza mayor, previa comunicación al público participante.
 
 2. ELEGIBILIDAD
@@ -1032,7 +1031,7 @@ Toda factura ingresada para obtener puntos adicionales o para ser utilizada como
 const OFFICIAL_TERMS_TEXT_V2 = `TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 
 1. GENERALIDADES DEL CONCURSO
-La promoción comercial denominada "Polla Mundialista Super Carnes 2026" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
+La promoción comercial denominada "PRONOSTICA EL MUNDIAL Y GANA" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
 Super Carnes podrá modificar la vigencia por razones operativas, técnicas, regulatorias o de fuerza mayor, previa comunicación al público participante.
 
 2. ELEGIBILIDAD
@@ -3514,7 +3513,7 @@ export function App() {
                 </button>
                 <button className="marea-header-brand" type="button" onClick={() => navigateToView('cancha')} aria-label="Ir a La Cancha">
                   {headerBrand}
-                  <small>Polla Mundialista 2026</small>
+                  <small>PRONOSTICA EL MUNDIAL Y GANA</small>
                 </button>
               </div>
               <nav className="hidden md:flex items-center gap-8">
@@ -3684,7 +3683,7 @@ export function App() {
                     <source src={heroVideoUrl} />
                   </video>
                 ) : (
-                  <img alt="Ambiente del estadio para la polla mundialista" src={STADIUM_IMAGE_URL} />
+                  <img alt="Ambiente del estadio para PRONOSTICA EL MUNDIAL Y GANA" src={STADIUM_IMAGE_URL} />
                 )}
                 <div className="marea-hero-overlay" />
               </div>

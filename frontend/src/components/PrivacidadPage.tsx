@@ -35,7 +35,7 @@ export function PrivacidadPage() {
           <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
           Volver
         </button>
-        <strong style={{ color: '#ffd27a', fontSize: '16px' }}>Super Carnes · Polla Mundialista 2026</strong>
+        <strong style={{ color: '#ffd27a', fontSize: '16px' }}>Super Carnes · PRONOSTICA EL MUNDIAL Y GANA</strong>
       </header>
 
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 24px 80px' }}>
@@ -50,7 +50,7 @@ export function PrivacidadPage() {
         {[
           {
             title: '1. Responsable del tratamiento',
-            body: 'Super Carnes, empresa constituida y operando en la República de Panamá, es responsable del tratamiento de los datos personales recopilados a través de la plataforma "Polla Mundialista Super Carnes 2026".',
+            body: 'Super Carnes, empresa constituida y operando en la República de Panamá, es responsable del tratamiento de los datos personales recopilados a través de la plataforma "PRONOSTICA EL MUNDIAL Y GANA".',
           },
           {
             title: '2. Datos que recopilamos',
@@ -58,7 +58,7 @@ export function PrivacidadPage() {
           },
           {
             title: '3. Finalidad del tratamiento',
-            body: 'Los datos personales se utilizan exclusivamente para:\n• Administrar, desarrollar y ejecutar la promoción "Polla Mundialista Super Carnes 2026"\n• Validar la identidad del participante y su elegibilidad\n• Verificar las facturas registradas ante la DGI\n• Contactar a los ganadores y gestionar la entrega de premios\n• Cumplir obligaciones legales y regulatorias aplicables en Panamá',
+            body: 'Los datos personales se utilizan exclusivamente para:\n• Administrar, desarrollar y ejecutar la promoción "PRONOSTICA EL MUNDIAL Y GANA"\n• Validar la identidad del participante y su elegibilidad\n• Verificar las facturas registradas ante la DGI\n• Contactar a los ganadores y gestionar la entrega de premios\n• Cumplir obligaciones legales y regulatorias aplicables en Panamá',
           },
           {
             title: '4. Base legal del tratamiento',

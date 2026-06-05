@@ -407,7 +407,7 @@ class ContestInvoiceRegistrationService
             'invoice_date' => optional($invoice->issued_at)->toDateString() ?? now()->toDateString(),
             'goal_points_awarded' => 1,
             'validation_status' => 'approved',
-            'validation_notes' => 'Factura aprobada para la polla mundialista.',
+            'validation_notes' => 'Factura aprobada para PRONOSTICA EL MUNDIAL Y GANA.',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

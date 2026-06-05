@@ -616,7 +616,7 @@ return new class extends Migration
 
         if (DB::table('campaigns')->count() === 0) {
             DB::table('campaigns')->insert([
-                'name' => 'Polla Mundialista Super Carnes 2026',
+                'name' => 'PRONOSTICA EL MUNDIAL Y GANA',
                 'description' => 'Campana oficial para la fase de grupos del Mundial 2026.',
                 'status' => 'active',
                 'starts_at' => '2026-05-22 00:00:00',
