@@ -1,4 +1,4 @@
-import type { ClientBootstrap, RegisteredInvoice, TournamentPhase, User, WalletMovement, WalletSnapshot } from '../types'
+﻿import type { ClientBootstrap, RegisteredInvoice, TournamentPhase, User, WalletMovement, WalletSnapshot } from '../types'
 import { InfoTooltip } from './InfoTooltip'
 
 function formatCompactNumber(value: number | string | null | undefined) {
@@ -37,10 +37,10 @@ function movementLabel(movement: WalletMovement) {
 
   const labels: Record<string, string> = {
     invoice_goal_awarded: 'Gol ganado por factura validada',
-    prediction_points_awarded: 'Goles ganados por pronostico',
-    coupon_redeemed: 'Canje realizado en vitrina',
-    game_shot_spent: 'Tiro usado en dinamica',
-    game_prize_won: 'Premio ganado en dinamica',
+    prediction_points_awarded: 'Goles ganados por pronóstico',
+    coupon_redeemed: 'Movimiento registrado en vitrina',
+    game_shot_spent: 'Tiro usado en dinámica',
+    game_prize_won: 'Premio asignado',
   }
 
   return labels[movement.type] ?? 'Movimiento registrado'
@@ -114,63 +114,133 @@ export function VitrinaView({
   const totalGoalsWon = movements.reduce((total, movement) => total + Math.max(Number(movement.goals_delta ?? 0), 0), 0)
   const phaseGoalsWon = Number(overview?.phase_goals ?? invoiceTotals?.phase_goals ?? 0)
   const phaseGoalsSpent = activePhaseMovements.reduce((total, movement) => total + Math.abs(Math.min(Number(movement.goals_delta ?? 0), 0)), 0)
+  const activePhaseInvoiceCount = activePhaseInvoices.length
 
   return (
-    <section className="vitrina-view">
-      <header className="vitrina-hero">
-        <div className="vitrina-hero-copy">
-          <span className="vitrina-kicker">SUPER CARNES 2026</span>
-          <h1>Vitrina de goles</h1>
-          <p>Consulta tus goles de la fase actual, el total de tus facturas aprobadas y cada movimiento registrado durante la promocion.</p>
+    <section className="vitrina-view marea-vitrina-page">
+      <header className="marea-vitrina-hero">
+        <div className="marea-vitrina-hero-copy">
+          <span className="marea-kicker">SUPER CARNES 2026</span>
+          <h1 className="cancha-headline-title auth-reference-title marea-vitrina-hero-title" aria-label="Tu vitrina de premios">
+            <span className="auth-reference-title-line is-light">TU VITRINA</span>
+            <span className="auth-reference-title-line is-gold">DE PREMIOS</span>
+          </h1>
+          <p className="marea-vitrina-hero-description">
+            Sube en el ranking, registra facturas válidas y compite por los premios oficiales de cada fase.
+          </p>
         </div>
 
-        <div className="vitrina-scoreboard">
-          <article className="vitrina-scoreboard-primary">
+        <div className="marea-vitrina-hero-art" aria-hidden="true">
+          <img className="marea-vitrina-hero-confetti" alt="" src="/redesign/auth-confetti-layer.svg" />
+          <div className="marea-vitrina-prize-chip tv">
+            <span className="material-symbols-outlined">tv</span>
+            <strong>TOP 10</strong>
+            <small>TV 50"</small>
+          </div>
+          <div className="marea-vitrina-prize-chip ball">
+            <span className="material-symbols-outlined">sports_soccer</span>
+            <strong>11-110</strong>
+            <small>Balón</small>
+          </div>
+          <div className="marea-vitrina-prize-chip certificate">
+            <span className="material-symbols-outlined">card_giftcard</span>
+            <strong>TOP 20</strong>
+            <small>USD 200</small>
+          </div>
+          <img className="marea-vitrina-hero-mascot" alt="" src="/redesign/auth-mascot-center.png" />
+          <img className="marea-vitrina-hero-ball" alt="" src="/redesign/auth-ball-center.png" />
+        </div>
+
+        <aside className="marea-vitrina-hero-stats">
+          <article className="marea-vitrina-stat-card is-primary">
             <span>
               Goles de fase
-              <InfoTooltip compact content="Goles que cuentan para la fase actual. Los goles de fases anteriores quedan guardados en el historial, pero no se suman aqui." />
+              <InfoTooltip compact content="Goles que cuentan para la fase actual. Los goles de fases anteriores quedan guardados en el historial, pero no se suman aquí." />
             </span>
             <strong>{formatCompactNumber(phaseGoalsWon)} G</strong>
           </article>
-          <article className="vitrina-scoreboard-secondary">
+          <article className="marea-vitrina-stat-card">
+            <span>Facturas aprobadas</span>
+            <strong>{formatCompactNumber(activePhaseInvoiceCount)}</strong>
+          </article>
+          <article className="marea-vitrina-stat-card">
             <span>
-              Facturas de fase
+              Valor aprobado
               <InfoTooltip compact content="Monto acumulado de tus facturas aprobadas emitidas dentro de la ventana de la fase actual." />
             </span>
             <strong>{formatCurrency(approvedInvoiceTotal)}</strong>
           </article>
-        </div>
+        </aside>
       </header>
 
-      <section className="vitrina-history-shell">
-        <div className="vitrina-history-head">
+      <section className="marea-vitrina-prizes-grid">
+        <article className="marea-vitrina-prize-card">
+          <div className="marea-vitrina-prize-card-head">
+            <span className="marea-vitrina-prize-label">Fase 1</span>
+            <h2>Premios por posición</h2>
+          </div>
+          <div className="marea-vitrina-prize-lanes">
+            <div className="marea-vitrina-prize-lane">
+              <div className="marea-vitrina-prize-lane-rank">Puestos 1 al 10</div>
+              <div className="marea-vitrina-prize-lane-copy">
+                <strong>1 televisor de 50 pulgadas cada uno</strong>
+                <p>Los 10 mejores puntajes de la primera fase ganan un televisor nuevo.</p>
+              </div>
+            </div>
+            <div className="marea-vitrina-prize-lane">
+              <div className="marea-vitrina-prize-lane-rank">Puestos 11 al 110</div>
+              <div className="marea-vitrina-prize-lane-copy">
+                <strong>1 balón original cada uno</strong>
+                <p>Los siguientes 100 lugares de la fase reciben un balón oficial.</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article className="marea-vitrina-prize-card is-highlight">
+          <div className="marea-vitrina-prize-card-head">
+            <span className="marea-vitrina-prize-label">Fase 2</span>
+            <h2>Remate competitivo</h2>
+          </div>
+          <div className="marea-vitrina-phase-banner">
+            <strong>Top 20 del ranking final</strong>
+            <span>20 certificados de regalo de USD 200 cada uno</span>
+          </div>
+          <p className="marea-vitrina-prize-note">
+            Las facturas válidas también fortalecen tu posición en los criterios oficiales de desempate.
+          </p>
+        </article>
+      </section>
+
+      <section className="marea-vitrina-history-shell">
+        <div className="marea-vitrina-history-head">
           <div>
-            <span className="vitrina-kicker">Actividad oficial</span>
+            <span className="marea-kicker">Actividad oficial</span>
             <h2>
               Historial de cuenta
-              <InfoTooltip compact content={`Historico completo de movimientos. Acumulado general: ${formatCompactNumber(wallet?.lifetime_goals_earned ?? totalGoalsWon)} goles y ${formatCurrency(historicalInvoiceTotal)} en facturas aprobadas.`} />
+              <InfoTooltip compact content={`Histórico completo de movimientos. Acumulado general: ${formatCompactNumber(wallet?.lifetime_goals_earned ?? totalGoalsWon)} goles y ${formatCurrency(historicalInvoiceTotal)} en facturas aprobadas.`} />
             </h2>
           </div>
 
-          <div className="vitrina-chip-row">
-            <span className="vitrina-chip">{formatCompactNumber(movements.length)} movimientos</span>
-            <span className="vitrina-chip positive">+{formatCompactNumber(phaseGoalsWon)} G fase</span>
-            <span className="vitrina-chip negative">-{formatCompactNumber(phaseGoalsSpent)} G fase</span>
+          <div className="marea-vitrina-chip-row">
+            <span className="marea-vitrina-chip">{formatCompactNumber(movements.length)} movimientos</span>
+            <span className="marea-vitrina-chip positive">+{formatCompactNumber(phaseGoalsWon)} G fase</span>
+            <span className="marea-vitrina-chip negative">-{formatCompactNumber(phaseGoalsSpent)} G fase</span>
           </div>
         </div>
 
         {movements.length ? (
-          <div className="vitrina-history-list">
+          <div className="marea-vitrina-history-list">
             {movements.map((movement) => {
               const tone = movementTone(movement)
 
               return (
-                <article key={movement.id} className={`vitrina-history-card ${tone}`}>
-                  <div className="vitrina-history-icon">
+                <article key={movement.id} className={`marea-vitrina-history-card ${tone}`}>
+                  <div className="marea-vitrina-history-icon">
                     <span className="material-symbols-outlined">{movementIcon(movement)}</span>
                   </div>
 
-                  <div className="vitrina-history-copy">
+                  <div className="marea-vitrina-history-copy">
                     <strong>{movementLabel(movement)}</strong>
                     <p>{formatUpperDate(movement.created_at)}</p>
                     <small>
@@ -179,7 +249,7 @@ export function VitrinaView({
                     </small>
                   </div>
 
-                  <div className="vitrina-history-score">
+                  <div className="marea-vitrina-history-score">
                     <strong>
                       {movement.goals_delta > 0 ? '+' : ''}
                       {formatCompactNumber(movement.goals_delta)} G
@@ -194,13 +264,14 @@ export function VitrinaView({
             })}
           </div>
         ) : (
-          <div className="vitrina-empty-state">
+          <div className="marea-vitrina-empty-state">
             <span className="material-symbols-outlined">monitoring</span>
             <h3>Sin movimientos registrados</h3>
-            <p>Cuando sumes goles, uses tiros o canjees premios, el historial aparecera aqui.</p>
+            <p>Cuando sumes goles o se validen nuevas facturas, el historial oficial aparecerÃ¡ aquí.</p>
           </div>
         )}
       </section>
     </section>
   )
 }
+

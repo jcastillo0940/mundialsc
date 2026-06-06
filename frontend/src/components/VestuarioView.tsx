@@ -48,7 +48,6 @@ function podiumLabel(place: number) {
   return `${place}to lugar`
 }
 
-
 function performancePercent(entry: LeaderboardEntry, maxGoals: number) {
   if (maxGoals <= 0) return 10
   return Math.max(14, Math.round((entry.goals / maxGoals) * 100))
@@ -87,45 +86,56 @@ export function VestuarioView({
   }, [leaderboard, userIndex])
 
   return (
-    <section className="vestuario-view">
-      <header className="vestuario-stage">
-        <div className="vestuario-stage-copy">
-          <span className="vestuario-kicker">SUPER CARNES 2026</span>
-          <h1>Tabla de goleadores</h1>
-          <p>Consulta tu posicion, los lideres actuales y el avance de participantes durante la promocion.</p>
+    <section className="vestuario-view marea-ranking-page">
+      <header className="marea-ranking-hero">
+        <div className="marea-ranking-hero-copy">
+          <span className="marea-kicker">SUPER CARNES 2026</span>
+          <h1 className="cancha-headline-title auth-reference-title marea-ranking-hero-title" aria-label="Tabla de goleadores">
+            <span className="auth-reference-title-line is-light">TABLA DE</span>
+            <span className="auth-reference-title-line is-gold">GOLEADORES</span>
+          </h1>
+          <p className="marea-ranking-hero-description">Consulta tu posicion, tus goles y el avance oficial de la promocion.</p>
         </div>
 
-        <div className="vestuario-stage-player">
-          <div className="vestuario-player-badge">
-            {avatarUrl ? <img alt={`Avatar de ${user.full_name}`} className="vestuario-avatar-image" src={avatarUrl} /> : userInitials(user.full_name)}
-          </div>
-          <div className="vestuario-stage-player-copy">
-            <strong>{user.full_name}</strong>
-            <span>{user.branch?.name ?? 'Participante registrado'}</span>
-            <small>
-              {userEntry ? `Posicion #${positionLabel(userEntry.position)} en el ranking oficial` : 'Esperando tu aparicion en el ranking'}
-            </small>
-          </div>
-          <div className="vestuario-stage-score">
-            <span>Tus goles</span>
-            <strong>{formatCompactNumber(userGoals)} G</strong>
-          </div>
+        <div className="marea-ranking-hero-art" aria-hidden="true">
+          <img className="marea-ranking-hero-confetti" alt="" src="/redesign/auth-confetti-layer.svg" />
+          <img className="marea-ranking-hero-player" alt="" src="/redesign/auth-player-left.png" />
+          <img className="marea-ranking-hero-ball" alt="" src="/redesign/auth-ball-center.png" />
         </div>
+
+        <aside className="marea-ranking-user-card">
+          <div className="marea-ranking-user-head">
+            <div className="marea-ranking-user-avatar">
+              {avatarUrl ? <img alt={`Avatar de ${user.full_name}`} className="vestuario-avatar-image" src={avatarUrl} /> : userInitials(user.full_name)}
+            </div>
+            <div className="marea-ranking-user-copy">
+              <strong>{user.full_name}</strong>
+              <span>{user.branch?.name ?? 'Participante registrado'}</span>
+              <small>
+                {userEntry ? `Posicion #${positionLabel(userEntry.position)} en el ranking oficial` : 'Esperando tu aparicion en el ranking'}
+              </small>
+            </div>
+          </div>
+          <div className="marea-ranking-user-score">
+            <span>Tus goles</span>
+            <strong>{formatCompactNumber(userGoals)}</strong>
+          </div>
+        </aside>
       </header>
 
-      <section className="vestuario-podium-shell">
+      <section className="marea-ranking-podium-shell">
         {podiumEntries.length ? (
-          <div className="vestuario-podium-grid">
+          <div className="marea-ranking-podium-grid">
             {podiumEntries.map((entry, index) => {
               const isChampion = topThree[0]?.user_id === entry.user_id
               const place = topThree.findIndex((candidate) => candidate.user_id === entry.user_id) + 1
 
               return (
-                <article key={entry.user_id} className={`${isChampion ? 'vestuario-podium-card champion' : 'vestuario-podium-card support'} place-${place}`}>
-                  <div className="vestuario-podium-avatar">{userInitials(entry.full_name)}</div>
-                  <div className="vestuario-podium-place">{place}</div>
-                  <span className="vestuario-podium-rank-label">{podiumLabel(place)}</span>
-                  <span className="vestuario-podium-icon material-symbols-outlined">
+                <article key={entry.user_id} className={`${isChampion ? 'marea-ranking-podium-card champion' : 'marea-ranking-podium-card support'} place-${place}`}>
+                  <div className="marea-ranking-podium-badge">{place}</div>
+                  <div className="marea-ranking-podium-avatar">{userInitials(entry.full_name)}</div>
+                  <span className="marea-ranking-podium-label">{podiumLabel(place)}</span>
+                  <span className="marea-ranking-podium-icon material-symbols-outlined">
                     {isChampion ? 'emoji_events' : index === 0 ? 'military_tech' : 'workspace_premium'}
                   </span>
                   <h3>{entry.full_name}</h3>
@@ -144,10 +154,10 @@ export function VestuarioView({
         )}
       </section>
 
-      <section className="vestuario-ranking-shell">
-        <div className="vestuario-ranking-head">
+      <section className="marea-ranking-table-shell">
+        <div className="marea-ranking-table-head">
           <div>
-            <span className="vestuario-panel-kicker">Ranking oficial</span>
+            <span className="marea-kicker">Ranking oficial</span>
             <h2>Tu posicion</h2>
           </div>
         </div>
@@ -225,7 +235,6 @@ export function VestuarioView({
           </div>
         )}
       </section>
-
     </section>
   )
 }

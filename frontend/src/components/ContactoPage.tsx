@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { PublicBrandHeader } from './PublicBrandHeader'
 
 interface ContactInfo {
   contact_email?: string
@@ -12,30 +12,28 @@ interface Props {
 }
 
 export function ContactoPage({ contactInfo }: Props) {
-  const navigate = useNavigate()
-
   const items = [
     contactInfo.contact_email && {
       icon: 'mail',
-      label: 'Correo electrónico',
+      label: 'Correo electronico',
       value: contactInfo.contact_email,
       href: `mailto:${contactInfo.contact_email}`,
     },
     contactInfo.contact_phone && {
       icon: 'phone',
-      label: 'Teléfono',
+      label: 'Telefono',
       value: contactInfo.contact_phone,
       href: `tel:${contactInfo.contact_phone.replace(/\s|-/g, '')}`,
     },
     contactInfo.contact_address && {
       icon: 'location_on',
-      label: 'Dirección',
+      label: 'Direccion',
       value: contactInfo.contact_address,
       href: null,
     },
     contactInfo.contact_hours && {
       icon: 'schedule',
-      label: 'Horario de atención',
+      label: 'Horario de atencion',
       value: contactInfo.contact_hours,
       href: null,
     },
@@ -43,45 +41,14 @@ export function ContactoPage({ contactInfo }: Props) {
 
   return (
     <div className="min-h-screen bg-background text-on-background" style={{ fontFamily: 'Segoe UI, Arial, sans-serif' }}>
-      <header style={{
-        background: 'rgba(10,18,22,0.97)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        padding: '16px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-      }}>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          style={{
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: '10px',
-            color: '#eef4ef',
-            padding: '8px 14px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '14px',
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
-          Volver
-        </button>
-        <strong style={{ color: '#ffd27a', fontSize: '16px' }}>Super Carnes · PRONOSTICA EL MUNDIAL Y GANA</strong>
-      </header>
+      <PublicBrandHeader />
 
       <main style={{ maxWidth: '600px', margin: '0 auto', padding: '40px 24px 80px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
           <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#007aff' }}>support_agent</span>
           <div>
             <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 700 }}>Contacto</h1>
-            <p style={{ margin: '4px 0 0', color: '#9fb4b2', fontSize: '14px' }}>¿Tienes preguntas sobre PRONOSTICA EL MUNDIAL Y GANA?</p>
+            <p style={{ margin: '4px 0 0', color: '#9fb4b2', fontSize: '14px' }}>Tienes preguntas sobre PRONOSTICA EL MUNDIAL Y GANA?</p>
           </div>
         </div>
 
@@ -129,7 +96,7 @@ export function ContactoPage({ contactInfo }: Props) {
             color: '#9fb4b2',
           }}>
             <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '12px', display: 'block' }}>info</span>
-            La información de contacto estará disponible próximamente.
+            La informacion de contacto estara disponible proximamente.
           </div>
         )}
 
@@ -144,7 +111,7 @@ export function ContactoPage({ contactInfo }: Props) {
           lineHeight: '1.6',
         }}>
           <strong style={{ color: '#d4e8e0' }}>Super Carnes</strong><br />
-          Para consultas sobre la promoción "PRONOSTICA EL MUNDIAL Y GANA", puedes acercarte a cualquiera de nuestras sucursales
+          Para consultas sobre la promocion "PRONOSTICA EL MUNDIAL Y GANA", puedes acercarte a cualquiera de nuestras sucursales
           o escribirnos por los medios indicados. Atendemos con gusto.
         </div>
       </main>

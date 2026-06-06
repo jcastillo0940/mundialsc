@@ -63,7 +63,12 @@ function formatDate(dateValue: string) {
   if (!dateValue) return ''
   const date = new Date(`${dateValue}T12:00:00`)
   if (Number.isNaN(date.getTime())) return dateValue
-  return date.toLocaleDateString('es-PA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Panama' })
+  return date.toLocaleDateString('es-PA', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Panama',
+  })
 }
 
 function DebugRow({ label, value, ok }: { label: string; value: string; ok: boolean }) {
@@ -77,8 +82,8 @@ function DebugRow({ label, value, ok }: { label: string; value: string; ok: bool
 }
 
 function invoiceStatusMeta(status: string) {
-  if (status === 'approved') return { tone: 'approved' as const, label: 'GOL VÁLIDO', icon: 'verified', points: true }
-  if (status === 'pending') return { tone: 'pending' as const, label: 'EN REVISIÓN', icon: 'update', points: false }
+  if (status === 'approved') return { tone: 'approved' as const, label: 'GOL VALIDO', icon: 'verified', points: true }
+  if (status === 'pending') return { tone: 'pending' as const, label: 'EN REVISION', icon: 'update', points: false }
   return { tone: 'rejected' as const, label: 'RECHAZADA', icon: 'dangerous', points: false }
 }
 
@@ -111,7 +116,6 @@ export function InvoiceRegistrationView({
   const deriveShortCode = (raw: string) => {
     if (!raw) return ''
     if (raw.startsWith(CUFE_PREFIX)) return raw.slice(CUFE_PREFIX.length)
-    // URL DGI: ?chFE=FE01200000032812-2-249262-SHORTCODE&...
     const chFeMatch = raw.match(/[?&]chFE=[^&]*-([A-Z0-9]{10,})(?:&|$)/i)
     if (chFeMatch?.[1]) return chFeMatch[1]
     const idx = raw.lastIndexOf('-')
@@ -128,7 +132,6 @@ export function InvoiceRegistrationView({
     const trimmed = value.replace(/\s/g, '')
     setShortCode(trimmed)
     onFieldChange('rawInput', trimmed ? CUFE_PREFIX + trimmed : '')
-    // Auto-registrar si se pegó un código con longitud suficiente (>= 30 chars)
     if (autoPaste && trimmed.length >= 30) {
       setTimeout(() => onRegister(CUFE_PREFIX + trimmed), 0)
     }
@@ -137,34 +140,61 @@ export function InvoiceRegistrationView({
   const totalPoints = useMemo(
     () =>
       invoices
-        .filter((i) => i.validation_status === 'approved')
-        .reduce((sum, i) => sum + Number(i.points_awarded ?? 0), 0),
+        .filter((invoice) => invoice.validation_status === 'approved')
+        .reduce((sum, invoice) => sum + Number(invoice.points_awarded ?? 0), 0),
     [invoices],
   )
+
+  const approvedCount = useMemo(
+    () => invoices.filter((invoice) => invoice.validation_status === 'approved').length,
+    [invoices],
+  )
+
+  const rejectedCount = useMemo(
+    () => invoices.filter((invoice) => invoice.validation_status === 'rejected').length,
+    [invoices],
+  )
+
+  const heroStatusCopy =
+    invoices.length > 0
+      ? approvedCount > 0
+        ? 'Tus facturas validadas ya estan sumando goles dentro de la promocion.'
+        : 'Tu proxima factura valida puede convertir este entrenamiento en puntos.'
+      : 'Escanea tu primera factura DGI para empezar a sumar goles dentro de la promocion.'
 
   const invoiceCards = useMemo(
     () =>
       invoices.slice(0, 5).map((invoice) => {
         const meta = invoiceStatusMeta(invoice.validation_status)
         const colorMap = {
-          approved: { border: 'border-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-          pending:  { border: 'border-yellow-500',  bg: 'bg-yellow-500/10',  text: 'text-yellow-400',  badge: 'bg-yellow-500/20  text-yellow-400  border-yellow-500/30'  },
-          rejected: { border: 'border-red-500',     bg: 'bg-red-500/10',     text: 'text-red-400',     badge: 'bg-red-500/20     text-red-400     border-red-500/30'     },
+          approved: {
+            badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+          },
+          pending: {
+            badge: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+          },
+          rejected: {
+            badge: 'bg-red-500/20 text-red-400 border-red-500/30',
+          },
         }
         const c = colorMap[meta.tone]
         const title = invoice.invoice_number ? `#${invoice.invoice_number}` : `#${String(invoice.id).padStart(6, '0')}`
         const date = invoice.issued_at ?? invoice.created_at
 
         return (
-          <div key={invoice.id} className={`flex items-center gap-3 p-3 rounded-xl border-l-4 ${c.border} bg-surface-container-lowest`}>
-            <div className={`w-9 h-9 rounded-full ${c.bg} flex items-center justify-center flex-shrink-0`}>
-              <span className={`material-symbols-outlined text-base ${c.text}`} data-weight="fill">{meta.icon}</span>
+          <div key={invoice.id} className={`marea-invoice-history-item ${meta.tone}`}>
+            <div className="marea-invoice-history-item-icon">
+              <span className="material-symbols-outlined" data-weight="fill">
+                {meta.icon}
+              </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-title-md text-on-surface text-sm truncate">{title}</div>
-              <div className="text-xs text-on-surface-variant">{date ? formatDate(date) : ''} · {formatCurrency(invoice.purchase_amount)}</div>
+            <div className="marea-invoice-history-item-copy">
+              <div className="marea-invoice-history-item-title">{title}</div>
+              <div className="marea-invoice-history-item-meta">
+                {date ? formatDate(date) : ''} · {formatCurrency(invoice.purchase_amount)}
+              </div>
             </div>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${c.badge} whitespace-nowrap`}>
+            <span className={`marea-invoice-history-item-badge ${c.badge}`}>
               {meta.points ? `+${Number(invoice.points_awarded ?? 0).toFixed(1)} GOL` : meta.label}
             </span>
           </div>
@@ -174,332 +204,357 @@ export function InvoiceRegistrationView({
   )
 
   return (
-    <div className="facturas-view flex flex-col gap-6 max-w-lg mx-auto lg:max-w-none">
+    <div className="facturas-view marea-invoice-page">
+      <section className="marea-invoice-hero-shell">
+        <div className="marea-invoice-hero-copy">
+          <span className="marea-kicker">SUPER CARNES 2026</span>
+          <h1 className="cancha-headline-title auth-reference-title marea-invoice-hero-title" aria-label="Registra tu factura">
+            <span className="auth-reference-title-line is-light">REGISTRA TU</span>
+            <span className="auth-reference-title-line is-gold">FACTURA</span>
+          </h1>
+          <p className="marea-invoice-hero-description">
+            Escanea el QR o ingresa el CUFE de tu factura para registrar compras validas y seguir sumando oportunidades dentro de la promocion.
+          </p>
+        </div>
 
-      {/* Tabs: QR primero, Manual segundo */}
-      <div className="flex rounded-2xl border border-outline-variant overflow-hidden">
+        <div className="marea-invoice-hero-art" aria-hidden="true">
+          <img className="marea-invoice-hero-confetti" alt="" src="/redesign/auth-confetti-layer.svg" />
+          <div className="marea-invoice-hero-ticket">
+            <div className="marea-invoice-hero-ticket-top">
+              <span>Factura DGI</span>
+              <span className="material-symbols-outlined">receipt_long</span>
+            </div>
+            <div className="marea-invoice-hero-ticket-qr" />
+            <div className="marea-invoice-hero-ticket-lines">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+          <img className="marea-invoice-hero-mascot" alt="" src="/redesign/auth-mascot-center.png" />
+          <img className="marea-invoice-hero-ball" alt="" src="/redesign/auth-ball-center.png" />
+        </div>
+
+        <aside className="marea-invoice-hero-stats">
+          <div className="marea-invoice-hero-stats-head">
+            <span>Marcador de facturas</span>
+            <strong>Entrenamiento activo</strong>
+          </div>
+          <div className="marea-invoice-hero-metrics">
+            <article>
+              <span>Registradas</span>
+              <strong>{invoices.length}</strong>
+            </article>
+          </div>
+          <p className="marea-invoice-hero-status-copy">{heroStatusCopy}</p>
+          {rejectedCount > 0 ? (
+            <span className="marea-invoice-hero-status-flag">
+              {rejectedCount} factura{rejectedCount === 1 ? '' : 's'} requieren correccion
+            </span>
+          ) : null}
+        </aside>
+      </section>
+
+      <div className="marea-invoice-mode-switch">
         <button
           type="button"
-          className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors ${
-            invoiceEntryMode === 'scan'
-              ? 'bg-primary-container text-white'
-              : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
-          }`}
+          className={`marea-invoice-mode-button ${invoiceEntryMode === 'scan' ? 'is-active' : ''}`}
           onClick={() => onModeChange('scan')}
         >
-          <span className="material-symbols-outlined text-lg">qr_code_scanner</span>
+          <span className="material-symbols-outlined">qr_code_scanner</span>
           Escanear QR
         </button>
         <button
           type="button"
-          className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors border-l border-outline-variant ${
-            invoiceEntryMode === 'manual'
-              ? 'bg-primary-container text-white'
-              : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
-          }`}
+          className={`marea-invoice-mode-button ${invoiceEntryMode === 'manual' ? 'is-active' : ''}`}
           onClick={() => onModeChange('manual')}
         >
-          <span className="material-symbols-outlined text-lg">edit</span>
+          <span className="material-symbols-outlined">edit</span>
           Ingresar CUFE
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <section className="lg:col-span-5 flex flex-col gap-4">
-
-          {/* Panel QR */}
+      <div className="marea-invoice-content-grid">
+        <section className="marea-invoice-entry-column">
           {invoiceEntryMode === 'scan' && !invoiceSubmitting && (
-            <div className="bg-surface-container-low rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="marea-invoice-work-card">
               {!invoiceScannerActivated ? (
-                <div className="flex flex-col items-center gap-4 px-6 py-10">
-                  <span className="material-symbols-outlined text-5xl text-primary-container">qr_code_scanner</span>
-                  <p className="text-sm text-on-surface-variant text-center">
-                    Apunta la cámara al código QR de tu factura DGI para registrarla automáticamente.
+                <div className="marea-invoice-work-card-empty">
+                  <span className="material-symbols-outlined">qr_code_scanner</span>
+                  <h2>Escaneo rapido</h2>
+                  <p>
+                    Apunta la camara al codigo QR de tu factura DGI para registrarla automaticamente.
                   </p>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary-container text-white font-semibold text-sm transition-opacity hover:opacity-90"
-                    onClick={onActivateScan}
-                  >
-                    <span className="material-symbols-outlined text-base">videocam</span>
+                  <button type="button" className="marea-invoice-action-button primary" onClick={onActivateScan}>
+                    <span className="material-symbols-outlined">videocam</span>
                     Activar escaneo de QR
                   </button>
                 </div>
               ) : (
                 <>
-                  <div className="px-5 pt-5 pb-3">
-                    <p className="text-sm text-on-surface-variant text-center">
-                      Apunta la cámara al código QR de tu factura DGI
+                  <div className="marea-invoice-work-card-head">
+                    <div>
+                      <span className="marea-invoice-panel-kicker">Camara activa</span>
+                      <h2>Apunta al codigo QR</h2>
+                    </div>
+                    <p>Apunta la camara al codigo QR de tu factura DGI.</p>
+                  </div>
+                  <div id="dgi-qr-reader" className="marea-invoice-scanner-frame" />
+                  {invoiceScannerError && (
+                    <div className="marea-invoice-inline-alert is-error">
+                      <span className="material-symbols-outlined">error</span>
+                      {invoiceScannerError}
+                    </div>
+                  )}
+                  <div className="marea-invoice-work-card-footer">
+                    <p>
+                      Si no funciona el escaner,{' '}
+                      <button type="button" className="marea-invoice-inline-link" onClick={() => onModeChange('manual')}>
+                        ingresa el CUFE manualmente
+                      </button>
                     </p>
                   </div>
-                  <div id="dgi-qr-reader" className="w-full min-h-[280px] bg-black" />
-              {invoiceScannerError && (
-                <div className="mx-4 mb-4 mt-2 flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-sm text-red-400">
-                  <span className="material-symbols-outlined text-base flex-shrink-0 mt-0.5">error</span>
-                  {invoiceScannerError}
-                </div>
-              )}
-              <div className="px-5 pb-3 pt-2 text-center">
-                <p className="text-xs text-on-surface-variant">
-                  Si no funciona el escáner,{' '}
-                  <button type="button" className="underline text-primary-container" onClick={() => onModeChange('manual')}>
-                    ingresa el CUFE manualmente
-                  </button>
-                </p>
-              </div>
 
-              {/* Panel de debug técnico */}
-              {showScannerDebug && <div className="border-t border-outline-variant">
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-on-surface-variant hover:bg-surface-container transition-colors"
-                  onClick={() => setDebugOpen((v) => !v)}
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm">bug_report</span>
-                    Info técnica del escáner
-                  </span>
-                  <span className="material-symbols-outlined text-sm">{debugOpen ? 'expand_less' : 'expand_more'}</span>
-                </button>
+                  {showScannerDebug ? (
+                    <div className="border-t border-outline-variant">
+                      <button type="button" className="marea-invoice-debug-toggle" onClick={() => setDebugOpen((open) => !open)}>
+                        <span className="marea-invoice-debug-toggle-label">
+                          <span className="material-symbols-outlined">bug_report</span>
+                          Info tecnica del escaner
+                        </span>
+                        <span className="material-symbols-outlined">{debugOpen ? 'expand_less' : 'expand_more'}</span>
+                      </button>
 
-                {debugOpen && (
-                  <div className="px-4 pb-4 font-mono text-[11px] space-y-1">
-                    <DebugRow
-                      label="Escáner"
-                      value={
-                        invoiceScannerDebug.scannerType === 'native'
-                          ? 'BarcodeDetector nativo ✓'
-                          : invoiceScannerDebug.scannerType === 'html5-qrcode'
-                            ? 'html5-qrcode (fallback)'
-                            : 'sin iniciar'
-                      }
-                      ok={invoiceScannerDebug.scannerType !== 'none'}
-                    />
-                    <DebugRow
-                      label="Etapa"
-                      value={invoiceScannerDebug.lastStage}
-                      ok={!['idle', 'camera-start-failed', 'media-devices-missing', 'insecure-context'].includes(invoiceScannerDebug.lastStage)}
-                    />
-                    {invoiceScannerDebug.lastError && (
-                      <DebugRow label="Último error" value={invoiceScannerDebug.lastError} ok={false} />
-                    )}
-                    <DebugRow
-                      label="BarcodeDetector"
-                      value={invoiceScannerDebug.barcodeDetectorAvailable ? 'disponible' : 'no disponible'}
-                      ok={invoiceScannerDebug.barcodeDetectorAvailable}
-                    />
-                    {invoiceScannerDebug.activeFormats.length > 0 && (
-                      <DebugRow
-                        label="Formatos activos"
-                        value={invoiceScannerDebug.activeFormats.join(', ')}
-                        ok={invoiceScannerDebug.activeFormats.includes('qr_code')}
-                      />
-                    )}
-                    <DebugRow
-                      label="Permiso cámara"
-                      value={invoiceScannerDebug.cameraPermission}
-                      ok={invoiceScannerDebug.cameraPermission === 'granted'}
-                    />
-                    <DebugRow
-                      label="HTTPS / secure"
-                      value={invoiceScannerDebug.isSecureContext ? 'sí' : 'NO — cámara bloqueada'}
-                      ok={invoiceScannerDebug.isSecureContext}
-                    />
-                    <DebugRow
-                      label="mediaDevices"
-                      value={invoiceScannerDebug.hasMediaDevices ? 'disponible' : 'no disponible'}
-                      ok={invoiceScannerDebug.hasMediaDevices}
-                    />
-                    <DebugRow
-                      label="getUserMedia"
-                      value={invoiceScannerDebug.hasGetUserMedia ? 'disponible' : 'no disponible'}
-                      ok={invoiceScannerDebug.hasGetUserMedia}
-                    />
-                    {invoiceScannerDebug.cameraResolution && (
-                      <DebugRow
-                        label="Resolución cámara"
-                        value={invoiceScannerDebug.cameraResolution}
-                        ok={true}
-                      />
-                    )}
-                    <DebugRow label="Origen" value={invoiceScannerDebug.origin} ok={true} />
-                    <div className="pt-1 text-on-surface-variant/50 break-all leading-relaxed">
-                      UA: {invoiceScannerDebug.userAgent}
+                      {debugOpen ? (
+                        <div className="marea-invoice-debug-panel">
+                          <DebugRow
+                            label="Escaner"
+                            value={
+                              invoiceScannerDebug.scannerType === 'native'
+                                ? 'BarcodeDetector nativo'
+                                : invoiceScannerDebug.scannerType === 'html5-qrcode'
+                                  ? 'html5-qrcode'
+                                  : 'sin iniciar'
+                            }
+                            ok={invoiceScannerDebug.scannerType !== 'none'}
+                          />
+                          <DebugRow
+                            label="Etapa"
+                            value={invoiceScannerDebug.lastStage}
+                            ok={!['idle', 'camera-start-failed', 'media-devices-missing', 'insecure-context'].includes(invoiceScannerDebug.lastStage)}
+                          />
+                          {invoiceScannerDebug.lastError ? (
+                            <DebugRow label="Ultimo error" value={invoiceScannerDebug.lastError} ok={false} />
+                          ) : null}
+                          <DebugRow
+                            label="BarcodeDetector"
+                            value={invoiceScannerDebug.barcodeDetectorAvailable ? 'disponible' : 'no disponible'}
+                            ok={invoiceScannerDebug.barcodeDetectorAvailable}
+                          />
+                          {invoiceScannerDebug.activeFormats.length > 0 ? (
+                            <DebugRow
+                              label="Formatos"
+                              value={invoiceScannerDebug.activeFormats.join(', ')}
+                              ok={invoiceScannerDebug.activeFormats.includes('qr_code')}
+                            />
+                          ) : null}
+                          <DebugRow
+                            label="Permiso camara"
+                            value={invoiceScannerDebug.cameraPermission}
+                            ok={invoiceScannerDebug.cameraPermission === 'granted'}
+                          />
+                          <DebugRow
+                            label="Secure context"
+                            value={invoiceScannerDebug.isSecureContext ? 'si' : 'no'}
+                            ok={invoiceScannerDebug.isSecureContext}
+                          />
+                          <DebugRow
+                            label="mediaDevices"
+                            value={invoiceScannerDebug.hasMediaDevices ? 'disponible' : 'no disponible'}
+                            ok={invoiceScannerDebug.hasMediaDevices}
+                          />
+                          <DebugRow
+                            label="getUserMedia"
+                            value={invoiceScannerDebug.hasGetUserMedia ? 'disponible' : 'no disponible'}
+                            ok={invoiceScannerDebug.hasGetUserMedia}
+                          />
+                          {invoiceScannerDebug.cameraResolution ? (
+                            <DebugRow label="Resolucion" value={invoiceScannerDebug.cameraResolution} ok={true} />
+                          ) : null}
+                          <DebugRow label="Origen" value={invoiceScannerDebug.origin} ok={true} />
+                          <div className="pt-1 text-on-surface-variant/50 break-all leading-relaxed">
+                            UA: {invoiceScannerDebug.userAgent}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                )}
-              </div>}
+                  ) : null}
                 </>
               )}
             </div>
           )}
 
-          {/* Panel Manual */}
           {invoiceEntryMode === 'manual' && !invoiceSubmitting && (
-            <div className="bg-surface-container-low rounded-2xl border border-outline-variant p-5 flex flex-col gap-4">
-
-              {/* Explicativo */}
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex flex-col gap-2.5">
-                <p className="text-sm font-semibold text-blue-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-base">info</span>
-                  ¿Qué número debo escribir?
-                </p>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  El CUFE de tu factura Super Carnes tiene varias partes separadas por guiones.
-                  Solo necesitas escribir el bloque final, los números después del último guion:
-                </p>
-                <div className="font-mono text-[11px] bg-surface-container rounded-lg p-3 break-all leading-relaxed">
-                  <span className="text-on-surface-variant/40">FE01200000032812-2-249262-</span><span className="text-emerald-400 font-bold">6300032026051830904933463090311813389704</span>
+            <div className="marea-invoice-work-card marea-invoice-work-card-manual">
+              <div className="marea-invoice-work-card-head">
+                <div>
+                  <span className="marea-invoice-panel-kicker">Registro manual</span>
+                  <h2>Ingresa el CUFE</h2>
                 </div>
-                <p className="text-xs text-on-surface-variant/70">
-                  Escribe solo la parte en <span className="text-emerald-400 font-semibold">verde</span>. Lo encontrarás al final de la factura, debajo del código QR, etiquetado como CUFE.
+                <p>Usa el bloque final del CUFE para registrar tu factura con rapidez.</p>
+              </div>
+
+              <div className="marea-invoice-info-block">
+                <p className="marea-invoice-info-block-title">
+                  <span className="material-symbols-outlined">info</span>
+                  Que numero debo escribir?
+                </p>
+                <p className="marea-invoice-info-block-copy">
+                  El CUFE de tu factura Super Carnes tiene varias partes separadas por guiones. Solo necesitas escribir el bloque final, los numeros despues del ultimo guion.
+                </p>
+                <div className="marea-invoice-code-sample">
+                  <span className="text-on-surface-variant/40">FE01200000032812-2-249262-</span>
+                  <span className="text-emerald-400 font-bold">6300032026051830904933463090311813389704</span>
+                </div>
+                <p className="marea-invoice-info-block-copy is-muted">
+                  Escribe solo la parte en verde. La encontraras al final de la factura, debajo del codigo QR, etiquetada como CUFE.
                 </p>
               </div>
 
-              {/* Input del código corto */}
-              <div>
-                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">
-                  Código final del CUFE
-                </label>
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center rounded-xl border border-outline-variant overflow-hidden bg-surface-container-lowest focus-within:border-primary-container transition-colors">
-                    <span className="px-3 py-3 text-xs text-on-surface-variant/40 font-mono bg-surface-container border-r border-outline-variant select-none whitespace-nowrap shrink-0">
-                      FE…-249262-
-                    </span>
+              <div className="marea-invoice-field-group">
+                <label className="marea-invoice-field-label">Codigo final del CUFE</label>
+                <div className="marea-invoice-field-stack">
+                  <div className="marea-invoice-short-code-field">
+                    <span className="marea-invoice-short-code-prefix">FE...-249262-</span>
                     <input
                       type="text"
                       inputMode="numeric"
-                      className="flex-1 min-w-0 bg-transparent px-3 py-3 text-on-surface text-sm font-mono focus:outline-none"
-                      placeholder="6300032026051830…"
+                      className="marea-invoice-short-code-input"
+                      placeholder="6300032026051830..."
                       value={shortCode}
-                      onChange={(e) => handleShortCodeChange(e.target.value)}
-                      onPaste={(e) => {
-                        const pasted = e.clipboardData.getData('text')
-                        e.preventDefault()
+                      onChange={(event) => handleShortCodeChange(event.target.value)}
+                      onPaste={(event) => {
+                        const pasted = event.clipboardData.getData('text')
+                        event.preventDefault()
                         handleShortCodeChange(pasted, true)
                       }}
                     />
                   </div>
-                  <p className="text-xs text-on-surface-variant">
-                    Solo los números finales, sin espacios ni guiones.
-                  </p>
+                  <p className="marea-invoice-field-help">Solo los numeros finales, sin espacios ni guiones.</p>
                 </div>
               </div>
 
-              {invoiceScannerError && (
-                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-sm text-red-400">
-                  <span className="material-symbols-outlined text-base flex-shrink-0 mt-0.5">error</span>
+              {invoiceScannerError ? (
+                <div className="marea-invoice-inline-alert is-error">
+                  <span className="material-symbols-outlined">error</span>
                   {invoiceScannerError}
                 </div>
-              )}
+              ) : null}
 
               <button
                 type="button"
                 disabled={shortCode.length < 10 || invoiceSubmitting}
                 onClick={() => onRegister(CUFE_PREFIX + shortCode)}
-                className="w-full py-3.5 bg-primary-container text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="marea-invoice-action-button primary"
               >
-                <span className="material-symbols-outlined text-base">sports_soccer</span>
-                {invoiceSubmitting ? 'Registrando…' : 'Registrar factura'}
+                <span className="material-symbols-outlined">sports_soccer</span>
+                {invoiceSubmitting ? 'Registrando...' : 'Registrar factura'}
               </button>
             </div>
           )}
 
-          {/* Loader mientras se registra */}
-          {invoiceSubmitting && (
-            <div ref={loaderRef} className="bg-surface-container-low rounded-2xl border border-outline-variant p-8 flex flex-col items-center gap-5 text-center">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full border-4 border-outline-variant border-t-primary-container animate-spin" />
-                <span className="material-symbols-outlined absolute inset-0 flex items-center justify-center text-primary-container text-2xl" data-weight="fill">
+          {invoiceSubmitting ? (
+            <div ref={loaderRef} className="marea-invoice-loader-card">
+              <div className="marea-invoice-loader-visual">
+                <div className="marea-invoice-loader-ring" />
+                <span className="material-symbols-outlined" data-weight="fill">
                   receipt_long
                 </span>
               </div>
               <div>
-                <p className="font-bold text-on-surface text-lg">Verificando Factura…</p>
-                <p className="text-sm text-on-surface-variant mt-1.5">
-                  Estamos consultando tu factura en la DGI.<br />Por favor espera, puede tardar hasta 45 segundos.
+                <p className="marea-invoice-loader-title">Verificando factura...</p>
+                <p className="marea-invoice-loader-copy">
+                  Estamos consultando tu factura en la DGI.
+                  <br />
+                  Por favor espera, puede tardar hasta 45 segundos.
                 </p>
               </div>
-              <div className="flex gap-1.5 mt-1">
+              <div className="marea-invoice-loader-dots">
                 <span className="w-2 h-2 rounded-full bg-primary-container animate-bounce [animation-delay:0ms]" />
                 <span className="w-2 h-2 rounded-full bg-primary-container animate-bounce [animation-delay:150ms]" />
                 <span className="w-2 h-2 rounded-full bg-primary-container animate-bounce [animation-delay:300ms]" />
               </div>
             </div>
-          )}
+          ) : null}
 
-          {/* Resultado del registro */}
-          {hasResolved && !invoiceSubmitting && (
-            <div className="flex flex-col gap-3">
-              <div className="bg-surface-container-low rounded-2xl border border-emerald-500/30 overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-4 border-b border-outline-variant bg-emerald-500/10">
-                  <div className="w-9 h-9 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="material-symbols-outlined text-emerald-400 text-xl" data-weight="fill">check_circle</span>
+          {hasResolved && !invoiceSubmitting ? (
+            <div className="marea-invoice-success-stack">
+              <div className="marea-invoice-success-card">
+                <div className="marea-invoice-success-head">
+                  <div className="marea-invoice-success-icon">
+                    <span className="material-symbols-outlined" data-weight="fill">
+                      check_circle
+                    </span>
                   </div>
                   <div>
-                    <div className="font-bold text-emerald-400 text-sm">¡Factura registrada!</div>
-                    {resolvedInvoiceData?.issuer_name && (
-                      <div className="text-xs text-on-surface-variant">{resolvedInvoiceData.issuer_name}</div>
-                    )}
+                    <div className="marea-invoice-success-title">Factura registrada</div>
+                    {resolvedInvoiceData?.issuer_name ? (
+                      <div className="marea-invoice-success-subtitle">{resolvedInvoiceData.issuer_name}</div>
+                    ) : null}
                   </div>
                 </div>
-                <div className="grid grid-cols-3 divide-x divide-outline-variant">
-                  <div className="px-4 py-3 text-center">
-                    <div className="text-xs text-on-surface-variant mb-0.5">Monto</div>
-                    <div className="font-semibold text-primary-container text-sm">{formatCurrency(resolvedInvoiceData?.purchase_amount)}</div>
+                <div className="marea-invoice-success-grid">
+                  <div>
+                    <div className="marea-invoice-success-label">Monto</div>
+                    <div className="marea-invoice-success-value is-gold">{formatCurrency(resolvedInvoiceData?.purchase_amount)}</div>
                   </div>
-                  <div className="px-4 py-3 text-center">
-                    <div className="text-xs text-on-surface-variant mb-0.5">Fecha</div>
-                    <div className="font-semibold text-on-surface text-sm">{formatDate(resolvedInvoiceData?.issued_at ?? '')}</div>
+                  <div>
+                    <div className="marea-invoice-success-label">Fecha</div>
+                    <div className="marea-invoice-success-value">{formatDate(resolvedInvoiceData?.issued_at ?? '')}</div>
                   </div>
-                  <div className="px-4 py-3 text-center">
-                    <div className="text-xs text-on-surface-variant mb-0.5">CUFE</div>
-                    <div className="font-semibold text-on-surface text-xs truncate">{resolvedInvoiceData?.cufe?.slice(-8)}</div>
+                  <div>
+                    <div className="marea-invoice-success-label">CUFE</div>
+                    <div className="marea-invoice-success-value is-small">{resolvedInvoiceData?.cufe?.slice(-8)}</div>
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onReset}
-                className="w-full py-3.5 bg-surface-container border border-outline-variant text-on-surface font-semibold text-sm rounded-2xl flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors"
-              >
-                <span className="material-symbols-outlined text-base">qr_code_scanner</span>
+              <button type="button" onClick={onReset} className="marea-invoice-action-button secondary">
+                <span className="material-symbols-outlined">qr_code_scanner</span>
                 Registrar otra factura
               </button>
             </div>
-          )}
-
+          ) : null}
         </section>
 
-        {/* Historial */}
-        <section className="lg:col-span-7">
-          <div className="bg-surface-container-low rounded-2xl border border-outline-variant flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant">
-              <h2 className="font-semibold text-on-surface">Mis facturas</h2>
-              {totalPoints > 0 && (
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-primary-container/20 text-primary-container border border-primary-container/30">
-                  {totalPoints.toFixed(1)} goles totales
-                </span>
-              )}
+        <section className="marea-invoice-history-column">
+          <div className="marea-invoice-history-card">
+            <div className="marea-invoice-history-card-head">
+              <div>
+                <span className="marea-invoice-panel-kicker">Historial real</span>
+                <h2>Mis facturas</h2>
+              </div>
+              {totalPoints > 0 ? (
+                <span className="marea-invoice-history-card-badge">{totalPoints.toFixed(1)} goles totales</span>
+              ) : null}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2.5 max-h-[520px]">
-              {invoiceCards.length > 0 ? invoiceCards : (
-                <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
-                  <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">receipt_long</span>
+            <div className="marea-invoice-history-list">
+              {invoiceCards.length > 0 ? (
+                invoiceCards
+              ) : (
+                <div className="marea-invoice-history-empty">
+                  <span className="material-symbols-outlined">receipt_long</span>
                   <div>
-                    <p className="text-sm font-medium text-on-surface-variant">Sin facturas aún</p>
-                    <p className="text-xs text-on-surface-variant/60 mt-1">Escanea el QR de tu primera factura DGI para comenzar</p>
+                    <p className="marea-invoice-history-empty-title">Sin facturas aun</p>
+                    <p className="marea-invoice-history-empty-copy">Escanea el QR de tu primera factura DGI para comenzar</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {invoices.length > 5 && (
-              <div className="px-5 py-3 border-t border-outline-variant text-center text-xs text-on-surface-variant">
-                Mostrando 5 de {invoices.length} facturas
-              </div>
-            )}
+            {invoices.length > 5 ? (
+              <div className="marea-invoice-history-card-foot">Mostrando 5 de {invoices.length} facturas</div>
+            ) : null}
           </div>
         </section>
       </div>
