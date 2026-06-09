@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import type { Branch, User } from '../types'
 import { optimizeAvatarFile } from '../utils/avatarUpload'
+import { isPushSupported, registerPushSubscription, unregisterPushSubscription, getPushState } from '../utils/pushNotifications'
 
 type CuentaSection = 'perfil' | 'terminos'
 
@@ -47,6 +48,8 @@ export function CuentaView({
   const [branchId, setBranchId] = useState(String(user.branch?.id ?? ''))
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url ?? null)
+  const [pushStatus, setPushStatus] = useState<'idle' | 'checking' | 'enabled' | 'disabled' | 'error'>('idle')
+  const [pushMessage, setPushMessage] = useState<string | null>(null)
 
   useEffect(() => {
     setEmail(user.email)
@@ -55,6 +58,33 @@ export function CuentaView({
     setAvatarFile(null)
     setAvatarPreview(user.avatar_url ?? null)
   }, [user.email, user.phone, user.avatar_url, user.branch])
+
+  useEffect(() => {
+    let alive = true
+
+    async function loadPushState() {
+      if (!isPushSupported()) {
+        if (alive) setPushStatus('disabled')
+        return
+      }
+
+      setPushStatus('checking')
+
+      try {
+        const state = await getPushState()
+        if (!alive) return
+        setPushStatus(state.enabled ? 'enabled' : 'disabled')
+      } catch {
+        if (alive) setPushStatus('error')
+      }
+    }
+
+    void loadPushState()
+
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!avatarFile) return
@@ -83,6 +113,32 @@ export function CuentaView({
       setAvatarFile(optimized)
     } catch {
       setAvatarFile(file)
+    }
+  }
+
+  async function handleEnablePush() {
+    setPushMessage(null)
+
+    try {
+      await registerPushSubscription()
+      setPushStatus('enabled')
+      setPushMessage('Notificaciones activadas.')
+    } catch (error) {
+      setPushStatus('error')
+      setPushMessage(error instanceof Error ? error.message : 'No fue posible activar las notificaciones.')
+    }
+  }
+
+  async function handleDisablePush() {
+    setPushMessage(null)
+
+    try {
+      await unregisterPushSubscription()
+      setPushStatus('disabled')
+      setPushMessage('Notificaciones desactivadas.')
+    } catch (error) {
+      setPushStatus('error')
+      setPushMessage(error instanceof Error ? error.message : 'No fue posible desactivar las notificaciones.')
     }
   }
 
@@ -202,6 +258,29 @@ export function CuentaView({
                 </button>
               </div>
             </form>
+
+            <div className="cuenta-push-panel">
+              <div className="cuenta-panel-head">
+                <span className="cuenta-kicker">Publicidad y avisos</span>
+                <h2>Notificaciones push web</h2>
+              </div>
+              <p className="cuenta-push-copy">
+                Recibe promociones, recordatorios y anuncios del concurso directamente en tu navegador.
+              </p>
+              <div className="cuenta-push-actions">
+                <button className="cuenta-save-button" type="button" onClick={() => void handleEnablePush()} disabled={pushStatus === 'checking'}>
+                  Activar notificaciones
+                </button>
+                <button className="cuenta-section-tab" type="button" onClick={() => void handleDisablePush()} disabled={pushStatus === 'checking'}>
+                  Desactivar
+                </button>
+              </div>
+              <div className="cuenta-push-status">
+                <span>Estado:</span>
+                <strong>{pushStatus === 'enabled' ? 'Activas' : pushStatus === 'checking' ? 'Verificando...' : pushStatus === 'error' ? 'Error' : 'Inactivas'}</strong>
+              </div>
+              {pushMessage ? <p className="cuenta-push-message">{pushMessage}</p> : null}
+            </div>
           </section>
         </div>
       )}

@@ -114,7 +114,14 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::post('/integrations/live-score/sync-live', [BackofficeController::class, 'syncLive'])->name('admin.integrations.live-score.sync-live');
         Route::post('/integrations/live-score/sync-commentary', [BackofficeController::class, 'syncCommentary'])->name('admin.integrations.live-score.sync-commentary');
         Route::get('/users', [BackofficeController::class, 'users'])->name('admin.users');
-        Route::put('/users/{user}', [BackofficeController::class, 'updateUserStatus'])->name('admin.users.update');
+        Route::get('/users/{user}/edit', [BackofficeController::class, 'editUser'])->name('admin.users.edit');
+        Route::get('/users/{user}/audit', [BackofficeController::class, 'userAudit'])->name('admin.users.audit');
+        Route::get('/newsletter', [BackofficeController::class, 'newsletter'])->name('admin.newsletter');
+        Route::get('/newsletter/preview', [BackofficeController::class, 'newsletterPreview'])->name('admin.newsletter.preview');
+        Route::post('/newsletter/{subscriber}/resend', [BackofficeController::class, 'newsletterResendConfirmation'])->name('admin.newsletter.resend');
+        Route::post('/newsletter/{subscriber}/unsubscribe', [BackofficeController::class, 'newsletterUnsubscribe'])->name('admin.newsletter.unsubscribe');
+        Route::get('/mail-logs', [BackofficeController::class, 'mailLogs'])->name('admin.mail-logs');
+        Route::put('/users/{user}', [BackofficeController::class, 'updateUser'])->name('admin.users.update');
         Route::get('/player-points', [BackofficeController::class, 'playerPoints'])->name('admin.player-points');
         Route::get('/player-points/{user}', [BackofficeController::class, 'playerPointsDetail'])->name('admin.player-points.detail');
         Route::post('/users/{user}/assisted-invoices', [BackofficeController::class, 'storeAssistedInvoice'])->name('admin.users.assisted-invoices.store');
@@ -123,6 +130,7 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::put('/fraud/{flag}', [BackofficeController::class, 'updateFraudFlag'])->name('admin.fraud.update');
         Route::get('/site', [BackofficeController::class, 'site'])->name('admin.site');
         Route::put('/site', [BackofficeController::class, 'updateSiteSettings'])->name('admin.site.update');
+        Route::post('/site/test-smtp', [BackofficeController::class, 'testSmtp'])->name('admin.site.test-smtp');
         Route::get('/branches', [BackofficeController::class, 'branches'])->name('admin.branches');
         Route::post('/branches', [BackofficeController::class, 'storeBranch'])->name('admin.branches.store');
         Route::put('/branches/{branch}', [BackofficeController::class, 'updateBranch'])->name('admin.branches.update');

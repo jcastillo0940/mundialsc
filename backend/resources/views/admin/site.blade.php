@@ -18,11 +18,11 @@
             </div>
             <div class="row">
                 <label style="display:flex;flex-direction:column;gap:4px;flex:1">
-                    <small><strong>Logo del header (topbar)</strong> — reemplaza el texto "Super Carnes" en la barra superior de la app.</small>
+                    <small><strong>Logo del header (topbar)</strong> â€” reemplaza el texto "Super Carnes" en la barra superior de la app.</small>
                     <input name="header_logo_url" value="{{ $settings['header_logo_url'] }}" placeholder="https://...logo-header.png">
                 </label>
                 <label style="display:flex;flex-direction:column;gap:4px;flex:1">
-                    <small><strong>Logo del login</strong> — aparece en la pantalla de acceso. Si no se configura el logo del header, se usa este como respaldo.</small>
+                    <small><strong>Logo del login</strong> â€” aparece en la pantalla de acceso. Si no se configura el logo del header, se usa este como respaldo.</small>
                     <input name="auth_logo_url" value="{{ $settings['auth_logo_url'] }}" placeholder="https://...logo-login.png">
                 </label>
             </div>
@@ -58,6 +58,40 @@
         </div>
 
         <div class="card">
+            <h3>SMTP y correo</h3>
+            <p class="muted">Estos valores se guardan en base de datos y el backend los usa en runtime para envios y pruebas.</p>
+            <div class="row">
+                <select name="mail_mailer">
+                    <option value="smtp" @selected(($settings['mail_mailer'] ?? 'smtp') === 'smtp')>SMTP</option>
+                    <option value="log" @selected(($settings['mail_mailer'] ?? '') === 'log')>Log</option>
+                    <option value="array" @selected(($settings['mail_mailer'] ?? '') === 'array')>Array</option>
+                    <option value="sendmail" @selected(($settings['mail_mailer'] ?? '') === 'sendmail')>Sendmail</option>
+                    <option value="failover" @selected(($settings['mail_mailer'] ?? '') === 'failover')>Failover</option>
+                    <option value="roundrobin" @selected(($settings['mail_mailer'] ?? '') === 'roundrobin')>Round robin</option>
+                    <option value="postmark" @selected(($settings['mail_mailer'] ?? '') === 'postmark')>Postmark</option>
+                    <option value="resend" @selected(($settings['mail_mailer'] ?? '') === 'resend')>Resend</option>
+                    <option value="ses" @selected(($settings['mail_mailer'] ?? '') === 'ses')>SES</option>
+                </select>
+                <input name="mail_host" value="{{ $settings['mail_host'] }}" placeholder="smtp.tu-proveedor.com">
+                <input name="mail_port" type="number" value="{{ $settings['mail_port'] }}" placeholder="587">
+            </div>
+            <div class="row">
+                <input name="mail_username" value="{{ $settings['mail_username'] }}" placeholder="Usuario SMTP">
+                <input name="mail_password" type="password" value="{{ $settings['mail_password'] }}" placeholder="Contraseña SMTP">
+                <select name="mail_encryption">
+                    <option value="" @selected(($settings['mail_encryption'] ?? '') === '')>Sin cifrado</option>
+                    <option value="tls" @selected(($settings['mail_encryption'] ?? '') === 'tls')>TLS</option>
+                    <option value="ssl" @selected(($settings['mail_encryption'] ?? '') === 'ssl')>SSL</option>
+                </select>
+            </div>
+            <div class="row">
+                <input name="mail_from_address" type="email" value="{{ $settings['mail_from_address'] }}" placeholder="no-reply@supercarnes.com">
+                <input name="mail_from_name" value="{{ $settings['mail_from_name'] }}" placeholder="Super Carnes">
+            </div>
+            <p class="muted">El correo de prueba se envia desde el boton inferior, usando esta misma configuracion.</p>
+        </div>
+
+        <div class="card">
             <h3>Colores del sitio</h3>
             <p class="muted">Deja un campo vacío para usar el color por defecto del tema. Los cambios aplican en tiempo real al guardar.</p>
 
@@ -76,7 +110,6 @@
 
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:14px">
                 @foreach($themeDefaults as $key => $meta)
-                @php $current = $settings[$key] ?: $meta['default']; @endphp
                 <label style="display:flex;flex-direction:column;gap:6px">
                     <span style="font-size:12px;color:var(--muted)">{{ $meta['label'] }}</span>
                     <div style="display:flex;align-items:center;gap:8px">
@@ -196,6 +229,16 @@
         </div>
 
         <button type="submit">Guardar configuracion del sitio</button>
+    </form>
+
+    <form method="post" action="{{ route('admin.site.test-smtp') }}" class="card" style="margin-top:18px">
+        @csrf
+        <h3>Prueba SMTP</h3>
+        <p class="muted">Usa la configuración guardada arriba para enviar un correo de verificación al buzón que indiques.</p>
+        <div class="row">
+            <input name="test_email" type="email" placeholder="correo@pruebas.com">
+            <button type="submit">Enviar correo de prueba</button>
+        </div>
     </form>
 </div>
 @endsection

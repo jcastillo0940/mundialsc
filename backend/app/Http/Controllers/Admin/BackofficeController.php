@@ -12,15 +12,19 @@ use App\Models\LiveScoreSyncRun;
 use App\Models\MatchPrediction;
 use App\Models\MatchResultApproval;
 use App\Models\PhasePrize;
+use App\Models\NewsletterSubscriber;
 use App\Models\PrizeToken;
 use App\Models\PromoWinner;
 use App\Models\PromoWinnerContact;
+use App\Models\MailLog;
+use App\Models\AuditLog;
 use App\Models\RegisteredInvoice;
 use App\Models\SiteSetting;
 use App\Models\Team;
 use App\Models\TournamentMatch;
 use App\Models\TournamentPhase;
 use App\Models\User;
+use App\Notifications\NewsletterConfirmationNotification;
 use App\Support\Audit;
 use App\Support\ContestInvoiceRegistrationService;
 use App\Support\LiveScoreSyncService;
@@ -31,6 +35,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -872,19 +878,238 @@ class BackofficeController extends Controller
 
     public function users(): View
     {
+        $query = trim((string) request('query'));
+
         return view('admin.users', [
             'users' => User::query()
                 ->where('role', 'client')
+                ->when($query !== '', fn ($builder) => $builder->where(function ($search) use ($query) {
+                    $search->where('name', 'like', '%'.$query.'%')
+                        ->orWhere('cedula', 'like', '%'.$query.'%')
+                        ->orWhere('email', 'like', '%'.$query.'%');
+                }))
                 ->orderByDesc('created_at')
                 ->limit(200)
                 ->get(),
+            'query' => $query,
         ]);
     }
 
-    public function updateUserStatus(Request $request, User $user): RedirectResponse
+    public function editUser(User $user): View
     {
+        abort_unless($user->role === 'client', 404);
+
+        return view('admin.user-edit', [
+            'user' => $user,
+            'branches' => \App\Models\Branch::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
+    public function userAudit(User $user): View
+    {
+        abort_unless($user->role === 'client', 404);
+
+        $events = AuditLog::query()
+            ->where(function ($query) use ($user) {
+                $query->where('entity_type', 'user')
+                    ->where('entity_id', $user->id)
+                    ->orWhere(function ($nested) use ($user) {
+                        $nested->where('entity_type', 'user')
+                            ->whereNull('entity_id')
+                            ->where('user_id', $user->id);
+                    })
+                    ->orWhere(function ($nested) use ($user) {
+                        $nested->where('entity_type', 'registered_invoice')
+                            ->where('entity_id', '>', 0)
+                            ->whereRaw("json_extract(payload, '$.participant_user_id') = ?", [$user->id]);
+                    })
+                    ->orWhere(function ($nested) use ($user) {
+                        $nested->where('entity_type', 'fraud_flag')
+                            ->where('entity_id', '>', 0)
+                            ->whereRaw("json_extract(payload, '$.user_id') = ?", [$user->id]);
+                    })
+                    ->orWhere(function ($nested) use ($user) {
+                        $nested->where('entity_type', 'coupon')
+                            ->where('entity_id', '>', 0)
+                            ->whereRaw("json_extract(payload, '$.user_id') = ?", [$user->id]);
+                    });
+            })
+            ->latest('id')
+            ->paginate(80)
+            ->withQueryString();
+
+        return view('admin.user-audit', [
+            'user' => $user,
+            'events' => $events,
+        ]);
+    }
+
+    public function newsletter(Request $request): View
+    {
+        $search = trim((string) $request->string('search'));
+        $status = $request->string('status', 'all')->toString();
+
+        $subscribersQuery = NewsletterSubscriber::query()
+            ->when($search !== '', fn ($query) => $query->where('email', 'like', '%'.$search.'%'))
+            ->when($status === 'confirmed', fn ($query) => $query->whereNotNull('confirmed_at')->whereNull('unsubscribed_at'))
+            ->when($status === 'pending', fn ($query) => $query->whereNull('confirmed_at')->whereNull('unsubscribed_at'))
+            ->when($status === 'unsubscribed', fn ($query) => $query->whereNotNull('unsubscribed_at'));
+
+        return view('admin.newsletter', [
+            'subscribers' => $subscribersQuery->orderByDesc('updated_at')->paginate(40)->withQueryString(),
+            'summary' => [
+                'total' => NewsletterSubscriber::query()->count(),
+                'confirmed' => NewsletterSubscriber::query()->whereNotNull('confirmed_at')->whereNull('unsubscribed_at')->count(),
+                'pending' => NewsletterSubscriber::query()->whereNull('confirmed_at')->whereNull('unsubscribed_at')->count(),
+                'unsubscribed' => NewsletterSubscriber::query()->whereNotNull('unsubscribed_at')->count(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'status' => $status,
+            ],
+        ]);
+    }
+
+    public function newsletterResendConfirmation(Request $request, NewsletterSubscriber $subscriber): RedirectResponse
+    {
+        if ($subscriber->unsubscribed_at) {
+            return back()->withErrors(['subscriber' => 'Este correo ya se dio de baja.']);
+        }
+
+        $token = Str::random(64);
+
+        $subscriber->forceFill([
+            'subscribed_at' => $subscriber->subscribed_at ?? now(),
+            'confirmed_at' => null,
+            'confirmation_token_hash' => Hash::make($token),
+            'confirmation_sent_at' => now(),
+            'source' => $subscriber->source ?: 'admin',
+        ])->save();
+
+        $subscriber->notify(new \App\Notifications\NewsletterConfirmationNotification($token));
+
+        MailLog::query()->create([
+            'channel' => 'newsletter',
+            'event_type' => 'resent',
+            'recipient_email' => $subscriber->email,
+            'subject' => 'Confirma tu suscripción al newsletter',
+            'status' => 'resent',
+            'subscriber_id' => $subscriber->id,
+            'user_id' => $request->user()?->id,
+            'meta' => [
+                'action' => 'admin_resend',
+            ],
+            'sent_at' => now(),
+        ]);
+
+        Audit::log('newsletter.confirmation_resent', 'newsletter_subscriber', $subscriber->id, $request->user(), $request);
+
+        return back()->with('status', 'Se reenviÃ³ la confirmaciÃ³n del newsletter.');
+    }
+
+    public function newsletterUnsubscribe(Request $request, NewsletterSubscriber $subscriber): RedirectResponse
+    {
+        $subscriber->forceFill([
+            'unsubscribed_at' => now(),
+            'confirmed_at' => null,
+            'confirmation_token_hash' => null,
+            'confirmation_sent_at' => null,
+        ])->save();
+
+        MailLog::query()->create([
+            'channel' => 'newsletter',
+            'event_type' => 'unsubscribed',
+            'recipient_email' => $subscriber->email,
+            'subject' => 'Newsletter baja',
+            'status' => 'unsubscribed',
+            'subscriber_id' => $subscriber->id,
+            'user_id' => $request->user()?->id,
+            'meta' => [
+                'action' => 'admin_unsubscribe',
+            ],
+            'sent_at' => now(),
+        ]);
+
+        Audit::log('newsletter.unsubscribed', 'newsletter_subscriber', $subscriber->id, $request->user(), $request);
+
+        return back()->with('status', 'Suscriptor dado de baja.');
+    }
+
+    public function newsletterPreview(): View
+    {
+        $resetPreviewHtml = view('emails.reset-password', [
+            'name' => 'Participante Demo',
+            'url' => route('admin.dashboard'),
+            'appName' => config('app.name', 'Super Carnes'),
+            'supportEmail' => config('mail.from.address'),
+        ])->render();
+
+        $newsletterPreviewHtml = view('emails.newsletter-confirmation', [
+            'name' => 'Amigo Demo',
+            'url' => route('admin.dashboard'),
+            'appName' => config('app.name', 'Super Carnes'),
+            'supportEmail' => config('mail.from.address'),
+        ])->render();
+
+        return view('admin.newsletter-preview', [
+            'resetPreviewHtml' => $resetPreviewHtml,
+            'newsletterPreviewHtml' => $newsletterPreviewHtml,
+        ]);
+    }
+
+    public function mailLogs(Request $request): View
+    {
+        $channel = $request->string('channel', 'all')->toString();
+        $status = $request->string('status', 'all')->toString();
+        $search = trim((string) $request->string('search'));
+
+        $query = MailLog::query()
+            ->when($channel !== 'all', fn ($q) => $q->where('channel', $channel))
+            ->when($status !== 'all', fn ($q) => $q->where('status', $status))
+            ->when($search !== '', fn ($q) => $q->where('recipient_email', 'like', '%'.$search.'%'));
+
+        return view('admin.mail-logs', [
+            'logs' => $query->latest('id')->paginate(60)->withQueryString(),
+            'summary' => [
+                'total' => MailLog::query()->count(),
+                'queued' => MailLog::query()->where('status', 'queued')->count(),
+                'confirmed' => MailLog::query()->where('status', 'confirmed')->count(),
+                'resent' => MailLog::query()->where('status', 'resent')->count(),
+                'unsubscribed' => MailLog::query()->where('status', 'unsubscribed')->count(),
+            ],
+            'filters' => compact('channel', 'status', 'search'),
+        ]);
+    }
+
+    public function updateUser(Request $request, User $user): RedirectResponse
+    {
+        $before = [
+            'name' => $user->name,
+            'cedula' => $user->cedula,
+            'document_type' => $user->document_type,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'branch_id' => $user->branch_id,
+            'birthdate' => optional($user->birthdate)?->toDateString(),
+            'resides_in_panama' => (bool) $user->resides_in_panama,
+            'is_employee' => (bool) $user->is_employee,
+            'is_active' => (bool) $user->is_active,
+            'disqualified_at' => optional($user->disqualified_at)?->toIso8601String(),
+            'disqualification_reason' => $user->disqualification_reason,
+        ];
+
         $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'cedula' => ['required', 'string', 'max:30', 'unique:users,cedula,'.$user->id],
+            'document_type' => ['required', 'string', 'max:30'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'branch_id' => ['nullable', 'exists:branches,id'],
+            'birthdate' => ['nullable', 'date'],
+            'resides_in_panama' => ['required', 'boolean'],
+            'is_employee' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
+            'password' => ['nullable', 'string', 'min:8', 'max:255'],
             'disqualify_user' => ['required', 'boolean'],
             'disqualification_reason' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -892,10 +1117,48 @@ class BackofficeController extends Controller
         $shouldDisqualify = (bool) $data['disqualify_user'];
         $reason = $data['disqualification_reason'] ?? null;
 
-        $user->update([
+        $payload = [
+            'name' => $data['name'],
+            'cedula' => $data['cedula'],
+            'document_type' => $data['document_type'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?: null,
+            'branch_id' => $data['branch_id'] ?: null,
+            'birthdate' => $data['birthdate'] ?: null,
+            'resides_in_panama' => (bool) $data['resides_in_panama'],
+            'is_employee' => (bool) $data['is_employee'],
             'is_active' => (bool) $data['is_active'],
             'disqualified_at' => $shouldDisqualify ? ($user->disqualified_at ?? now()) : null,
             'disqualification_reason' => $shouldDisqualify ? $reason : null,
+        ];
+
+        if (! empty($data['password'])) {
+            $payload['password'] = bcrypt($data['password']);
+        }
+
+        $user->update($payload);
+
+        $after = [
+            'name' => $user->name,
+            'cedula' => $user->cedula,
+            'document_type' => $user->document_type,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'branch_id' => $user->branch_id,
+            'birthdate' => optional($user->birthdate)?->toDateString(),
+            'resides_in_panama' => (bool) $user->resides_in_panama,
+            'is_employee' => (bool) $user->is_employee,
+            'is_active' => (bool) $user->is_active,
+            'disqualified_at' => optional($user->disqualified_at)?->toIso8601String(),
+            'disqualification_reason' => $user->disqualification_reason,
+        ];
+
+        Audit::log('user.profile.updated', 'user', $user->id, $request->user(), $request, [
+            'before' => $before,
+            'after' => $after,
+            'changes' => collect($before)
+                ->mapWithKeys(fn ($value, $key) => $value === $after[$key] ? [] : [$key => ['before' => $value, 'after' => $after[$key]]])
+                ->all(),
         ]);
 
         Audit::log('user.status.updated', 'user', $user->id, $request->user(), $request, [
@@ -904,7 +1167,7 @@ class BackofficeController extends Controller
             'disqualification_reason' => $user->disqualification_reason,
         ]);
 
-        return back()->with('status', 'Estado del usuario actualizado.');
+        return back()->with('status', 'Participante actualizado.');
     }
 
     public function fraud(): View
@@ -1011,7 +1274,7 @@ class BackofficeController extends Controller
             }
         }
 
-        $this->invoiceRegistrationService->registerAssisted(
+        $result = $this->invoiceRegistrationService->registerAssisted(
             targetUser: $user,
             data: $data,
             actor: $request->user(),
@@ -1019,7 +1282,17 @@ class BackofficeController extends Controller
             fraudFlag: $flag,
         );
 
-        return back()->with('status', 'Factura asistida registrada con trazabilidad completa.');
+        $verificationStatus = $result['verification_status'] ?? null;
+        $pointsAwarded = $verificationStatus === 'approved' ? 1 : 0;
+        $verificationLabel = match ($verificationStatus) {
+            'approved' => 'aprobada',
+            'pending' => 'pendiente de confirmacion',
+            'disqualify' => 'en revision antifraude',
+            'rejected' => 'no aprobada',
+            default => 'procesada',
+        };
+
+        return back()->with('status', "Factura asistida {$verificationLabel}. Puntos acreditados: {$pointsAwarded}. ".($result['message'] ?? ''));
     }
 
     public function site(): View
@@ -1096,11 +1369,21 @@ class BackofficeController extends Controller
             'recaptcha_enabled'    => ['nullable', 'boolean'],
             'recaptcha_site_key'   => ['nullable', 'string', 'max:255'],
             'recaptcha_secret_key' => ['nullable', 'string', 'max:255'],
+            'mail_mailer'          => ['nullable', 'in:smtp,log,array,sendmail,failover,roundrobin,postmark,resend,ses'],
+            'mail_host'            => ['nullable', 'string', 'max:255'],
+            'mail_port'            => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'mail_username'        => ['nullable', 'string', 'max:255'],
+            'mail_password'        => ['nullable', 'string', 'max:255'],
+            'mail_encryption'      => ['nullable', 'in:tls,ssl'],
+            'mail_from_address'    => ['nullable', 'email', 'max:150'],
+            'mail_from_name'       => ['nullable', 'string', 'max:150'],
         ]);
 
         $data['show_scanner_debug'] = $request->boolean('show_scanner_debug') ? '1' : '0';
         $data['show_auth_ticker']   = $request->boolean('show_auth_ticker') ? '1' : '0';
         $data['recaptcha_enabled']  = $request->boolean('recaptcha_enabled') ? '1' : '0';
+        $data['mail_port']          = isset($data['mail_port']) ? (string) $data['mail_port'] : null;
+        $data['mail_encryption']    = $data['mail_encryption'] === '' ? null : ($data['mail_encryption'] ?? null);
 
         foreach ($data as $key => $value) {
             SiteSetting::set($key, $value);
@@ -1111,6 +1394,53 @@ class BackofficeController extends Controller
         ]);
 
         return back()->with('status', 'Configuracion del sitio actualizada.');
+    }
+
+    public function testSmtp(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'test_email' => ['required', 'email', 'max:150'],
+        ]);
+
+        $recipient = trim($data['test_email']);
+        $subject = 'Prueba SMTP - '.config('app.name', 'Laravel');
+        $html = view('emails.smtp-test', [
+            'appName' => config('app.name', 'Super Carnes'),
+            'recipient' => $recipient,
+            'siteUrl' => route('admin.dashboard'),
+        ])->render();
+
+        try {
+            Mail::html($html, function ($message) use ($recipient, $subject): void {
+                $message->to($recipient)->subject($subject);
+            });
+        } catch (\Throwable $throwable) {
+            Audit::log('mail.smtp_test_failed', 'mail_test', null, $request->user(), $request, [
+                'recipient_email' => $recipient,
+                'error' => $throwable->getMessage(),
+            ]);
+
+            return back()->withErrors(['test_email' => 'No se pudo enviar el correo de prueba. Revisa la configuracion SMTP.']);
+        }
+
+        MailLog::query()->create([
+            'channel' => 'smtp_test',
+            'event_type' => 'sent',
+            'recipient_email' => $recipient,
+            'subject' => $subject,
+            'status' => 'sent',
+            'user_id' => $request->user()?->id,
+            'meta' => [
+                'action' => 'smtp_test',
+            ],
+            'sent_at' => now(),
+        ]);
+
+        Audit::log('mail.smtp_test_sent', 'mail_test', null, $request->user(), $request, [
+            'recipient_email' => $recipient,
+        ]);
+
+        return back()->with('status', 'Correo de prueba enviado correctamente.');
     }
 
     private function validatePrize(Request $request): array
@@ -1158,6 +1488,14 @@ class BackofficeController extends Controller
             'recaptcha_enabled',
             'recaptcha_site_key',
             'recaptcha_secret_key',
+            'mail_mailer',
+            'mail_host',
+            'mail_port',
+            'mail_username',
+            'mail_password',
+            'mail_encryption',
+            'mail_from_address',
+            'mail_from_name',
         ];
 
         $settings = [];

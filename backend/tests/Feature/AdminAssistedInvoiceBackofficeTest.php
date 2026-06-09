@@ -6,6 +6,7 @@ use App\Models\Campaign;
 use App\Models\FraudFlag;
 use App\Models\InvoiceGoalSetting;
 use App\Models\RegisteredInvoice;
+use App\Models\Branch;
 use App\Models\TournamentPhase;
 use App\Models\User;
 use App\Models\Wallet;
@@ -18,6 +19,82 @@ use Tests\TestCase;
 class AdminAssistedInvoiceBackofficeTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_admin_can_search_and_edit_participants(): void
+    {
+        $admin = $this->createAdmin();
+        $branch = Branch::query()->create([
+            'name' => 'Sucursal Central',
+            'code' => 'CENTRAL',
+            'address' => 'Direccion prueba',
+            'phone' => '555-0000',
+            'is_active' => true,
+        ]);
+        $player = $this->createClient('+50760001111');
+
+        $listResponse = $this->actingAs($admin)->get('/adminrepus1car/users?query='.$player->cedula);
+        $listResponse->assertOk();
+        $listResponse->assertSee($player->cedula, false);
+
+        $editResponse = $this->actingAs($admin)->get("/adminrepus1car/users/{$player->id}/edit");
+        $editResponse->assertOk();
+        $editResponse->assertSee('Editar participante');
+
+        $response = $this->actingAs($admin)->put("/adminrepus1car/users/{$player->id}", [
+            'name' => 'Cliente Editado',
+            'cedula' => '8-123-4567',
+            'document_type' => 'cedula',
+            'email' => 'editado@example.com',
+            'phone' => '+50769990000',
+            'branch_id' => $branch->id,
+            'birthdate' => '1990-01-15',
+            'resides_in_panama' => 1,
+            'is_employee' => 0,
+            'is_active' => 1,
+            'password' => 'NuevaClave123',
+            'disqualify_user' => 0,
+            'disqualification_reason' => null,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status', 'Participante actualizado.');
+
+        $player->refresh();
+        $this->assertSame('Cliente Editado', $player->name);
+        $this->assertSame('8-123-4567', $player->cedula);
+        $this->assertSame('editado@example.com', $player->email);
+        $this->assertSame((string) $branch->id, (string) $player->branch_id);
+        $this->assertTrue($player->is_active);
+    }
+
+    public function test_admin_can_view_participant_audit_trail(): void
+    {
+        $admin = $this->createAdmin();
+        $player = $this->createClient('+50760002222');
+
+        $this->actingAs($admin)->put("/adminrepus1car/users/{$player->id}", [
+            'name' => 'Cliente Auditoria',
+            'cedula' => '8-765-4321',
+            'document_type' => 'cedula',
+            'email' => 'auditoria@example.com',
+            'phone' => '+50769990001',
+            'branch_id' => null,
+            'birthdate' => '1992-03-10',
+            'resides_in_panama' => 1,
+            'is_employee' => 0,
+            'is_active' => 1,
+            'password' => '',
+            'disqualify_user' => 0,
+            'disqualification_reason' => null,
+        ])->assertRedirect();
+
+        $auditResponse = $this->actingAs($admin)->get("/adminrepus1car/users/{$player->id}/audit");
+        $auditResponse->assertOk();
+        $auditResponse->assertSee('Auditoria del participante');
+        $auditResponse->assertSee('user.profile.updated');
+        $auditResponse->assertSee('cedula');
+        $auditResponse->assertSee('8-765-4321', false);
+    }
 
     public function test_admin_views_whatsapp_links_in_fraud_queue_and_participant_detail(): void
     {
@@ -131,6 +208,10 @@ class AdminAssistedInvoiceBackofficeTest extends TestCase
         ]);
 
         $response->assertRedirect();
+        $response->assertSessionHas('status', function (string $status): bool {
+            return str_contains($status, 'Factura asistida aprobada')
+                && str_contains($status, 'Puntos acreditados: 1');
+        });
 
         $invoice = RegisteredInvoice::query()->first();
         $this->assertNotNull($invoice);

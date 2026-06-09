@@ -50,4 +50,10 @@ return [
         'tokeninfo_url' => env('GOOGLE_TOKENINFO_URL', 'https://oauth2.googleapis.com/tokeninfo'),
     ],
 
+    'push' => [
+        'vapid_public_key' => env('PUSH_VAPID_PUBLIC_KEY'),
+        'vapid_private_key' => env('PUSH_VAPID_PRIVATE_KEY'),
+        'vapid_subject' => env('PUSH_VAPID_SUBJECT', 'mailto:soporte@localhost'),
+    ],
+
 ];

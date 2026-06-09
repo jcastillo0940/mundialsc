@@ -10,17 +10,22 @@ use App\Http\Controllers\Api\DailyInvoiceGoalController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\MatchCommentaryController;
+use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PredictionController;
 use App\Http\Controllers\Api\PrizeController;
 use App\Http\Controllers\Api\RedemptionController;
 use App\Http\Controllers\Api\TeamFlagController;
 use App\Http\Controllers\Api\PublicSettingsController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:auth-register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
     Route::post('google', [AuthController::class, 'google'])->middleware('throttle:auth-google');
+    Route::post('forgot-password', [PasswordResetController::class, 'requestReset'])->middleware('throttle:password-reset');
+    Route::post('reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:password-reset');
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('google/complete', [AuthController::class, 'completeGoogleRegistration'])->middleware('throttle:auth-register');
@@ -28,6 +33,12 @@ Route::prefix('auth')->group(function (): void {
         Route::post('profile', [AuthController::class, 'updateProfile']);
         Route::post('logout', [AuthController::class, 'logout']);
     });
+});
+
+Route::prefix('newsletter')->group(function (): void {
+    Route::post('subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:newsletter');
+    Route::post('confirm', [NewsletterController::class, 'confirm'])->middleware('throttle:newsletter');
+    Route::post('unsubscribe', [NewsletterController::class, 'unsubscribe'])->middleware('throttle:newsletter');
 });
 
 Route::get('client/teams/{team}/flag', [TeamFlagController::class, 'show'])->name('api.client.teams.flag');
@@ -59,6 +70,10 @@ Route::middleware(['auth:sanctum', 'registration.complete'])->group(function ():
 
     Route::get('coupons', [CouponController::class, 'index']);
     Route::get('coupons/{code}', [CouponController::class, 'show']);
+
+    Route::get('push/subscriptions', [PushSubscriptionController::class, 'index'])->middleware('role:client');
+    Route::post('push/subscriptions', [PushSubscriptionController::class, 'store'])->middleware('role:client');
+    Route::delete('push/subscriptions', [PushSubscriptionController::class, 'destroy'])->middleware('role:client');
 
     Route::prefix('cashier')->middleware('role:cashier,admin')->group(function (): void {
         Route::post('coupons/scan', [CashierCouponController::class, 'scan'])->middleware('throttle:cashier-scan');

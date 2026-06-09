@@ -21,6 +21,15 @@ export interface User {
   wallet?: WalletSummary | null
 }
 
+export interface PushSubscriptionState {
+  id: number
+  endpoint: string
+  is_enabled: boolean
+  last_seen_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 export interface UserBranch {
   id: number
   name: string

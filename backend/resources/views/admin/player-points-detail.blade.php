@@ -98,9 +98,10 @@
                 <th>No. Factura</th>
                 <th>Emisor</th>
                 <th>Estado</th>
+                <th>Decisión y puntos</th>
                 <th>Origen</th>
                 <th style="text-align:right">Monto</th>
-                <th style="text-align:right">Puntos ganados</th>
+                <th style="text-align:right">Puntos</th>
             </tr>
         </thead>
         <tbody>
@@ -112,7 +113,26 @@
                     <small class="muted" style="font-size:11px">{{ Str::limit($invoice->cufe, 30) }}</small>
                 </td>
                 <td>{{ $invoice->issuer_name ?: '-' }}</td>
-                <td><span class="pill">{{ $invoice->validation_status }}</span></td>
+                <td>
+                    @if($invoice->validation_status === 'approved')
+                        <span class="pill" style="background:#1a2d1a;border-color:#2d5a2d;color:#8ee2b1">aprobada</span>
+                    @elseif($invoice->validation_status === 'pending')
+                        <span class="pill" style="background:#2d2a1a;border-color:#7a6a20;color:#ffd27a">pendiente</span>
+                    @elseif($invoice->validation_status === 'disqualify')
+                        <span class="pill" style="background:#2d1a1a;border-color:#7a2020;color:#ff9d9d">revision</span>
+                    @else
+                        <span class="pill">{{ $invoice->validation_status }}</span>
+                    @endif
+                </td>
+                <td>
+                    @if($invoice->validation_status === 'approved')
+                        <span class="pill" style="background:#1a2d1a;border-color:#2d5a2d;color:#8ee2b1">aprobada, +{{ number_format($invoice->points_awarded) }} punto(s)</span>
+                    @elseif($invoice->validation_status === 'pending')
+                        <span class="pill" style="background:#2d2a1a;border-color:#7a6a20;color:#ffd27a">pendiente, 0 puntos</span>
+                    @else
+                        <span class="pill" style="background:#2d1a1a;border-color:#7a2020;color:#ff9d9d">no aprobada, 0 puntos</span>
+                    @endif
+                </td>
                 <td>
                     @if($invoice->registration_source === 'admin_assisted')
                         <strong>Admin asistido</strong><br>
@@ -136,7 +156,7 @@
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="6" style="text-align:right"><strong>Total puntos por facturas aprobadas</strong></td>
+                <td colspan="7" style="text-align:right"><strong>Total puntos por facturas aprobadas</strong></td>
                 <td style="text-align:right"><strong style="color:#8ee2b1">{{ number_format($invoicePoints) }}</strong></td>
             </tr>
         </tfoot>

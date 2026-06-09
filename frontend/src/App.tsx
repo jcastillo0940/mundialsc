@@ -47,7 +47,7 @@ const AUTH_REFERENCE_ASSETS = {
 }
 const STADIUM_IMAGE_URL = AUTH_REFERENCE_ASSETS.stadium
 
-type AuthMode = 'login' | 'register'
+type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password'
 type MainView = 'cancha' | 'reglas' | 'facturas' | 'perfil' | 'cuenta'
 type PredictionMode = 'pending' | 'mine'
 type InvoiceEntryMode = 'scan' | 'manual'
@@ -86,6 +86,10 @@ interface AuthResponse {
   user: User
   message?: string
   requires_registration_completion?: boolean
+}
+
+interface GenericMessageResponse {
+  message: string
 }
 
 interface ParticipantBrand {
@@ -1167,6 +1171,11 @@ export function App() {
   const [loading, setLoading] = useState(false)
   const [authBootstrapping, setAuthBootstrapping] = useState<boolean>(Boolean(localStorage.getItem(TOKEN_KEY)))
   const [registerStep, setRegisterStep] = useState(1)
+  const [resetPasswordEmail, setResetPasswordEmail] = useState('')
+  const [resetPasswordToken, setResetPasswordToken] = useState('')
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetPasswordConfirmation, setResetPasswordConfirmation] = useState('')
+  const [newsletterEmail, setNewsletterEmail] = useState('')
   const [, setAuthBgVideoId] = useState(DEFAULT_AUTH_BG_YOUTUBE_ID)
   const [authLogoUrl, setAuthLogoUrl] = useState(DEFAULT_AUTH_LOGO_URL)
   const [headerLogoUrl, setHeaderLogoUrl] = useState('')
@@ -1205,6 +1214,9 @@ export function App() {
   const [registrationAvatarPreview, setRegistrationAvatarPreview] = useState<string | null>(null)
   const currentView = currentViewFromPath(location.pathname)
   const isAuthRoute = location.pathname === '/login'
+  const authSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
+  const resetPasswordTokenFromUrl = authSearchParams.get('token') ?? ''
+  const newsletterTokenFromUrl = authSearchParams.get('newsletter_token') ?? ''
   const isPublicPage = ['/terminos', '/privacidad', '/contacto'].includes(location.pathname)
   const isRegistrationClosed = new Date() > new Date(registrationDeadline)
   const isCompletingGoogleRegistration = Boolean(token && user && !isRegistrationComplete(user))
@@ -1585,6 +1597,11 @@ export function App() {
   useEffect(() => {
     if (authBootstrapping) return
     if (isPublicPage) return
+    if (isAuthRoute && resetPasswordTokenFromUrl) {
+      setAuthMode('reset-password')
+      setResetPasswordToken(resetPasswordTokenFromUrl)
+      return
+    }
     if (isRegistrationClosed && authMode === 'register') setAuthMode('login')
     const isKnownClientRoute = Object.values(CLIENT_VIEW_PATHS).includes(location.pathname)
     const registrationIsComplete = isRegistrationComplete(user)
@@ -1611,7 +1628,22 @@ export function App() {
     if (user && !isKnownClientRoute) {
       navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
     }
-  }, [authBootstrapping, isAuthRoute, location.pathname, navigate, token, user])
+  }, [authBootstrapping, authMode, isAuthRoute, location.pathname, navigate, resetPasswordTokenFromUrl, token, user])
+
+  useEffect(() => {
+    if (!isAuthRoute || !newsletterTokenFromUrl) return
+
+    void (async () => {
+      try {
+        const response = await api.post<GenericMessageResponse>('/newsletter/confirm', {
+          token: newsletterTokenFromUrl,
+        })
+        setMessage(response.data.message ?? 'Tu suscripción al newsletter quedó confirmada.')
+      } catch {
+        setMessage('No pudimos confirmar tu suscripción. Solicita un nuevo enlace.')
+      }
+    })()
+  }, [isAuthRoute, newsletterTokenFromUrl])
 
   useEffect(() => {
     if (currentView !== 'cuenta') return
@@ -2288,6 +2320,34 @@ export function App() {
         return
       }
 
+      if (authMode === 'forgot-password') {
+        const response = await api.post<GenericMessageResponse>('/auth/forgot-password', {
+          email: resetPasswordEmail.trim() || authForm.email,
+        })
+        setMessage(response.data.message ?? 'Si tu correo esta en nuestra base de datos, te enviaremos un enlace para cambiar tu contraseña.')
+        return
+      }
+
+      if (authMode === 'reset-password') {
+        if (resetPassword !== resetPasswordConfirmation) {
+          setMessage('Tu solicitud fue recibida. Si todo es correcto, podrás continuar con el cambio de contraseña.')
+          return
+        }
+
+        const response = await api.post<GenericMessageResponse>('/auth/reset-password', {
+          token: resetPasswordToken,
+          email: resetPasswordEmail,
+          password: resetPassword,
+          password_confirmation: resetPasswordConfirmation,
+        })
+        setMessage(response.data.message ?? 'Tu contraseña fue actualizada correctamente.')
+        setAuthMode('login')
+        setResetPassword('')
+        setResetPasswordConfirmation('')
+        navigate('/login', { replace: true })
+        return
+      }
+
       if (authMode === 'register') {
         const documentError = validateDocumentNumber(authForm.document_type, authForm.cedula)
 
@@ -2349,6 +2409,10 @@ export function App() {
         navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
       }
     } catch (authError) {
+      if (authMode === 'forgot-password' || authMode === 'reset-password') {
+        setMessage('Si tu correo esta en nuestra base de datos, te enviaremos un enlace para cambiar tu contraseña.')
+        return
+      }
       if (
         authError instanceof Error &&
         (
@@ -2363,6 +2427,24 @@ export function App() {
       } else {
         setError(normalizeError(authError))
       }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const response = await api.post<GenericMessageResponse>('/newsletter/subscribe', {
+        email: newsletterEmail || authForm.email,
+      })
+      setMessage(response.data.message ?? 'Gracias. Si tu correo es válido, recibirás novedades del newsletter.')
+    } catch (newsletterError) {
+      setMessage('Si tu correo es válido, recibirás novedades del newsletter.')
     } finally {
       setLoading(false)
     }
@@ -3316,16 +3398,126 @@ export function App() {
             )}
 
             <div className={`auth-panel-header${authMode === 'register' || isCompletingGoogleRegistration ? ' is-register' : ''}`}>
-              <p>{isCompletingGoogleRegistration ? 'Registro pendiente' : authMode === 'login' ? '' : 'Crea tu cuenta'}</p>
-              <h2>{isCompletingGoogleRegistration ? 'Completa tus datos legales' : authMode === 'login' ? '¡Bienvenido de nuevo!' : 'Regístrate'}</h2>
+              <p>
+                {isCompletingGoogleRegistration
+                  ? 'Registro pendiente'
+                  : authMode === 'register'
+                    ? 'Crea tu cuenta'
+                    : authMode === 'forgot-password'
+                      ? 'Recuperación segura'
+                      : authMode === 'reset-password'
+                        ? 'Nueva contraseña'
+                        : ''}
+              </p>
+              <h2>
+                {isCompletingGoogleRegistration
+                  ? 'Completa tus datos legales'
+                  : authMode === 'register'
+                    ? 'Regístrate'
+                    : authMode === 'forgot-password'
+                      ? 'Recupera tu acceso'
+                      : authMode === 'reset-password'
+                        ? 'Define tu nueva clave'
+                        : '¡Bienvenido de nuevo!'}
+              </h2>
               <span>
                 {isCompletingGoogleRegistration
                   ? `Tu correo de Google ya fue verificado: ${user?.email ?? authForm.email}. Solo falta completar los datos obligatorios para participar.`
-                  : authMode === 'login'
-                    ? 'Ingresa tus datos para continuar'
-                    : 'Completa tus datos para participar por premios de Super Carnes.'}
+                  : authMode === 'register'
+                    ? 'Completa tus datos para participar por premios de Super Carnes.'
+                    : authMode === 'forgot-password'
+                      ? 'Te enviaremos un enlace si el correo existe en nuestra base de datos.'
+                      : authMode === 'reset-password'
+                        ? 'Usa el enlace que recibiste por correo para crear una clave nueva.'
+                        : 'Ingresa tus datos para continuar'}
               </span>
             </div>
+
+            {authMode === 'login' ? (
+              <div className="auth-helper-links">
+                <button type="button" className="auth-helper-link" onClick={() => setAuthMode('forgot-password')}>
+                  Olvidé mi contraseña
+                </button>
+                <button type="button" className="auth-helper-link" onClick={() => setNewsletterEmail(authForm.email)}>
+                  Recibir newsletter
+                </button>
+              </div>
+            ) : null}
+
+            {authMode === 'forgot-password' ? (
+              <div className="auth-mini-card">
+                <p>Te enviaremos un correo con un enlace de un solo uso.</p>
+                <label className="auth-reference-field">
+                  <span>Correo electrónico</span>
+                  <div className="auth-reference-input">
+                    <span className="material-symbols-outlined">mail</span>
+                    <input
+                      required
+                      placeholder="ejemplo@correo.com"
+                      type="email"
+                      value={resetPasswordEmail || authForm.email}
+                      onChange={(event) => {
+                        setResetPasswordEmail(event.target.value)
+                        setAuthForm((current) => ({ ...current, email: event.target.value }))
+                      }}
+                    />
+                  </div>
+                </label>
+                <button className="auth-submit" type="submit" disabled={loading}>
+                  Enviar enlace
+                </button>
+                <button type="button" className="auth-helper-link" onClick={() => setAuthMode('login')}>
+                  Volver al inicio de sesión
+                </button>
+              </div>
+            ) : null}
+
+            {authMode === 'reset-password' ? (
+              <div className="auth-mini-card">
+                <p>Vas a cambiar tu contraseña usando el enlace recibido por correo.</p>
+                <input type="hidden" value={resetPasswordToken} readOnly />
+                <label className="auth-reference-field">
+                  <span>Correo electrónico</span>
+                  <div className="auth-reference-input">
+                    <span className="material-symbols-outlined">mail</span>
+                    <input
+                      required
+                      placeholder="ejemplo@correo.com"
+                      type="email"
+                      value={resetPasswordEmail}
+                      onChange={(event) => setResetPasswordEmail(event.target.value)}
+                    />
+                  </div>
+                </label>
+                <label className="auth-reference-field">
+                  <span>Nueva contraseña</span>
+                  <div className="auth-reference-input">
+                    <span className="material-symbols-outlined">lock</span>
+                    <input
+                      required
+                      type="password"
+                      value={resetPassword}
+                      onChange={(event) => setResetPassword(event.target.value)}
+                    />
+                  </div>
+                </label>
+                <label className="auth-reference-field">
+                  <span>Confirmar contraseña</span>
+                  <div className="auth-reference-input">
+                    <span className="material-symbols-outlined">verified_user</span>
+                    <input
+                      required
+                      type="password"
+                      value={resetPasswordConfirmation}
+                      onChange={(event) => setResetPasswordConfirmation(event.target.value)}
+                    />
+                  </div>
+                </label>
+                <button className="auth-submit" type="submit" disabled={loading}>
+                  Actualizar contraseña
+                </button>
+              </div>
+            ) : null}
 
             {isCompletingGoogleRegistration || authMode === 'register' ? (
               <>
@@ -3678,10 +3870,31 @@ export function App() {
 
             <p className="auth-deadline">
               <span className="material-symbols-outlined">calendar_month</span>
-              {authMode === 'register' ? `Registro hasta el ${REGISTRATION_DEADLINE}` : 'Mundialista Â· Super Carnes 2026'}
+              {authMode === 'register'
+                ? `Registro hasta el ${REGISTRATION_DEADLINE}`
+                : authMode === 'forgot-password' || authMode === 'reset-password'
+                  ? 'Recuperación de acceso segura'
+                  : 'Mundialista Â· Super Carnes 2026'}
             </p>
           </form>
           </div>
+          <form className="auth-newsletter" onSubmit={handleNewsletterSubmit}>
+            <div>
+              <strong>Newsletter</strong>
+              <p>Recibe novedades y fechas importantes sin salir de esta pantalla.</p>
+            </div>
+            <div className="auth-newsletter-row">
+              <input
+                type="email"
+                placeholder="tu@correo.com"
+                value={newsletterEmail || authForm.email}
+                onChange={(event) => setNewsletterEmail(event.target.value)}
+              />
+              <button type="submit" disabled={loading}>
+                Suscribirme
+              </button>
+            </div>
+          </form>
           <div className="auth-reference-footer" aria-label="Como participar">
             <div className="auth-reference-footer-title">¿CÓMO PARTICIPAR?</div>
             <div className="auth-reference-footer-steps">

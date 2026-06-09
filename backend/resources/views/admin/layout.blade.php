@@ -55,6 +55,9 @@
             <a href="{{ route('admin.winners') }}">Ganadores</a>
             <a href="{{ route('admin.integrations') }}">Integraciones</a>
             <a href="{{ route('admin.users') }}">Usuarios</a>
+            <a href="{{ route('admin.newsletter') }}">Newsletter</a>
+            <a href="{{ route('admin.newsletter.preview') }}">Vista previa emails</a>
+            <a href="{{ route('admin.mail-logs') }}">Log de envíos</a>
             <a href="{{ route('admin.fraud') }}">Antifraude</a>
             <a href="{{ route('admin.site') }}">Sitio y SEO</a>
             <a href="{{ route('admin.branches') }}">Sucursales</a>

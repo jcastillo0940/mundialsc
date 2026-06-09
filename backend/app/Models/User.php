@@ -91,6 +91,11 @@ class User extends Authenticatable
         return $this->hasMany(RegisteredInvoice::class);
     }
 
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
+    }
+
     public function fraudFlags(): HasMany
     {
         return $this->hasMany(FraudFlag::class);

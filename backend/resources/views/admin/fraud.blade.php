@@ -60,7 +60,16 @@
                 <td>
                     @if($flag->invoice)
                         <small>{{ $flag->invoice->cufe }}</small><br>
-                        <small>{{ $flag->invoice->validation_status }} | ${{ number_format((float) $flag->invoice->purchase_amount, 2) }}</small><br>
+                        @if($flag->invoice->validation_status === 'approved')
+                            <span class="pill" style="background:#1a2d1a;border-color:#2d5a2d;color:#8ee2b1">aprobada, +{{ number_format((float) $flag->invoice->points_awarded) }} punto(s)</span><br>
+                        @elseif($flag->invoice->validation_status === 'pending')
+                            <span class="pill" style="background:#2d2a1a;border-color:#7a6a20;color:#ffd27a">pendiente, 0 puntos</span><br>
+                        @elseif($flag->invoice->validation_status === 'disqualify')
+                            <span class="pill" style="background:#2d1a1a;border-color:#7a2020;color:#ff9d9d">revision antifraude, 0 puntos</span><br>
+                        @else
+                            <span class="pill" style="background:#2d1a1a;border-color:#7a2020;color:#ff9d9d">no aprobada, 0 puntos</span><br>
+                        @endif
+                        <small class="muted">{{ $flag->invoice->validation_status }} | ${{ number_format((float) $flag->invoice->purchase_amount, 2) }}</small><br>
                         <small>Origen: {{ $flag->invoice->registration_source === 'admin_assisted' ? 'asistida por admin' : 'cliente' }}</small>
                     @else
                         <span class="muted">Sin factura creada</span>
