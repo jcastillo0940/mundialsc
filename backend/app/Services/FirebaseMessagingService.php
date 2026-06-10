@@ -29,34 +29,40 @@ class FirebaseMessagingService
                 continue;
             }
 
+            $title     = $campaign->push_title     ?: ($campaign->name ?? '');
+            $body      = $campaign->push_description ?: $title;
+            $imageUrl  = $campaign->push_image_url  ?: null;
+            $btnText   = $campaign->push_button_text ?: null;
+            $btnUrl    = $campaign->push_button_url  ?: (string) config('app.url');
+
             $response = Http::withToken($accessToken)->post($endpoint, [
                 'message' => [
                     'token' => $tokenRow->token,
                     'notification' => [
-                        'title' => $campaign->title,
-                        'body' => $campaign->description ?: $campaign->title,
-                        'image' => $campaign->image_url ?: null,
+                        'title' => $title,
+                        'body'  => $body,
+                        'image' => $imageUrl,
                     ],
                     'webpush' => [
                         'fcm_options' => [
-                            'link' => $campaign->button_url ?: (string) config('app.url'),
+                            'link' => $btnUrl,
                         ],
                         'notification' => array_filter([
-                            'title' => $campaign->title,
-                            'body' => $campaign->description ?: $campaign->title,
-                            'icon' => $campaign->image_url ?: null,
-                            'image' => $campaign->image_url ?: null,
-                            'actions' => $campaign->button_text && $campaign->button_url ? [[
+                            'title'   => $title,
+                            'body'    => $body,
+                            'icon'    => $imageUrl,
+                            'image'   => $imageUrl,
+                            'actions' => $btnText ? [[
                                 'action' => 'open_link',
-                                'title' => $campaign->button_text,
+                                'title'  => $btnText,
                             ]] : null,
                         ]),
                     ],
                     'data' => array_filter([
                         'campaign_id' => (string) $campaign->id,
-                        'button_text' => $campaign->button_text ?: '',
-                        'button_url' => $campaign->button_url ?: '',
-                        'image_url' => $campaign->image_url ?: '',
+                        'button_text' => $btnText   ?: '',
+                        'button_url'  => $btnUrl    ?: '',
+                        'image_url'   => $imageUrl  ?: '',
                     ]),
                 ],
             ]);

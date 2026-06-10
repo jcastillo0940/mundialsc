@@ -48,7 +48,7 @@ export function CuentaView({
   const [branchId, setBranchId] = useState(String(user.branch?.id ?? ''))
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url ?? null)
-  const [pushStatus, setPushStatus] = useState<'idle' | 'checking' | 'enabled' | 'disabled' | 'error'>('idle')
+  const [pushStatus, setPushStatus] = useState<'idle' | 'checking' | 'enabled' | 'disabled' | 'error' | 'blocked'>('idle')
   const [pushMessage, setPushMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -118,6 +118,18 @@ export function CuentaView({
 
   async function handleEnablePush() {
     setPushMessage(null)
+
+    if (!isPushSupported()) {
+      setPushStatus('error')
+      setPushMessage('Tu navegador no soporta notificaciones push.')
+      return
+    }
+
+    if (Notification.permission === 'denied') {
+      setPushStatus('blocked')
+      setPushMessage(null)
+      return
+    }
 
     try {
       await registerPushSubscription()
@@ -277,8 +289,18 @@ export function CuentaView({
               </div>
               <div className="cuenta-push-status">
                 <span>Estado:</span>
-                <strong>{pushStatus === 'enabled' ? 'Activas' : pushStatus === 'checking' ? 'Verificando...' : pushStatus === 'error' ? 'Error' : 'Inactivas'}</strong>
+                <strong>{pushStatus === 'enabled' ? 'Activas' : pushStatus === 'checking' ? 'Verificando...' : pushStatus === 'error' ? 'Error' : pushStatus === 'blocked' ? 'Bloqueadas' : 'Inactivas'}</strong>
               </div>
+              {pushStatus === 'blocked' && (
+                <div className="cuenta-push-blocked">
+                  <p>Tu navegador tiene las notificaciones <strong>bloqueadas</strong> para este sitio. Para activarlas:</p>
+                  <ol>
+                    <li>Haz clic en el <strong>candado 🔒</strong> en la barra de dirección del navegador</li>
+                    <li>Busca <strong>Notificaciones</strong> y cambia a <strong>Permitir</strong></li>
+                    <li>Recarga la página y vuelve a intentarlo</li>
+                  </ol>
+                </div>
+              )}
               {pushMessage ? <p className="cuenta-push-message">{pushMessage}</p> : null}
             </div>
           </section>

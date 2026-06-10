@@ -38,7 +38,8 @@ export async function registerPushSubscription(): Promise<void> {
     throw new Error('El usuario no autorizo las notificaciones.')
   }
 
-  const serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+  await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+  const serviceWorkerRegistration = await navigator.serviceWorker.ready
   const token = await getToken(messaging, {
     vapidKey: vapidPublicKey,
     serviceWorkerRegistration,

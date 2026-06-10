@@ -3,6 +3,17 @@
 @section('content')
 <h1>Campañas Push</h1>
 
+@if(session('status'))
+    <div class="alert alert-success" style="margin-bottom:16px;padding:12px 16px;background:rgba(0,200,100,.15);border:1px solid rgba(0,200,100,.4);border-radius:8px;color:#6effc0;">
+        {{ session('status') }}
+    </div>
+@endif
+@if($errors->any())
+    <div class="alert alert-error" style="margin-bottom:16px;padding:12px 16px;background:rgba(255,60,60,.12);border:1px solid rgba(255,60,60,.35);border-radius:8px;color:#ff9090;">
+        {{ $errors->first() }}
+    </div>
+@endif
+
 <div class="card">
     <h2>Nueva campaña</h2>
     <form method="post" action="{{ route('admin.push-campaigns.store') }}" class="grid">

@@ -58,7 +58,13 @@ return [
 
     'firebase' => [
         'project_id' => env('FIREBASE_PROJECT_ID'),
-        'service_account_json' => env('FIREBASE_SERVICE_ACCOUNT_JSON'),
+        'service_account_json' => (static function () {
+            $val = env('FIREBASE_SERVICE_ACCOUNT_JSON', '');
+            if ($val && !str_starts_with(trim($val), '{') && file_exists(base_path($val))) {
+                return file_get_contents(base_path($val));
+            }
+            return $val;
+        })(),
     ],
 
 ];

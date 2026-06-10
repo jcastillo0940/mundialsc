@@ -14,8 +14,11 @@ class PushSubscriptionController extends Controller
     {
         $user = $request->user();
 
+        $hasFcm = $user->fcmTokens()->where('is_enabled', true)->exists();
+        $hasVapid = $user->pushSubscriptions()->where('is_enabled', true)->exists();
+
         return response()->json([
-            'enabled' => (bool) $user->pushSubscriptions()->where('is_enabled', true)->exists(),
+            'enabled' => $hasFcm || $hasVapid,
             'subscriptions' => $user->pushSubscriptions()
                 ->orderByDesc('updated_at')
                 ->get()

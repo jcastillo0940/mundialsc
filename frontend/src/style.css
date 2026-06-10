@@ -7622,6 +7622,27 @@ a {
   cursor: default;
 }
 
+.cuenta-push-blocked {
+  background: rgba(255, 180, 0, 0.12);
+  border: 1px solid rgba(255, 180, 0, 0.35);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #f5d97a;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.cuenta-push-blocked p {
+  margin: 0 0 10px;
+}
+
+.cuenta-push-blocked ol {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
 @media (max-width: 1024px) {
   .feedback {
     right: 12px;
