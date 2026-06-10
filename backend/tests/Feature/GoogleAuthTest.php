@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\Branch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -167,6 +168,43 @@ class GoogleAuthTest extends TestCase
         $this->assertNotNull($user->avatar_path);
         Storage::disk('public')->assertExists($user->avatar_path);
         $this->assertLessThanOrEqual(500 * 1024, Storage::disk('public')->size($user->avatar_path));
+    }
+
+    public function test_registration_is_allowed_even_after_the_old_deadline_passes(): void
+    {
+        Storage::fake('public');
+
+        config()->set('contest.registration_deadline', now('America/Panama')->subDay()->toDateTimeString());
+
+        $branch = Branch::query()->create([
+            'name' => 'Sucursal Central',
+            'code' => 'SC',
+            'is_active' => true,
+        ]);
+
+        $response = $this->postJson('/api/auth/register', [
+            'full_name' => 'Participante Tardio',
+            'document_type' => 'cedula',
+            'cedula' => '8-888-8888',
+            'email' => 'tardio@example.com',
+            'phone' => '+50761234567',
+            'avatar' => UploadedFile::fake()->image('avatar.jpg'),
+            'birthdate' => now('America/Panama')->subYears(20)->toDateString(),
+            'resides_in_panama' => '1',
+            'is_employee' => '0',
+            'accepted_terms' => '1',
+            'group_stage_goal_prediction' => '120',
+            'password' => 'secret123',
+            'password_confirmation' => 'secret123',
+            'branch_id' => $branch->id,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('user.email', 'tardio@example.com');
+
+        $user = User::query()->where('email', 'tardio@example.com')->firstOrFail();
+        $this->assertNotNull($user->registration_completed_at);
     }
 
     public function test_profile_avatar_update_is_optimized_to_at_most_500_kb(): void

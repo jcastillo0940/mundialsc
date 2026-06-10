@@ -1,13 +1,6 @@
 import { api } from '../api'
-
-export interface PushSubscriptionPayload {
-  endpoint: string
-  keys: {
-    p256dh: string
-    auth: string
-  }
-  content_encoding?: string
-}
+import { firebaseMessagingPromise } from '../firebase'
+import { getToken, deleteToken } from 'firebase/messaging'
 
 export interface PushSubscriptionRecord {
   enabled: boolean
@@ -23,19 +16,6 @@ export interface PushSubscriptionRecord {
   }>
 }
 
-function base64UrlToUint8Array(base64UrlString: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64UrlString.length % 4)) % 4)
-  const base64 = (base64UrlString + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const rawData = window.atob(base64)
-  const outputArray = new Uint8Array(rawData.length)
-
-  for (let index = 0; index < rawData.length; ++index) {
-    outputArray[index] = rawData.charCodeAt(index)
-  }
-
-  return outputArray
-}
-
 export function isPushSupported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
@@ -46,11 +26,11 @@ export async function getPushState() {
 }
 
 export async function registerPushSubscription(): Promise<void> {
-  const pushState = await getPushState()
-  const vapidPublicKey = pushState.vapid_public_key?.trim()
+  const messaging = await firebaseMessagingPromise
+  const vapidPublicKey = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim()
 
-  if (!vapidPublicKey || !isPushSupported()) {
-    throw new Error('Push no disponible en este navegador o no configurado en el servidor.')
+  if (!messaging || !vapidPublicKey || !isPushSupported()) {
+    throw new Error('Firebase Messaging no está disponible en este navegador o no está configurado.')
   }
 
   const permission = await Notification.requestPermission()
@@ -58,34 +38,38 @@ export async function registerPushSubscription(): Promise<void> {
     throw new Error('El usuario no autorizo las notificaciones.')
   }
 
-  const serviceWorkerRegistration = await navigator.serviceWorker.register('/sw-push.js', { scope: '/' })
-  const existingSubscription = await serviceWorkerRegistration.pushManager.getSubscription()
-
-  if (existingSubscription) {
-    await api.post('/push/subscriptions', existingSubscription.toJSON() as PushSubscriptionPayload)
-    return
-  }
-
-  const subscription = await serviceWorkerRegistration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: base64UrlToUint8Array(vapidPublicKey) as unknown as BufferSource,
+  const serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+  const token = await getToken(messaging, {
+    vapidKey: vapidPublicKey,
+    serviceWorkerRegistration,
   })
 
-  await api.post('/push/subscriptions', subscription.toJSON() as PushSubscriptionPayload)
+  if (!token) {
+    throw new Error('No fue posible obtener el token de Firebase Messaging.')
+  }
+
+  await api.post('/push/fcm-token', {
+    token,
+    device_name: navigator.platform || navigator.userAgent,
+    platform: 'web',
+  })
 }
 
 export async function unregisterPushSubscription(): Promise<void> {
   if (!('serviceWorker' in navigator)) return
 
+  const messaging = await firebaseMessagingPromise
   const registration = await navigator.serviceWorker.getRegistration()
-  const subscription = await registration?.pushManager.getSubscription()
 
-  if (subscription) {
-    await api.delete('/push/subscriptions', {
-      data: {
-        endpoint: subscription.endpoint,
-      },
-    })
-    await subscription.unsubscribe()
+  if (messaging && registration) {
+    const token = await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim(),
+      serviceWorkerRegistration: registration,
+    }).catch(() => null)
+
+    if (token) {
+      await api.delete('/push/fcm-token', { data: { token } })
+      await deleteToken(messaging).catch(() => undefined)
+    }
   }
 }

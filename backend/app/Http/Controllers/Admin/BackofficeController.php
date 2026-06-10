@@ -17,7 +17,9 @@ use App\Models\PrizeToken;
 use App\Models\PromoWinner;
 use App\Models\PromoWinnerContact;
 use App\Models\MailLog;
+use App\Models\Campaign;
 use App\Models\AuditLog;
+use App\Models\Branch;
 use App\Models\RegisteredInvoice;
 use App\Models\SiteSetting;
 use App\Models\Team;
@@ -31,6 +33,8 @@ use App\Support\LiveScoreSyncService;
 use App\Support\PointsAuditService;
 use App\Support\PromotionRankingService;
 use App\Support\TournamentScoring;
+use App\Services\FirebaseMessagingService;
+use App\Services\PushCampaignDispatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -50,6 +54,8 @@ class BackofficeController extends Controller
         private readonly PromotionRankingService $rankingService,
         private readonly PointsAuditService $pointsAuditService,
         private readonly ContestInvoiceRegistrationService $invoiceRegistrationService,
+        private readonly FirebaseMessagingService $firebaseMessaging,
+        private readonly PushCampaignDispatcher $pushCampaignDispatcher,
     ) {
     }
 
@@ -1302,11 +1308,93 @@ class BackofficeController extends Controller
         ]);
     }
 
+    public function pushCampaigns(): View
+    {
+        return view('admin.push-campaigns', [
+            'campaigns' => Campaign::query()->with(['targetUser'])->orderByDesc('id')->get(),
+            'clients' => User::query()->where('role', 'client')->orderBy('name')->get(['id', 'name', 'email', 'branch_id', 'is_active']),
+            'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
+    public function storePushCampaign(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:150'],
+            'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url', 'max:255'],
+            'button_text' => ['nullable', 'string', 'max:80'],
+            'button_url' => ['nullable', 'url', 'max:255'],
+            'audience_type' => ['required', 'in:all,user,branch,active'],
+            'target_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'target_branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'only_active_users' => ['nullable', 'boolean'],
+            'send_now' => ['nullable', 'boolean'],
+            'send_at' => ['nullable', 'date'],
+        ]);
+
+        if ($data['audience_type'] === 'user' && empty($data['target_user_id'])) {
+            throw ValidationException::withMessages(['target_user_id' => 'Selecciona un usuario destino.']);
+        }
+
+        if ($data['audience_type'] === 'branch' && empty($data['target_branch_id'])) {
+            throw ValidationException::withMessages(['target_branch_id' => 'Selecciona una sucursal destino.']);
+        }
+
+        $campaign = Campaign::query()->create([
+            'name' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'status' => 'active',
+            'starts_at' => now(),
+            'ends_at' => now()->addYear(),
+            'invoice_min_amount_for_shot' => 25,
+            'amount_per_point' => 25,
+            'points_per_block' => 1,
+            'daily_max_points' => 1000,
+            'daily_max_invoices' => 100,
+            'coupon_ttl_hours' => 72,
+            'games_enabled' => false,
+            'major_prizes_enabled' => false,
+            'invoice_scan_enabled' => true,
+            'redemption_enabled' => false,
+            'push_title' => $data['title'],
+            'push_description' => $data['description'] ?? null,
+            'push_image_url' => $data['image_url'] ?? null,
+            'push_button_text' => $data['button_text'] ?? null,
+            'push_button_url' => $data['button_url'] ?? null,
+            'push_audience_type' => $data['audience_type'],
+            'push_target_user_id' => $data['target_user_id'] ?? null,
+            'push_target_branch_id' => $data['target_branch_id'] ?? null,
+            'push_only_active_users' => (bool) ($data['only_active_users'] ?? false),
+            'push_send_at' => !empty($data['send_at']) ? $data['send_at'] : null,
+            'push_status' => !empty($data['send_now']) ? 'sending' : (!empty($data['send_at']) ? 'scheduled' : 'draft'),
+        ]);
+
+        if (! empty($data['send_now'])) {
+            $this->dispatchPushCampaign($campaign->fresh());
+            return back()->with('status', 'Campaña creada y enviada.');
+        }
+
+        return back()->with('status', 'Campaña creada.');
+    }
+
+    public function sendPushCampaign(Campaign $campaign): RedirectResponse
+    {
+        $this->dispatchPushCampaign($campaign);
+
+        return back()->with('status', 'Campaña enviada.');
+    }
+
     public function branches(): View
     {
         return view('admin.branches', [
             'branches' => \App\Models\Branch::query()->orderBy('name')->get(),
         ]);
+    }
+
+    private function dispatchPushCampaign(Campaign $campaign): void
+    {
+        $this->pushCampaignDispatcher->dispatch($campaign);
     }
 
     public function storeBranch(Request $request): RedirectResponse
@@ -1454,6 +1542,79 @@ class BackofficeController extends Controller
             'prize_type' => ['required', 'string', 'max:120'],
             'stock' => ['required', 'integer', 'min:0'],
         ]);
+    }
+
+    public function updatePushCampaign(Request $request, Campaign $campaign): RedirectResponse
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:150'],
+            'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url', 'max:255'],
+            'button_text' => ['nullable', 'string', 'max:80'],
+            'button_url' => ['nullable', 'url', 'max:255'],
+            'audience_type' => ['required', 'in:all,user,branch,active'],
+            'target_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'target_branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'only_active_users' => ['nullable', 'boolean'],
+            'send_at' => ['nullable', 'date'],
+            'push_status' => ['nullable', 'in:draft,scheduled,sending,sent,failed'],
+        ]);
+
+        if ($data['audience_type'] === 'user' && empty($data['target_user_id'])) {
+            throw ValidationException::withMessages(['target_user_id' => 'Selecciona un usuario destino.']);
+        }
+
+        if ($data['audience_type'] === 'branch' && empty($data['target_branch_id'])) {
+            throw ValidationException::withMessages(['target_branch_id' => 'Selecciona una sucursal destino.']);
+        }
+
+        $campaign->forceFill([
+            'name' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'push_title' => $data['title'],
+            'push_description' => $data['description'] ?? null,
+            'push_image_url' => $data['image_url'] ?? null,
+            'push_button_text' => $data['button_text'] ?? null,
+            'push_button_url' => $data['button_url'] ?? null,
+            'push_audience_type' => $data['audience_type'],
+            'push_target_user_id' => $data['target_user_id'] ?? null,
+            'push_target_branch_id' => $data['target_branch_id'] ?? null,
+            'push_only_active_users' => (bool) ($data['only_active_users'] ?? false),
+            'push_send_at' => !empty($data['send_at']) ? $data['send_at'] : null,
+            'push_status' => $data['push_status'] ?? $campaign->push_status,
+        ])->save();
+
+        return back()->with('status', 'Campaña actualizada.');
+    }
+
+    public function destroyPushCampaign(Campaign $campaign): RedirectResponse
+    {
+        $campaign->delete();
+
+        return back()->with('status', 'Campaña eliminada.');
+    }
+
+    public function testPushCampaign(Campaign $campaign): RedirectResponse
+    {
+        $query = \App\Models\FcmToken::query()->where('is_enabled', true);
+
+        if ($campaign->push_audience_type === 'user' && $campaign->push_target_user_id) {
+            $query->where('user_id', $campaign->push_target_user_id);
+        } elseif ($campaign->push_audience_type === 'branch' && $campaign->push_target_branch_id) {
+            $query->whereHas('user', fn ($branchQuery) => $branchQuery->where('branch_id', $campaign->push_target_branch_id));
+        } elseif ($campaign->push_audience_type === 'active' || $campaign->push_only_active_users) {
+            $query->whereHas('user', fn ($activeQuery) => $activeQuery->where('is_active', true));
+        }
+
+        $token = $query->orderByDesc('updated_at')->first();
+
+        if (! $token) {
+            return back()->withErrors(['push' => 'No hay tokens FCM disponibles para prueba.']);
+        }
+
+        $result = $this->firebaseMessaging->sendCampaign($campaign->fresh(), collect([$token]));
+
+        return back()->with('status', "Prueba enviada. Exitosos: {$result['sent']}, fallidos: {$result['failed']}.");
     }
 
     private function siteSettings(): array

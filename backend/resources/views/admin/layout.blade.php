@@ -60,6 +60,7 @@
             <a href="{{ route('admin.mail-logs') }}">Log de envíos</a>
             <a href="{{ route('admin.fraud') }}">Antifraude</a>
             <a href="{{ route('admin.site') }}">Sitio y SEO</a>
+            <a href="{{ route('admin.push-campaigns') }}">Push campañas</a>
             <a href="{{ route('admin.branches') }}">Sucursales</a>
         </nav>
         <form method="post" action="{{ route('admin.logout') }}">

@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class FcmToken extends Model
+{
+    protected $fillable = [
+        'user_id',
+        'token',
+        'device_name',
+        'platform',
+        'user_agent',
+        'is_enabled',
+        'last_seen_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_enabled' => 'boolean',
+            'last_seen_at' => 'datetime',
+        ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+}

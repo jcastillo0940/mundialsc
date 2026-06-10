@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -47,7 +47,7 @@ const AUTH_REFERENCE_ASSETS = {
 }
 const STADIUM_IMAGE_URL = AUTH_REFERENCE_ASSETS.stadium
 
-type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password'
+type AuthMode = 'login' | 'register'
 type MainView = 'cancha' | 'reglas' | 'facturas' | 'perfil' | 'cuenta'
 type PredictionMode = 'pending' | 'mine'
 type InvoiceEntryMode = 'scan' | 'manual'
@@ -86,10 +86,6 @@ interface AuthResponse {
   user: User
   message?: string
   requires_registration_completion?: boolean
-}
-
-interface GenericMessageResponse {
-  message: string
 }
 
 interface ParticipantBrand {
@@ -164,8 +160,6 @@ const VIEW_DEMO_TARGETS: Record<MainView, string> = {
   reglas: 'demo-view-reglas',
   cuenta: 'demo-view-cuenta',
 }
-
-const ALL_GROUPS_KEY = '__all__'
 
 function useTimedFeedback(initialValue: string | null = null): [string | null, (value: string | null) => void] {
   const [value, setValue] = useState<string | null>(initialValue)
@@ -319,7 +313,7 @@ function buildInvoiceCameraScanConfig() {
   return {
     fps: 15,
     qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-      // QR denso necesita el mayor Ã¡rea posible en pÃ­xeles
+      // QR denso necesita el mayor área posible en píxeles
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
       const targetSize = Math.floor(minEdge * 0.92)
       return {
@@ -354,8 +348,8 @@ async function applyAutofocusToActiveStream() {
   }
 }
 
-// Scanner nativo usando BarcodeDetector a resoluciÃ³n completa (sin crop/escala).
-// Detecta QR densos que html5-qrcode no puede leer porque trabaja a resoluciÃ³n visual.
+// Scanner nativo usando BarcodeDetector a resolución completa (sin crop/escala).
+// Detecta QR densos que html5-qrcode no puede leer porque trabaja a resolución visual.
 async function startNativeBarcodeScanner(
   elementId: string,
   formats: string[],
@@ -373,7 +367,7 @@ async function startNativeBarcodeScanner(
   container.innerHTML = ''
   container.appendChild(video)
 
-  // Intentar primero con alta resoluciÃ³n; si el dispositivo rechaza, reintentar sin constraints de res.
+  // Intentar primero con alta resolución; si el dispositivo rechaza, reintentar sin constraints de res.
   let stream: MediaStream
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -416,8 +410,8 @@ async function startNativeBarcodeScanner(
       }
       let bitmap: ImageBitmap | null = null
       try {
-        // createImageBitmap captura el frame a la resoluciÃ³n real de la cÃ¡mara (no la visual del elemento).
-        // detect(video) en Chrome Android usa la resoluciÃ³n de renderizado CSS, que puede ser mucho menor.
+        // createImageBitmap captura el frame a la resolución real de la cámara (no la visual del elemento).
+        // detect(video) en Chrome Android usa la resolución de renderizado CSS, que puede ser mucho menor.
         bitmap = await createImageBitmap(video)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const codes: any[] = await detector.detect(bitmap)
@@ -674,7 +668,7 @@ function extractInvoiceCufeFromOcrText(value: string) {
   const normalizedText = value
     .toUpperCase()
     .replace(/[|]/g, 'I')
-    .replace(/[â€œâ€"]/g, '')
+    .replace(/[“”"]/g, '')
     .replace(/\r/g, '\n')
 
   const cufeIndex = normalizedText.indexOf('CUFE')
@@ -995,113 +989,113 @@ function currentViewFromPath(pathname: string): MainView {
   return 'cancha'
 }
 
-const OFFICIAL_TERMS_TEXT = `TÃ‰RMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
+const OFFICIAL_TERMS_TEXT = `TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 
 1. GENERALIDADES DEL CONCURSO
-La promociÃ³n comercial denominada "PRONOSTICA EL MUNDIAL Y GANA" es organizada por Super Carnes y tendrÃ¡ vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
-Super Carnes podrÃ¡ modificar la vigencia por razones operativas, tÃ©cnicas, regulatorias o de fuerza mayor, previa comunicaciÃ³n al pÃºblico participante.
+La promoción comercial denominada "PRONOSTICA EL MUNDIAL Y GANA" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
+Super Carnes podrá modificar la vigencia por razones operativas, técnicas, regulatorias o de fuerza mayor, previa comunicación al público participante.
 
 2. ELEGIBILIDAD
-PodrÃ¡n participar Ãºnicamente personas naturales mayores de 18 aÃ±os, residentes en la RepÃºblica de PanamÃ¡, portadoras de cÃ©dula de identidad personal o pasaporte vigente, que completen correctamente el proceso de registro.
-No podrÃ¡n participar colaboradores directos de Super Carnes, personas vinculadas directa o indirectamente con la organizaciÃ³n, administraciÃ³n o auditorÃ­a de la promociÃ³n, ni sus familiares dentro del cuarto grado de consanguinidad y segundo de afinidad.
+Podrán participar únicamente personas naturales mayores de 18 años, residentes en la República de Panamá, portadoras de cédula de identidad personal o pasaporte vigente, que completen correctamente el proceso de registro.
+No podrán participar colaboradores directos de Super Carnes, personas vinculadas directa o indirectamente con la organización, administración o auditoría de la promoción, ni sus familiares dentro del cuarto grado de consanguinidad y segundo de afinidad.
 
-3. MECÃNICA DE PARTICIPACIÃ“N
-La promociÃ³n premia el conocimiento y habilidad de los participantes respecto a los resultados deportivos de los partidos habilitados en la plataforma oficial.
-La primera ronda de pronÃ³sticos estarÃ¡ habilitada desde el 4 de junio de 2026 hasta el 10 de junio de 2026 a las 11:59 p. m.
-La segunda ronda de pronÃ³sticos estarÃ¡ habilitada desde el 28 de junio de 2026 hasta el 29 de junio de 2026, una vez definidos los clasificados al cierre de la fase de grupos del 27 de junio de 2026.
-Cada participante deberÃ¡ completar correctamente su registro en la plataforma oficial con nombre, documento, correo y telÃ©fono, ademÃ¡s de registrar sus pronÃ³sticos dentro de las fechas habilitadas para cada ronda.
+3. MECÁNICA DE PARTICIPACIÓN
+La promoción premia el conocimiento y habilidad de los participantes respecto a los resultados deportivos de los partidos habilitados en la plataforma oficial.
+La primera ronda de pronósticos estará habilitada desde el 4 de junio de 2026 hasta el 10 de junio de 2026 a las 11:59 p. m.
+La segunda ronda de pronósticos estará habilitada desde el 28 de junio de 2026 hasta el 29 de junio de 2026, una vez definidos los clasificados al cierre de la fase de grupos del 27 de junio de 2026.
+Cada participante deberá completar correctamente su registro en la plataforma oficial con nombre, documento, correo y teléfono, además de registrar sus pronósticos dentro de las fechas habilitadas para cada ronda.
 
 4. NATURALEZA DEL CONCURSO
-La promociÃ³n constituye un concurso basado en habilidad, conocimiento, anÃ¡lisis y destreza deportiva. La asignaciÃ³n de premios se determina exclusivamente conforme al sistema de puntuaciÃ³n establecido en estos tÃ©rminos y condiciones.
+La promoción constituye un concurso basado en habilidad, conocimiento, análisis y destreza deportiva. La asignación de premios se determina exclusivamente conforme al sistema de puntuación establecido en estos términos y condiciones.
 
-5. SISTEMA DE PUNTUACIÃ“N
-Los participantes acumularÃ¡n puntos conforme a la precisiÃ³n de sus pronÃ³sticos en los partidos habilitados en cada ronda:
+5. SISTEMA DE PUNTUACIÓN
+Los participantes acumularán puntos conforme a la precisión de sus pronósticos en los partidos habilitados en cada ronda:
 1 punto: Por acertar la victoria del equipo Favorito.
-2 puntos: Por acertar que el partido finalizarÃ¡ en empate.
+2 puntos: Por acertar que el partido finalizará en empate.
 3 puntos: Por acertar la victoria del equipo No Favorito.
 3 puntos adicionales: Por acertar el marcador exacto.
-Para efectos exclusivos de la promociÃ³n, se considerarÃ¡ Favorito al equipo que ocupe la mejor posiciÃ³n en el Ranking Mundial Masculino de la FIFA vigente al inicio de la promociÃ³n.
-1 punto adicional por compras: Por ingresar en la plataforma el CUFE de una factura de compra realizada en Super Carnes por un monto mayor a USD 25.00, sin incluir ITBMS. La factura debe haber sido emitida el mismo dÃ­a del registro o el dÃ­a calendario inmediatamente anterior.
+Para efectos exclusivos de la promoción, se considerará Favorito al equipo que ocupe la mejor posición en el Ranking Mundial Masculino de la FIFA vigente al inicio de la promoción.
+1 punto adicional por compras: Por ingresar en la plataforma el CUFE de una factura de compra realizada en Super Carnes por un monto mayor a USD 25.00, sin incluir ITBMS. La factura debe haber sido emitida el mismo día del registro o el día calendario inmediatamente anterior.
 
 6. PREMIOS
-Los premios de cada ronda se otorgarÃ¡n de manera independiente.
-Primera ronda: los participantes ubicados entre las posiciones 1 y 10 de la tabla de puntuaciÃ³n recibirÃ¡n 1 televisor nuevo de 50 pulgadas cada uno.
-Primera ronda: los participantes ubicados entre las posiciones 11 y 110 de la tabla de puntuaciÃ³n recibirÃ¡n 1 balÃ³n original cada uno.
-Segunda ronda: los 20 participantes con mayor cantidad de puntos recibirÃ¡n 1 tarjeta de regalo para compras en Super Carnes por USD 200.00 cada uno.
+Los premios de cada ronda se otorgarán de manera independiente.
+Primera ronda: los participantes ubicados entre las posiciones 1 y 10 de la tabla de puntuación recibirán 1 televisor nuevo de 50 pulgadas cada uno.
+Primera ronda: los participantes ubicados entre las posiciones 11 y 110 de la tabla de puntuación recibirán 1 balón original cada uno.
+Segunda ronda: los 20 participantes con mayor cantidad de puntos recibirán 1 tarjeta de regalo para compras en Super Carnes por USD 200.00 cada uno.
 Los premios no son transferibles ni canjeables por dinero en efectivo.
 
 7. CRITERIOS DE DESEMPATE
-En caso de empate, se aplicarÃ¡n en este orden: mayor cantidad de marcadores exactos acertados, mayor cantidad de facturas vÃ¡lidas registradas, mayor monto acumulado en compras vÃ¡lidas, mayor aproximaciÃ³n al total de goles anotados en la primera ronda y fecha y hora de registro mÃ¡s temprana.
+En caso de empate, se aplicarán en este orden: mayor cantidad de marcadores exactos acertados, mayor cantidad de facturas válidas registradas, mayor monto acumulado en compras válidas, mayor aproximación al total de goles anotados en la primera ronda y fecha y hora de registro más temprana.
 
-8. NOTIFICACIÃ“N Y ENTREGA DEL PREMIO
-Los ganadores oficiales de cada ronda serÃ¡n anunciados dentro de los cinco dÃ­as calendario siguientes al cierre de la ronda correspondiente a travÃ©s de las redes sociales oficiales de Super Carnes.
-Los ganadores serÃ¡n contactados vÃ­a correo electrÃ³nico y llamada telefÃ³nica. Si un potencial ganador no responde a los intentos de contacto dentro de los cinco dÃ­as calendario siguientes al primer intento, perderÃ¡ el derecho al premio y Super Carnes podrÃ¡ adjudicarlo al siguiente participante en la tabla de posiciones.
+8. NOTIFICACIÓN Y ENTREGA DEL PREMIO
+Los ganadores oficiales de cada ronda serán anunciados dentro de los cinco días calendario siguientes al cierre de la ronda correspondiente a través de las redes sociales oficiales de Super Carnes.
+Los ganadores serán contactados vía correo electrónico y llamada telefónica. Si un potencial ganador no responde a los intentos de contacto dentro de los cinco días calendario siguientes al primer intento, perderá el derecho al premio y Super Carnes podrá adjudicarlo al siguiente participante en la tabla de posiciones.
 
-9. PROTECCIÃ“N DE DATOS Y ACEPTACIÃ“N
-Al registrarse, el participante acepta estos tÃ©rminos y condiciones, y autoriza a Super Carnes al uso de sus datos personales exclusivamente para fines de este concurso y contacto comercial, en cumplimiento de las leyes de protecciÃ³n de datos vigentes.
+9. PROTECCIÓN DE DATOS Y ACEPTACIÓN
+Al registrarse, el participante acepta estos términos y condiciones, y autoriza a Super Carnes al uso de sus datos personales exclusivamente para fines de este concurso y contacto comercial, en cumplimiento de las leyes de protección de datos vigentes.
 
-8. VALIDACIÃ“N DE FACTURAS (CUFE)
-Toda factura ingresada para obtener puntos adicionales o para ser utilizada como criterio de desempate serÃ¡ verificada estrictamente contra el sistema de la DirecciÃ³n General de Ingresos (DGI). Solo serÃ¡n vÃ¡lidos los CÃ³digos Ãšnicos de FacturaciÃ³n ElectrÃ³nica (CUFE) legÃ­timos, que no hayan sido registrados previamente por otro participante, y que cumplan con los montos y fechas estipuladas. El intento de registro de un CUFE falso, alterado o perteneciente a otra persona resultarÃ¡ en la descalificaciÃ³n inmediata del participante.`
+8. VALIDACIÓN DE FACTURAS (CUFE)
+Toda factura ingresada para obtener puntos adicionales o para ser utilizada como criterio de desempate será verificada estrictamente contra el sistema de la Dirección General de Ingresos (DGI). Solo serán válidos los Códigos Únicos de Facturación Electrónica (CUFE) legítimos, que no hayan sido registrados previamente por otro participante, y que cumplan con los montos y fechas estipuladas. El intento de registro de un CUFE falso, alterado o perteneciente a otra persona resultará en la descalificación inmediata del participante.`
 
-const OFFICIAL_TERMS_TEXT_V2 = `TÃ‰RMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
+const OFFICIAL_TERMS_TEXT_V2 = `TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 
 1. GENERALIDADES DEL CONCURSO
-La promociÃ³n comercial denominada "PRONOSTICA EL MUNDIAL Y GANA" es organizada por Super Carnes y tendrÃ¡ vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
-Super Carnes podrÃ¡ modificar la vigencia por razones operativas, tÃ©cnicas, regulatorias o de fuerza mayor, previa comunicaciÃ³n al pÃºblico participante.
+La promoción comercial denominada "PRONOSTICA EL MUNDIAL Y GANA" es organizada por Super Carnes y tendrá vigencia desde el 4 de junio de 2026 hasta el 29 de junio de 2026.
+Super Carnes podrá modificar la vigencia por razones operativas, técnicas, regulatorias o de fuerza mayor, previa comunicación al público participante.
 
 2. ELEGIBILIDAD
-PodrÃ¡n participar Ãºnicamente personas naturales mayores de 18 aÃ±os, residentes en la RepÃºblica de PanamÃ¡, portadoras de cÃ©dula de identidad personal o pasaporte vigente, que completen correctamente el proceso de registro.
-No podrÃ¡n participar colaboradores directos de Super Carnes, personas vinculadas directa o indirectamente con la organizaciÃ³n, administraciÃ³n o auditorÃ­a de la promociÃ³n, ni sus familiares dentro del cuarto grado de consanguinidad y segundo de afinidad.
+Podrán participar únicamente personas naturales mayores de 18 años, residentes en la República de Panamá, portadoras de cédula de identidad personal o pasaporte vigente, que completen correctamente el proceso de registro.
+No podrán participar colaboradores directos de Super Carnes, personas vinculadas directa o indirectamente con la organización, administración o auditoría de la promoción, ni sus familiares dentro del cuarto grado de consanguinidad y segundo de afinidad.
 
-3. MECÃNICA DE PARTICIPACIÃ“N
-La promociÃ³n premia el conocimiento y habilidad de los participantes respecto a los resultados deportivos de los partidos habilitados en la plataforma oficial.
-La primera ronda de pronÃ³sticos estarÃ¡ habilitada desde el 4 de junio de 2026 hasta el 10 de junio de 2026 a las 11:59 p. m.
-La segunda ronda de pronÃ³sticos estarÃ¡ habilitada desde el 28 de junio de 2026 hasta el 29 de junio de 2026, una vez definidos los clasificados al cierre de la fase de grupos del 27 de junio de 2026.
-Cada participante deberÃ¡ completar correctamente su registro en la plataforma oficial con nombre, documento, correo y telÃ©fono, ademÃ¡s de registrar sus pronÃ³sticos dentro de las fechas habilitadas para cada ronda.
+3. MECÁNICA DE PARTICIPACIÓN
+La promoción premia el conocimiento y habilidad de los participantes respecto a los resultados deportivos de los partidos habilitados en la plataforma oficial.
+La primera ronda de pronósticos estará habilitada desde el 4 de junio de 2026 hasta el 10 de junio de 2026 a las 11:59 p. m.
+La segunda ronda de pronósticos estará habilitada desde el 28 de junio de 2026 hasta el 29 de junio de 2026, una vez definidos los clasificados al cierre de la fase de grupos del 27 de junio de 2026.
+Cada participante deberá completar correctamente su registro en la plataforma oficial con nombre, documento, correo y teléfono, además de registrar sus pronósticos dentro de las fechas habilitadas para cada ronda.
 
 4. NATURALEZA DEL CONCURSO
-La promociÃ³n constituye un concurso basado en habilidad, conocimiento, anÃ¡lisis y destreza deportiva. La asignaciÃ³n de premios se determina exclusivamente conforme al sistema de puntuaciÃ³n establecido en estos tÃ©rminos y condiciones.
+La promoción constituye un concurso basado en habilidad, conocimiento, análisis y destreza deportiva. La asignación de premios se determina exclusivamente conforme al sistema de puntuación establecido en estos términos y condiciones.
 
-5. SISTEMA DE PUNTUACIÃ“N
-Los participantes acumularÃ¡n puntos conforme a la precisiÃ³n de sus pronÃ³sticos en los partidos habilitados en cada ronda:
+5. SISTEMA DE PUNTUACIÓN
+Los participantes acumularán puntos conforme a la precisión de sus pronósticos en los partidos habilitados en cada ronda:
 - 1 punto por acertar la victoria del equipo Favorito.
-- 2 puntos por acertar que el partido finalizarÃ¡ en empate.
+- 2 puntos por acertar que el partido finalizará en empate.
 - 3 puntos por acertar la victoria del equipo No Favorito.
 - 3 puntos adicionales por acertar el marcador exacto.
-Para efectos exclusivos de la promociÃ³n, se considerarÃ¡ Favorito al equipo que ocupe la mejor posiciÃ³n en el Ranking Mundial Masculino de la FIFA vigente al inicio de la promociÃ³n.
-AdemÃ¡s, el participante podrÃ¡ acumular 1 punto adicional por cada factura vÃ¡lida registrada en la plataforma, siempre que la compra sea en Super Carnes, supere USD 25.00 sin ITBMS, que la factura haya sido emitida el mismo dÃ­a del registro o el dÃ­a calendario inmediatamente anterior, y que el CUFE sea vÃ¡lido.
+Para efectos exclusivos de la promoción, se considerará Favorito al equipo que ocupe la mejor posición en el Ranking Mundial Masculino de la FIFA vigente al inicio de la promoción.
+Además, el participante podrá acumular 1 punto adicional por cada factura válida registrada en la plataforma, siempre que la compra sea en Super Carnes, supere USD 25.00 sin ITBMS, que la factura haya sido emitida el mismo día del registro o el día calendario inmediatamente anterior, y que el CUFE sea válido.
 
-6. VALIDACIÃ“N DE FACTURAS
-Todas las facturas registradas serÃ¡n verificadas contra el sistema de la DirecciÃ³n General de Ingresos (DGI). Solo serÃ¡n vÃ¡lidas las facturas legÃ­timas, con CUFE verificable, no registradas previamente y que cumplan con los montos y fechas requeridas.
-El intento de usar facturas falsas, alteradas, duplicadas o pertenecientes a terceros constituye causal inmediata de descalificaciÃ³n.
+6. VALIDACIÓN DE FACTURAS
+Todas las facturas registradas serán verificadas contra el sistema de la Dirección General de Ingresos (DGI). Solo serán válidas las facturas legítimas, con CUFE verificable, no registradas previamente y que cumplan con los montos y fechas requeridas.
+El intento de usar facturas falsas, alteradas, duplicadas o pertenecientes a terceros constituye causal inmediata de descalificación.
 
 7. PREMIOS
-Los premios de cada ronda se otorgarÃ¡n de manera independiente.
-Al finalizar la primera ronda, los participantes ubicados entre las posiciones 1 y 10 de la tabla de puntuaciÃ³n recibirÃ¡n 1 televisor nuevo de 50 pulgadas cada uno.
-Al finalizar la primera ronda, los participantes ubicados entre las posiciones 11 y 110 de la tabla de puntuaciÃ³n recibirÃ¡n 1 balÃ³n original cada uno.
-Al finalizar la segunda ronda, los 20 participantes con mayor cantidad de puntos recibirÃ¡n 1 tarjeta de regalo para compras en Super Carnes por USD 200.00 cada uno.
-Los premios no son transferibles, no son canjeables por dinero en efectivo y no podrÃ¡n ser sustituidos por otros bienes o servicios. Los ganadores podrÃ¡n reclamar su premio dentro de los cinco dÃ­as calendario posteriores al anuncio oficial de la ronda correspondiente, presentando su documento de identidad.
+Los premios de cada ronda se otorgarán de manera independiente.
+Al finalizar la primera ronda, los participantes ubicados entre las posiciones 1 y 10 de la tabla de puntuación recibirán 1 televisor nuevo de 50 pulgadas cada uno.
+Al finalizar la primera ronda, los participantes ubicados entre las posiciones 11 y 110 de la tabla de puntuación recibirán 1 balón original cada uno.
+Al finalizar la segunda ronda, los 20 participantes con mayor cantidad de puntos recibirán 1 tarjeta de regalo para compras en Super Carnes por USD 200.00 cada uno.
+Los premios no son transferibles, no son canjeables por dinero en efectivo y no podrán ser sustituidos por otros bienes o servicios. Los ganadores podrán reclamar su premio dentro de los cinco días calendario posteriores al anuncio oficial de la ronda correspondiente, presentando su documento de identidad.
 
 8. CRITERIOS DE DESEMPATE
-En caso de empate, se aplicarÃ¡n sucesivamente estos criterios:
+En caso de empate, se aplicarán sucesivamente estos criterios:
 1. Mayor cantidad de marcadores exactos acertados.
-2. Mayor cantidad de facturas vÃ¡lidas registradas.
-3. Mayor monto acumulado en compras vÃ¡lidas.
-4. Mayor aproximaciÃ³n al total de goles anotados en la primera ronda, aplicable solo para desempates de la primera ronda.
-5. Fecha y hora de registro mÃ¡s temprana en el sistema oficial de la plataforma.
+2. Mayor cantidad de facturas válidas registradas.
+3. Mayor monto acumulado en compras válidas.
+4. Mayor aproximación al total de goles anotados en la primera ronda, aplicable solo para desempates de la primera ronda.
+5. Fecha y hora de registro más temprana en el sistema oficial de la plataforma.
 
-9. NOTIFICACIÃ“N Y ENTREGA DE PREMIOS
-Los ganadores oficiales de cada ronda serÃ¡n anunciados dentro de los cinco dÃ­as calendario siguientes al cierre de la ronda correspondiente, a travÃ©s de las redes sociales oficiales de Super Carnes.
-AdemÃ¡s, serÃ¡n contactados vÃ­a telefÃ³nica y/o correo electrÃ³nico. Si un ganador potencial no responde dentro de los cinco dÃ­as calendario siguientes al primer intento de contacto, perderÃ¡ el derecho al premio y Super Carnes podrÃ¡ adjudicarlo al siguiente participante con mayor puntuaciÃ³n.
+9. NOTIFICACIÓN Y ENTREGA DE PREMIOS
+Los ganadores oficiales de cada ronda serán anunciados dentro de los cinco días calendario siguientes al cierre de la ronda correspondiente, a través de las redes sociales oficiales de Super Carnes.
+Además, serán contactados vía telefónica y/o correo electrónico. Si un ganador potencial no responde dentro de los cinco días calendario siguientes al primer intento de contacto, perderá el derecho al premio y Super Carnes podrá adjudicarlo al siguiente participante con mayor puntuación.
 
-10. DESCALIFICACIÃ“N
-Super Carnes podrÃ¡ descalificar inmediatamente a cualquier participante que incumpla estos tÃ©rminos y condiciones, proporcione informaciÃ³n falsa o incompleta, intente manipular la plataforma o el sistema de puntuaciÃ³n, registre facturas fraudulentas o pertenecientes a terceros, o realice actos que afecten la transparencia o integridad de la promociÃ³n.
+10. DESCALIFICACIÓN
+Super Carnes podrá descalificar inmediatamente a cualquier participante que incumpla estos términos y condiciones, proporcione información falsa o incompleta, intente manipular la plataforma o el sistema de puntuación, registre facturas fraudulentas o pertenecientes a terceros, o realice actos que afecten la transparencia o integridad de la promoción.
 
-11. PROTECCIÃ“N DE DATOS PERSONALES
-Los datos personales suministrados serÃ¡n utilizados exclusivamente para la administraciÃ³n, desarrollo y ejecuciÃ³n de la promociÃ³n, asÃ­ como para la validaciÃ³n de identidad y entrega de premios, de conformidad con la Ley 81 de 2019 y demÃ¡s normas aplicables de la RepÃºblica de PanamÃ¡.
+11. PROTECCIÓN DE DATOS PERSONALES
+Los datos personales suministrados serán utilizados exclusivamente para la administración, desarrollo y ejecución de la promoción, así como para la validación de identidad y entrega de premios, de conformidad con la Ley 81 de 2019 y demás normas aplicables de la República de Panamá.
 
-12. ACEPTACIÃ“N DE LOS TÃ‰RMINOS Y CONDICIONES
-La participaciÃ³n en la promociÃ³n implica el conocimiento, aceptaciÃ³n plena e incondicional de los presentes tÃ©rminos y condiciones.`
+12. ACEPTACIÓN DE LOS TÉRMINOS Y CONDICIONES
+La participación en la promoción implica el conocimiento, aceptación plena e incondicional de los presentes términos y condiciones.`
 
 function normalizeBrandColor(prop: string, value: string) {
   const normalized = value.trim().toLowerCase()
@@ -1171,11 +1165,6 @@ export function App() {
   const [loading, setLoading] = useState(false)
   const [authBootstrapping, setAuthBootstrapping] = useState<boolean>(Boolean(localStorage.getItem(TOKEN_KEY)))
   const [registerStep, setRegisterStep] = useState(1)
-  const [resetPasswordEmail, setResetPasswordEmail] = useState('')
-  const [resetPasswordToken, setResetPasswordToken] = useState('')
-  const [resetPassword, setResetPassword] = useState('')
-  const [resetPasswordConfirmation, setResetPasswordConfirmation] = useState('')
-  const [newsletterEmail, setNewsletterEmail] = useState('')
   const [, setAuthBgVideoId] = useState(DEFAULT_AUTH_BG_YOUTUBE_ID)
   const [authLogoUrl, setAuthLogoUrl] = useState(DEFAULT_AUTH_LOGO_URL)
   const [headerLogoUrl, setHeaderLogoUrl] = useState('')
@@ -1187,6 +1176,7 @@ export function App() {
   const [recaptchaScriptReady, setRecaptchaScriptReady] = useState(false)
   const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false)
   const [googleClientId, setGoogleClientId] = useState(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '')
+  const [registrationDeadline, setRegistrationDeadline] = useState('2026-06-10T23:59:59-05:00')
   const [showScannerDebug, setShowScannerDebug] = useState(false)
   const [, setShowAuthTicker] = useState(true)
   const [contactInfo, setContactInfo] = useState<{ contact_email?: string; contact_phone?: string; contact_address?: string; contact_hours?: string }>({})
@@ -1204,7 +1194,6 @@ export function App() {
   const recaptchaResolveRef = useRef<((token: string) => void) | null>(null)
   const recaptchaRejectRef = useRef<((reason?: unknown) => void) | null>(null)
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
-  const authHeroRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
   const mobileUserSidebarRef = useRef<HTMLDivElement | null>(null)
   const [authForm, setAuthForm] = useState<AuthFormState>(EMPTY_AUTH_FORM)
@@ -1213,10 +1202,8 @@ export function App() {
   const [registrationAvatarPreview, setRegistrationAvatarPreview] = useState<string | null>(null)
   const currentView = currentViewFromPath(location.pathname)
   const isAuthRoute = location.pathname === '/login'
-  const authSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
-  const resetPasswordTokenFromUrl = authSearchParams.get('token') ?? ''
-  const newsletterTokenFromUrl = authSearchParams.get('newsletter_token') ?? ''
   const isPublicPage = ['/terminos', '/privacidad', '/contacto'].includes(location.pathname)
+  const isRegistrationClosed = new Date() > new Date(registrationDeadline)
   const isCompletingGoogleRegistration = Boolean(token && user && !isRegistrationComplete(user))
   const totalRegisterSteps = isCompletingGoogleRegistration ? 4 : 5
   const currentViewLabel = CLIENT_VIEW_LABELS[currentView]
@@ -1341,6 +1328,7 @@ export function App() {
         setGoogleAuthEnabled(Boolean(res.data.allow_google_auth))
         if (res.data.google_client_id?.trim()) setGoogleClientId(res.data.google_client_id)
         setParticipantBrands(parseParticipantBrands(res.data.participant_brands))
+        if (res.data.registration_deadline) setRegistrationDeadline(res.data.registration_deadline)
         applyTheme({
           '--background':       res.data.theme_background,
           '--surface-low':      res.data.theme_surface_low,
@@ -1594,11 +1582,7 @@ export function App() {
   useEffect(() => {
     if (authBootstrapping) return
     if (isPublicPage) return
-    if (isAuthRoute && resetPasswordTokenFromUrl) {
-      setAuthMode('reset-password')
-      setResetPasswordToken(resetPasswordTokenFromUrl)
-      return
-    }
+    if (isRegistrationClosed && authMode === 'register') setAuthMode('login')
     const isKnownClientRoute = Object.values(CLIENT_VIEW_PATHS).includes(location.pathname)
     const registrationIsComplete = isRegistrationComplete(user)
 
@@ -1624,22 +1608,7 @@ export function App() {
     if (user && !isKnownClientRoute) {
       navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
     }
-  }, [authBootstrapping, authMode, isAuthRoute, location.pathname, navigate, resetPasswordTokenFromUrl, token, user])
-
-  useEffect(() => {
-    if (!isAuthRoute || !newsletterTokenFromUrl) return
-
-    void (async () => {
-      try {
-        const response = await api.post<GenericMessageResponse>('/newsletter/confirm', {
-          token: newsletterTokenFromUrl,
-        })
-        setMessage(response.data.message ?? 'Tu suscripción al newsletter quedó confirmada.')
-      } catch {
-        setMessage('No pudimos confirmar tu suscripción. Solicita un nuevo enlace.')
-      }
-    })()
-  }, [isAuthRoute, newsletterTokenFromUrl])
+  }, [authBootstrapping, isAuthRoute, location.pathname, navigate, token, user])
 
   useEffect(() => {
     if (currentView !== 'cuenta') return
@@ -1769,53 +1738,6 @@ export function App() {
       isMounted = false
     }
   }, [])
-
-  useEffect(() => {
-    const hero = authHeroRef.current
-    if (!hero || user || !isAuthRoute) return
-
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const coarsePointer = window.matchMedia('(pointer: coarse)')
-    if (reduceMotion.matches || coarsePointer.matches || window.innerWidth < 1024) return
-
-    const layers = Array.from(hero.querySelectorAll<HTMLElement>('[data-auth-parallax]'))
-    if (!layers.length) return
-
-    let frameId = 0
-
-    const applyOffset = (clientX: number) => {
-      const bounds = hero.getBoundingClientRect()
-      const relativeX = (clientX - bounds.left) / Math.max(bounds.width, 1)
-      const normalizedX = Math.max(-1, Math.min(1, (relativeX - 0.5) * 2))
-
-      layers.forEach((layer) => {
-        const amount = Number(layer.dataset.authParallax ?? 0)
-        layer.style.transform = `translate3d(${normalizedX * amount}px, 0, 0)`
-      })
-    }
-
-    const handleMouseMove = (event: MouseEvent) => {
-      if (frameId) window.cancelAnimationFrame(frameId)
-      frameId = window.requestAnimationFrame(() => applyOffset(event.clientX))
-    }
-
-    const resetLayers = () => {
-      if (frameId) window.cancelAnimationFrame(frameId)
-      layers.forEach((layer) => {
-        layer.style.transform = 'translate3d(0px, 0, 0)'
-      })
-    }
-
-    hero.addEventListener('mousemove', handleMouseMove)
-    hero.addEventListener('mouseleave', resetLayers)
-
-    return () => {
-      if (frameId) window.cancelAnimationFrame(frameId)
-      hero.removeEventListener('mousemove', handleMouseMove)
-      hero.removeEventListener('mouseleave', resetLayers)
-      resetLayers()
-    }
-  }, [isAuthRoute, user])
 
   async function stopInvoiceScanner() {
     const activeScanner = invoiceScannerRef.current
@@ -2123,18 +2045,12 @@ export function App() {
       return
     }
 
-    setSelectedGroupLabel((current) => {
-      if (current === ALL_GROUPS_KEY) return ALL_GROUPS_KEY
-      return current && availableKeys.includes(current) ? current : ALL_GROUPS_KEY
-    })
+    setSelectedGroupLabel((current) => (current && availableKeys.includes(current) ? current : availableKeys[0]))
   }, [groupSummaries])
 
   const visibleMatches = useMemo(() => {
     const phaseName = activePredictionPhase?.name ?? null
-    const selectedGroupMatches =
-      selectedGroupLabel === ALL_GROUPS_KEY
-        ? activePhaseMatches
-        : activePhaseMatches.filter((match) => matchBucket(match, phaseName).key === selectedGroupLabel)
+    const selectedGroupMatches = activePhaseMatches.filter((match) => matchBucket(match, phaseName).key === selectedGroupLabel)
 
     if (predictionMode === 'mine') {
       return selectedGroupMatches.filter((match) => predictionMap.has(match.id))
@@ -2144,25 +2060,8 @@ export function App() {
   }, [activePhaseMatches, activePredictionPhase, predictionMap, predictionMode, selectedGroupLabel])
 
   const selectedGroupSummary = useMemo(
-    () => {
-      if (selectedGroupLabel === ALL_GROUPS_KEY) {
-        const total = activePhaseMatches.length
-        const completed = activePhaseMatches.filter((match) => predictionMap.has(match.id)).length
-        const pending = Math.max(total - completed, 0)
-
-        return {
-          groupLabel: ALL_GROUPS_KEY,
-          displayLabel: 'Todos los grupos',
-          total,
-          completed,
-          pending,
-          isComplete: total > 0 && pending === 0,
-        }
-      }
-
-      return groupSummaries.find((summary) => summary.groupLabel === selectedGroupLabel) ?? null
-    },
-    [activePhaseMatches, groupSummaries, predictionMap, selectedGroupLabel],
+    () => groupSummaries.find((summary) => summary.groupLabel === selectedGroupLabel) ?? null,
+    [groupSummaries, selectedGroupLabel],
   )
 
   const progress = useMemo(() => {
@@ -2316,34 +2215,6 @@ export function App() {
         return
       }
 
-      if (authMode === 'forgot-password') {
-        const response = await api.post<GenericMessageResponse>('/auth/forgot-password', {
-          email: resetPasswordEmail.trim() || authForm.email,
-        })
-        setMessage(response.data.message ?? 'Si tu correo esta en nuestra base de datos, te enviaremos un enlace para cambiar tu contraseña.')
-        return
-      }
-
-      if (authMode === 'reset-password') {
-        if (resetPassword !== resetPasswordConfirmation) {
-          setMessage('Tu solicitud fue recibida. Si todo es correcto, podrás continuar con el cambio de contraseña.')
-          return
-        }
-
-        const response = await api.post<GenericMessageResponse>('/auth/reset-password', {
-          token: resetPasswordToken,
-          email: resetPasswordEmail,
-          password: resetPassword,
-          password_confirmation: resetPasswordConfirmation,
-        })
-        setMessage(response.data.message ?? 'Tu contraseña fue actualizada correctamente.')
-        setAuthMode('login')
-        setResetPassword('')
-        setResetPasswordConfirmation('')
-        navigate('/login', { replace: true })
-        return
-      }
-
       if (authMode === 'register') {
         const documentError = validateDocumentNumber(authForm.document_type, authForm.cedula)
 
@@ -2405,10 +2276,6 @@ export function App() {
         navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
       }
     } catch (authError) {
-      if (authMode === 'forgot-password' || authMode === 'reset-password') {
-        setMessage('Si tu correo esta en nuestra base de datos, te enviaremos un enlace para cambiar tu contraseña.')
-        return
-      }
       if (
         authError instanceof Error &&
         (
@@ -2423,24 +2290,6 @@ export function App() {
       } else {
         setError(normalizeError(authError))
       }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setLoading(true)
-    setError(null)
-    setMessage(null)
-
-    try {
-      const response = await api.post<GenericMessageResponse>('/newsletter/subscribe', {
-        email: newsletterEmail || authForm.email,
-      })
-      setMessage(response.data.message ?? 'Gracias. Si tu correo es válido, recibirás novedades del newsletter.')
-    } catch (newsletterError) {
-      setMessage('Si tu correo es válido, recibirás novedades del newsletter.')
     } finally {
       setLoading(false)
     }
@@ -2597,8 +2446,8 @@ export function App() {
         ...current,
         [matchId]: {
           ...current[matchId],
-          home: current[matchId]?.home ?? '',
-          away: current[matchId]?.away ?? '',
+          home: current[matchId]?.home ?? '0',
+          away: current[matchId]?.away ?? '0',
           [side]: String(nextValue),
         },
       }
@@ -2698,10 +2547,10 @@ export function App() {
           <div className="marea-phase-header cancha-phase-header">
             <div className="marea-headline-wrap cancha-headline-wrap">
               <span className="marea-kicker">SUPER CARNES 2026</span>
-              <h1 className="cancha-headline-title auth-reference-title" aria-label="Panama juega y tu ganas">
-                <span className="auth-reference-title-line is-light">PANAMÁ</span>
-                <span className="auth-reference-title-line is-light">JUEGA Y TÚ</span>
-                <span className="auth-reference-title-line is-gold">GANAS!</span>
+              <h1 className="cancha-headline-title">
+                <span>PANAMÁ</span>
+                <span>JUEGA Y TÚ</span>
+                <span>GANAS!</span>
               </h1>
               <p>{activePredictionPhase ? `Fase activa: ${activePredictionPhase.name}` : 'Pronósticos oficiales del torneo'}</p>
             </div>
@@ -2803,9 +2652,6 @@ export function App() {
             <span>{bucketSelectorLabel}</span>
             <div className="marea-desktop-group-select-control">
               <select value={selectedGroupLabel ?? ''} onChange={(event) => setSelectedGroupLabel(event.target.value)}>
-                <option value={ALL_GROUPS_KEY}>
-                  {`Todos${groupSummaries.length ? ` - ${groupSummaries.length} grupos` : ''}`}
-                </option>
                 {groupSummaries.map((summary) => (
                   <option key={summary.groupLabel} value={summary.groupLabel}>
                     {`${summary.displayLabel}${summary.isComplete ? ' - Completado' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
@@ -2826,9 +2672,6 @@ export function App() {
           <label className="marea-mobile-group-select">
             <span>{bucketSelectorLabel}</span>
             <select value={selectedGroupLabel ?? ''} onChange={(event) => setSelectedGroupLabel(event.target.value)}>
-              <option value={ALL_GROUPS_KEY}>
-                {`Todos${groupSummaries.length ? ` - ${groupSummaries.length} grupos` : ''}`}
-              </option>
               {groupSummaries.map((summary) => (
                 <option key={summary.groupLabel} value={summary.groupLabel}>
                   {`${summary.displayLabel}${summary.isComplete ? ' - Completado' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
@@ -2845,12 +2688,12 @@ export function App() {
                 const homeTeam = match.homeTeam ?? match.home_team
                 const awayTeam = match.awayTeam ?? match.away_team
                 const favoriteTeam = getFavoriteTeam(match)
-                const draft = predictionDrafts[match.id] ?? { home: '', away: '' }
+                const draft = predictionDrafts[match.id] ?? { home: '0', away: '0' }
                 const prediction = predictionMap.get(match.id)
                 const isSaving = savingPredictionIds.includes(match.id)
                 const isReadonlyPrediction = predictionMode === 'mine' && Boolean(prediction)
-                const homeDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_home_score ?? 0) : draft.home
-                const awayDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_away_score ?? 0) : draft.away
+                const homeDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_home_score ?? 0) : (draft.home || '0')
+                const awayDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_away_score ?? 0) : (draft.away || '0')
 
                 return (
                   <article key={match.id} className={favoriteTeam ? 'marea-match-card featured cancha-match-card' : 'marea-match-card cancha-match-card'}>
@@ -2871,7 +2714,7 @@ export function App() {
                         <span className="material-symbols-outlined">workspace_premium</span>
                         <span>
                           Favorito: {favoriteTeam.name}
-                          {typeof favoriteTeam.ranking_fifa === 'number' ? ` Â· Ranking FIFA #${favoriteTeam.ranking_fifa}` : ''}
+                          {typeof favoriteTeam.ranking_fifa === 'number' ? ` · Ranking FIFA #${favoriteTeam.ranking_fifa}` : ''}
                         </span>
                       </div>
                     ) : null}
@@ -2908,7 +2751,6 @@ export function App() {
                               aria-label={`Marcador local ${homeTeam?.name ?? 'Local'}`}
                               type="text"
                               inputMode="numeric"
-                              placeholder="0"
                               value={homeDisplayScore}
                               onChange={(event) => updateScore(match.id, 'home', event.target.value)}
                             />
@@ -2935,7 +2777,6 @@ export function App() {
                               aria-label={`Marcador visitante ${awayTeam?.name ?? 'Visitante'}`}
                               type="text"
                               inputMode="numeric"
-                              placeholder="0"
                               value={awayDisplayScore}
                               onChange={(event) => updateScore(match.id, 'away', event.target.value)}
                             />
@@ -2996,7 +2837,7 @@ export function App() {
               const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
               stream.getTracks().forEach((t) => t.stop())
             } catch {
-              setInvoiceScannerError('Permiso de camara denegado. ActÃ­valo en la configuracion de tu navegador e intenta de nuevo.')
+              setInvoiceScannerError('Permiso de camara denegado. Actívalo en la configuracion de tu navegador e intenta de nuevo.')
               return
             }
           }
@@ -3035,11 +2876,11 @@ export function App() {
                 : 'bg-error/10 border-error/20 text-error'
           const scoreTone = status.tone === 'approved' ? 'text-primary-container' : status.tone === 'pending' ? 'text-secondary' : 'text-error'
           const badgeText = status.tone === 'approved' ? `+${Number(invoice.points_awarded ?? 0).toFixed(1)}` : status.tone === 'pending' ? '+0.0' : '0.0'
-          const labelText = status.tone === 'approved' ? 'GOL VÃLIDO' : status.tone === 'pending' ? 'REVISIÃ“N VAR' : 'FUERA DE JUEGO'
+          const labelText = status.tone === 'approved' ? 'GOL VÁLIDO' : status.tone === 'pending' ? 'REVISIÓN VAR' : 'FUERA DE JUEGO'
           const iconName = status.tone === 'approved' ? 'verified' : status.tone === 'pending' ? 'update' : 'dangerous'
           const title = invoice.invoice_number ? `#${invoice.invoice_number}` : `#PAN-${String(invoice.id).padStart(6, '0')}`
           const referenceDate = invoice.issued_at ?? invoice.created_at
-          const subtitle = `${referenceDate ? formatUpperDate(referenceDate) : 'Fecha pendiente'} â¬¢ ${formatCurrency(invoice.purchase_amount)}`
+          const subtitle = `${referenceDate ? formatUpperDate(referenceDate) : 'Fecha pendiente'} ⬢ ${formatCurrency(invoice.purchase_amount)}`
 
           return (
             <div
@@ -3071,7 +2912,7 @@ export function App() {
         <div className="relative w-full rounded-3xl overflow-hidden mb-gutter h-48 md:h-64 flex items-end p-6 md:p-10 border border-outline-variant">
               <div className="absolute inset-0 z-0">
                 <img
-                  alt="Estadio Rommel FernÃ¡ndez"
+                  alt="Estadio Rommel Fernández"
                   className="w-full h-full object-cover opacity-50 scale-105"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEx-hRFUMZ710fF7EatYLLO_SftyRg0ww2GvBNKWHSjPObe2Hu17fXzKDy8LOFbxMv93SOa0IWNTCINLfrcTI4Gv7Fb8T-KRHOU6iyLxekm6vci5QI1h6h-jtqFVtscsl4aPJJld2V-TOyhBaZNKlPweuhcxfvNwlUxFNiz07sFuBIttiDysG-4NIdDsaDGIygvIgQn-m1chePGiwL3D2k8IOl-CypudZp6J8U6ve38WWsbNyTIdWbQWlJlq2K7BKdk_nqv4a5KH8"
                 />
@@ -3079,7 +2920,7 @@ export function App() {
               </div>
               <div className="relative z-10">
                 <h1 className="font-display-lg text-headline-lg md:text-display-lg text-on-surface leading-none mb-2">EL ENTRENAMIENTO NACIONAL</h1>
-                <p className="text-secondary font-title-md text-title-md uppercase tracking-widest">Sube tus facturas y anota goles por PanamÃ¡</p>
+                <p className="text-secondary font-title-md text-title-md uppercase tracking-widest">Sube tus facturas y anota goles por Panamá</p>
               </div>
             </div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
@@ -3098,7 +2939,7 @@ export function App() {
                   </div>
                   <form className="flex flex-col gap-6" onSubmit={(event) => event.preventDefault()}>
                     <div className="flex flex-col gap-2">
-                      <label className="font-label-caps text-label-caps text-on-surface-variant ml-1">NÃšMERO DE FACTURA</label>
+                      <label className="font-label-caps text-label-caps text-on-surface-variant ml-1">NÚMERO DE FACTURA</label>
                       <input
                         className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-on-surface font-title-md transition-all"
                         placeholder="Ej: PAN-990234"
@@ -3123,16 +2964,16 @@ export function App() {
                         <span>ANOTAR 0.5 GOLES</span>
                         <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">sports_soccer</span>
                       </button>
-                      <p className="text-center text-body-sm text-on-surface-variant italic">Cada factura vÃ¡lida te acerca a la Copa.</p>
+                      <p className="text-center text-body-sm text-on-surface-variant italic">Cada factura válida te acerca a la Copa.</p>
                     </div>
                   </form>
                 </div>
                 <div className="bg-surface-container rounded-[1.5rem] p-6 border-l-4 border-secondary flex items-start gap-4">
                   <span className="material-symbols-outlined text-secondary text-3xl">lightbulb</span>
                   <div>
-                    <h3 className="font-title-md text-title-md text-secondary uppercase">TIP DEL CAPITÃN</h3>
+                    <h3 className="font-title-md text-title-md text-secondary uppercase">TIP DEL CAPITÁN</h3>
                     <p className="text-body-sm text-on-surface-variant">
-                      "No permitas que el VAR anule tu gol. AsegÃºrate de que el monto coincida exactamente con tu factura."
+                      "No permitas que el VAR anule tu gol. Asegúrate de que el monto coincida exactamente con tu factura."
                     </p>
                   </div>
                 </div>
@@ -3150,8 +2991,8 @@ export function App() {
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[600px]">
                     {invoiceCards ? invoiceCards : (
                       <div className="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant text-center">
-                        <div className="font-title-md text-on-surface mb-2">Sin facturas registradas todavÃ­a</div>
-                        <div className="text-body-sm text-on-surface-variant">Cuando existan registros reales del cliente, aparecerÃ¡n aquÃ­ sin datos de ejemplo.</div>
+                        <div className="font-title-md text-on-surface mb-2">Sin facturas registradas todavía</div>
+                        <div className="text-body-sm text-on-surface-variant">Cuando existan registros reales del cliente, aparecerán aquí sin datos de ejemplo.</div>
                       </div>
                     )}
                   </div>
@@ -3211,7 +3052,6 @@ export function App() {
   const currentViewDemoTarget = VIEW_DEMO_TARGETS[currentView]
   const isDemoTargetActive = (targetId: string) => demoTourStep?.targetId === targetId
   const headerBrand = <img alt="Super Carnes" src={effectiveHeaderLogo} />
-  const usesCanchaShell = currentView === 'cancha' || currentView === 'facturas'
   const topNavButton = (target: MainView) =>
     `marea-header-nav-button ${currentView === target ? 'is-active' : ''}`
 
@@ -3261,17 +3101,18 @@ export function App() {
             />
             <p>Pronostico enviado</p>
             <strong>Panama celebra tu jugada</strong>
+            <small>{predictionCelebration}</small>
           </div>
         </div>
       ) : null}
 
-      {/* Modal de TÃ©rminos y Condiciones */}
+      {/* Modal de Términos y Condiciones */}
       {termsModalOpen ? (
         <div className="terms-overlay" onClick={() => setTermsModalOpen(false)}>
           <div className="terms-modal" onClick={(e) => e.stopPropagation()}>
             <div className="terms-modal-header">
               <span className="material-symbols-outlined">gavel</span>
-              <span>TÃ©rminos y Condiciones</span>
+              <span>Términos y Condiciones</span>
               <button type="button" className="terms-modal-close" onClick={() => setTermsModalOpen(false)}>
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -3291,7 +3132,7 @@ export function App() {
               {!termsScrolledEnd ? (
                 <p className="terms-scroll-hint">
                   <span className="material-symbols-outlined">arrow_downward</span>
-                  DesplÃ¡zate hasta el final para habilitar la aceptaciÃ³n
+                  Desplázate hasta el final para habilitar la aceptación
                 </p>
               ) : null}
               <button
@@ -3303,7 +3144,7 @@ export function App() {
                   setTermsModalOpen(false)
                 }}
               >
-                {termsScrolledEnd ? 'Acepto los tÃ©rminos y condiciones' : 'Lee el documento completo primero'}
+                {termsScrolledEnd ? 'Acepto los términos y condiciones' : 'Lee el documento completo primero'}
               </button>
             </div>
           </div>
@@ -3321,7 +3162,7 @@ export function App() {
             <img alt="Logo de Super Carnes" src={authLogoUrl || AUTH_REFERENCE_ASSETS.logo} />
           </div>
           <div className="auth-reference-layout">
-            <div className="auth-hero auth-hero-reference" ref={authHeroRef}>
+            <div className="auth-hero auth-hero-reference">
               <div className="auth-hero-content auth-hero-content-reference">
                 <p className="auth-kicker auth-reference-pill">PROMOCION SUPER CARNES 2026</p>
                 <div className="auth-reference-title" aria-label="¡Panamá juega y tú ganas!">
@@ -3350,12 +3191,12 @@ export function App() {
                 </div>
               </div>
               <div className="auth-reference-characters" aria-hidden="true">
-                <img alt="" className="auth-reference-player" data-auth-parallax="14" src={AUTH_REFERENCE_ASSETS.player} />
-                <div className="auth-reference-mascot-stack" data-auth-parallax="20">
-                  <img alt="" className="auth-reference-ball" data-auth-parallax="28" src={AUTH_REFERENCE_ASSETS.ball} />
+                <img alt="" className="auth-reference-player" src={AUTH_REFERENCE_ASSETS.player} />
+                <div className="auth-reference-mascot-stack">
+                  <img alt="" className="auth-reference-ball" src={AUTH_REFERENCE_ASSETS.ball} />
                   <img alt="" className="auth-reference-mascot" src={AUTH_REFERENCE_ASSETS.mascot} />
                 </div>
-                <div className="auth-reference-badge" data-auth-parallax="10">
+                <div className="auth-reference-badge">
                   <span>¡ACIERTA</span>
                   <span>Y GANA!</span>
                 </div>
@@ -3368,12 +3209,14 @@ export function App() {
               <button className={authMode === 'login' ? 'active' : ''} type="button" onClick={() => { setAuthMode('login'); setRegisterStep(1) }}>
                 Iniciar sesión
               </button>
-              <button className={authMode === 'register' ? 'active' : ''} type="button" onClick={() => { setAuthMode('register'); setRegisterStep(1) }}>
-                Registrarse
-              </button>
+              {!isRegistrationClosed && (
+                <button className={authMode === 'register' ? 'active' : ''} type="button" onClick={() => { setAuthMode('register'); setRegisterStep(1) }}>
+                  Registrarse
+                </button>
+              )}
             </div>}
 
-            {!isCompletingGoogleRegistration && (
+            {isRegistrationClosed && !isCompletingGoogleRegistration && (
               <div style={{
                 background: 'rgba(0,122,255,0.15)',
                 border: '1px solid rgba(0,122,255,0.4)',
@@ -3387,131 +3230,21 @@ export function App() {
                 margin: '0 0 4px',
               }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '18px', flexShrink: 0 }}>lock</span>
-                <span>El registro sigue disponible. Si ya participas, inicia sesiÃ³n para ver tu posición y tus pronósticos.</span>
+                <span>El registro cerró el <strong>10 de junio de 2026</strong>. Si ya participas, inicia sesión para ver tu posición.</span>
               </div>
             )}
 
             <div className={`auth-panel-header${authMode === 'register' || isCompletingGoogleRegistration ? ' is-register' : ''}`}>
-              <p>
-                {isCompletingGoogleRegistration
-                  ? 'Registro pendiente'
-                  : authMode === 'register'
-                    ? 'Crea tu cuenta'
-                    : authMode === 'forgot-password'
-                      ? 'Recuperación segura'
-                      : authMode === 'reset-password'
-                        ? 'Nueva contraseña'
-                        : ''}
-              </p>
-              <h2>
-                {isCompletingGoogleRegistration
-                  ? 'Completa tus datos legales'
-                  : authMode === 'register'
-                    ? 'Regístrate'
-                    : authMode === 'forgot-password'
-                      ? 'Recupera tu acceso'
-                      : authMode === 'reset-password'
-                        ? 'Define tu nueva clave'
-                        : '¡Bienvenido de nuevo!'}
-              </h2>
+              <p>{isCompletingGoogleRegistration ? 'Registro pendiente' : authMode === 'login' ? '' : 'Crea tu cuenta'}</p>
+              <h2>{isCompletingGoogleRegistration ? 'Completa tus datos legales' : authMode === 'login' ? '¡Bienvenido de nuevo!' : 'Regístrate'}</h2>
               <span>
                 {isCompletingGoogleRegistration
                   ? `Tu correo de Google ya fue verificado: ${user?.email ?? authForm.email}. Solo falta completar los datos obligatorios para participar.`
-                  : authMode === 'register'
-                    ? 'Completa tus datos para participar por premios de Super Carnes.'
-                    : authMode === 'forgot-password'
-                      ? 'Te enviaremos un enlace si el correo existe en nuestra base de datos.'
-                      : authMode === 'reset-password'
-                        ? 'Usa el enlace que recibiste por correo para crear una clave nueva.'
-                        : 'Ingresa tus datos para continuar'}
+                  : authMode === 'login'
+                    ? 'Ingresa tus datos para continuar'
+                    : 'Completa tus datos para participar por premios de Super Carnes.'}
               </span>
             </div>
-
-            {authMode === 'login' ? (
-              <div className="auth-helper-links">
-                <button type="button" className="auth-helper-link" onClick={() => setAuthMode('forgot-password')}>
-                  Olvidé mi contraseña
-                </button>
-                <button type="button" className="auth-helper-link" onClick={() => setNewsletterEmail(authForm.email)}>
-                  Recibir newsletter
-                </button>
-              </div>
-            ) : null}
-
-            {authMode === 'forgot-password' ? (
-              <div className="auth-mini-card">
-                <p>Te enviaremos un correo con un enlace de un solo uso.</p>
-                <label className="auth-reference-field">
-                  <span>Correo electrónico</span>
-                  <div className="auth-reference-input">
-                    <span className="material-symbols-outlined">mail</span>
-                    <input
-                      required
-                      placeholder="ejemplo@correo.com"
-                      type="email"
-                      value={resetPasswordEmail || authForm.email}
-                      onChange={(event) => {
-                        setResetPasswordEmail(event.target.value)
-                        setAuthForm((current) => ({ ...current, email: event.target.value }))
-                      }}
-                    />
-                  </div>
-                </label>
-                <button className="auth-submit" type="submit" disabled={loading}>
-                  Enviar enlace
-                </button>
-                <button type="button" className="auth-helper-link" onClick={() => setAuthMode('login')}>
-                  Volver al inicio de sesión
-                </button>
-              </div>
-            ) : null}
-
-            {authMode === 'reset-password' ? (
-              <div className="auth-mini-card">
-                <p>Vas a cambiar tu contraseña usando el enlace recibido por correo.</p>
-                <input type="hidden" value={resetPasswordToken} readOnly />
-                <label className="auth-reference-field">
-                  <span>Correo electrónico</span>
-                  <div className="auth-reference-input">
-                    <span className="material-symbols-outlined">mail</span>
-                    <input
-                      required
-                      placeholder="ejemplo@correo.com"
-                      type="email"
-                      value={resetPasswordEmail}
-                      onChange={(event) => setResetPasswordEmail(event.target.value)}
-                    />
-                  </div>
-                </label>
-                <label className="auth-reference-field">
-                  <span>Nueva contraseña</span>
-                  <div className="auth-reference-input">
-                    <span className="material-symbols-outlined">lock</span>
-                    <input
-                      required
-                      type="password"
-                      value={resetPassword}
-                      onChange={(event) => setResetPassword(event.target.value)}
-                    />
-                  </div>
-                </label>
-                <label className="auth-reference-field">
-                  <span>Confirmar contraseña</span>
-                  <div className="auth-reference-input">
-                    <span className="material-symbols-outlined">verified_user</span>
-                    <input
-                      required
-                      type="password"
-                      value={resetPasswordConfirmation}
-                      onChange={(event) => setResetPasswordConfirmation(event.target.value)}
-                    />
-                  </div>
-                </label>
-                <button className="auth-submit" type="submit" disabled={loading}>
-                  Actualizar contraseña
-                </button>
-              </div>
-            ) : null}
 
             {isCompletingGoogleRegistration || authMode === 'register' ? (
               <>
@@ -3584,7 +3317,7 @@ export function App() {
                         Teléfono *
                         <div className="auth-phone-field">
                           <button className="auth-phone-prefix" type="button">
-                            <span className="auth-phone-prefix-badge" aria-hidden="true">PA</span>
+                            <span className="auth-phone-prefix-badge" aria-hidden="true">🇵🇦</span>
                             <span>+507</span>
                             <span className="material-symbols-outlined" aria-hidden="true">arrow_drop_down</span>
                           </button>
@@ -3621,7 +3354,7 @@ export function App() {
                           <span className="material-symbols-outlined">
                             {dt === 'cedula' ? 'id_card' : dt === 'passport' ? 'flight' : 'description'}
                           </span>
-                          {dt === 'cedula' ? 'CÃ©dula' : dt === 'passport' ? 'Pasaporte' : 'Residente'}
+                          {dt === 'cedula' ? 'Cédula' : dt === 'passport' ? 'Pasaporte' : 'Residente'}
                         </button>
                       ))}
                     </div>
@@ -3650,7 +3383,7 @@ export function App() {
                           onChange={(event) => {
                             setAuthForm({ ...authForm, birthdate: event.target.value })
                             if (event.target.value && !isAtLeast18(event.target.value)) {
-                              setError('Debes ser mayor de 18 aÃ±os para participar.')
+                              setError('Debes ser mayor de 18 años para participar.')
                             } else {
                               setError(null)
                             }
@@ -3662,14 +3395,14 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* Paso 3: PronÃ³stico + sucursal */}
+                {/* Paso 3: Pronóstico + sucursal */}
                 {registerStep === 3 ? (
                   <>
                     <div className="auth-section-label">
                       <span className="material-symbols-outlined">sports_soccer</span>
-                      <span>PronÃ³stico de desempate</span>
+                      <span>Pronóstico de desempate</span>
                     </div>
-                    <p className="auth-goal-hint">Â¿CuÃ¡ntos goles totales habrÃ¡ en la fase de grupos del Mundial 2026?</p>
+                    <p className="auth-goal-hint">¿Cuántos goles totales habrá en la fase de grupos del Mundial 2026?</p>
                     <div className="auth-goal-stepper">
                       <button
                         type="button"
@@ -3727,7 +3460,7 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* â”€â”€ Paso 4: Confirmaciones â”€â”€ */}
+                {/* ── Paso 4: Confirmaciones ── */}
                 {registerStep === 4 ? (
                   <>
                     <div className="auth-section-label">
@@ -3741,7 +3474,7 @@ export function App() {
                     >
                       <span className="material-symbols-outlined auth-toggle-card-icon">location_on</span>
                       <div className="auth-toggle-card-text">
-                        <strong>Resido en PanamÃ¡ y soy mayor de 18 aÃ±os</strong>
+                        <strong>Resido en Panamá y soy mayor de 18 años</strong>
                         <span>Obligatorio para participar</span>
                       </div>
                       <div className="auth-toggle-switch" />
@@ -3755,9 +3488,9 @@ export function App() {
                       <span className="material-symbols-outlined auth-toggle-card-icon">gavel</span>
                       <div className="auth-toggle-card-text">
                         <strong>
-                          {authForm.accepted_terms ? 'TÃ©rminos aceptados' : 'Leer y aceptar tÃ©rminos y condiciones'}
+                          {authForm.accepted_terms ? 'Términos aceptados' : 'Leer y aceptar términos y condiciones'}
                         </strong>
-                        <span>Obligatorio Â· Toca para leer el documento completo</span>
+                        <span>Obligatorio · Toca para leer el documento completo</span>
                       </div>
                       {authForm.accepted_terms
                         ? <span className="material-symbols-outlined" style={{ color: 'var(--secondary)', flexShrink: 0 }}>check_circle</span>
@@ -3767,7 +3500,7 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* â”€â”€ Paso 5: Cuenta â”€â”€ */}
+                {/* ── Paso 5: Cuenta ── */}
                 {!isCompletingGoogleRegistration && registerStep === 5 ? (
                   <div className="auth-section-label">
                     <span className="material-symbols-outlined">lock</span>
@@ -3777,7 +3510,7 @@ export function App() {
               </>
             ) : null}
 
-            {/* Campos de email/contraseÃ±a: login siempre, registro solo en paso 5 */}
+            {/* Campos de email/contraseña: login siempre, registro solo en paso 5 */}
             {!isCompletingGoogleRegistration && (authMode === 'login' || registerStep === 5) ? (
               <>
                 <label className={`auth-reference-field${authMode === 'register' && registrationStepErrors.email ? ' is-invalid' : ''}`}>
@@ -3808,7 +3541,7 @@ export function App() {
               </>
             ) : null}
 
-            {/* NavegaciÃ³n de pasos / submit */}
+            {/* Navegación de pasos / submit */}
             {isCompletingGoogleRegistration || authMode === 'register' ? (
               <div className="auth-step-nav">
                 {registerStep > 1 ? (
@@ -3834,15 +3567,15 @@ export function App() {
                         const docError = validateDocumentNumber(authForm.document_type, authForm.cedula)
                         if (docError) { setError(docError); return }
                         if (!authForm.birthdate) { setError('Debes ingresar tu fecha de nacimiento.'); return }
-                        if (!isAtLeast18(authForm.birthdate)) { setError('Debes ser mayor de 18 aÃ±os para participar.'); return }
+                        if (!isAtLeast18(authForm.birthdate)) { setError('Debes ser mayor de 18 años para participar.'); return }
                       }
                       if (registerStep === 3) {
                         if (!authForm.group_stage_goal_prediction.trim()) { setError('Debes ingresar tu pronostico de desempate.'); return }
                         if (!authForm.branch_id) { setError('Debes seleccionar tu sucursal de preferencia.'); return }
                       }
                       if (registerStep === 4) {
-                        if (!authForm.resides_in_panama) { setError('Debes confirmar que resides en PanamÃ¡.'); return }
-                        if (!authForm.accepted_terms) { setError('Debes leer y aceptar los tÃ©rminos y condiciones.'); return }
+                        if (!authForm.resides_in_panama) { setError('Debes confirmar que resides en Panamá.'); return }
+                        if (!authForm.accepted_terms) { setError('Debes leer y aceptar los términos y condiciones.'); return }
                       }
                       setRegisterStep((s) => s + 1)
                     }}
@@ -3864,33 +3597,12 @@ export function App() {
 
             <p className="auth-deadline">
               <span className="material-symbols-outlined">calendar_month</span>
-              {authMode === 'register'
-                ? `Registro hasta el ${REGISTRATION_DEADLINE}`
-                : authMode === 'forgot-password' || authMode === 'reset-password'
-                  ? 'Recuperación de acceso segura'
-                  : 'Mundialista Â· Super Carnes 2026'}
+              {authMode === 'register' ? `Registro hasta el ${REGISTRATION_DEADLINE}` : 'Mundialista · Super Carnes 2026'}
             </p>
           </form>
           </div>
-          <form className="auth-newsletter" onSubmit={handleNewsletterSubmit}>
-            <div>
-              <strong>Newsletter</strong>
-              <p>Recibe novedades y fechas importantes sin salir de esta pantalla.</p>
-            </div>
-            <div className="auth-newsletter-row">
-              <input
-                type="email"
-                placeholder="tu@correo.com"
-                value={newsletterEmail || authForm.email}
-                onChange={(event) => setNewsletterEmail(event.target.value)}
-              />
-              <button type="submit" disabled={loading}>
-                Suscribirme
-              </button>
-            </div>
-          </form>
           <div className="auth-reference-footer" aria-label="Como participar">
-            <div className="auth-reference-footer-title">¿CÓMO PARTICIPAR?</div>
+            <div className="auth-reference-footer-title">¿COMO PARTICIPAR?</div>
             <div className="auth-reference-footer-steps">
               {[
                 'Registrate gratis',
@@ -3909,7 +3621,7 @@ export function App() {
           </div>
         </section>
       ) : (
-        <div className={`client-shell bg-background text-on-background font-body-lg min-h-screen ${usesCanchaShell ? 'client-shell--cancha-reference' : ''} ${demoTourStep ? 'demo-tour-mode' : ''}`}>
+        <div className={`client-shell bg-background text-on-background font-body-lg min-h-screen ${currentView === 'cancha' ? 'client-shell--cancha-reference' : ''} ${demoTourStep ? 'demo-tour-mode' : ''}`}>
           <header className="marea-client-header marea-client-header--wide bg-background/80 backdrop-blur-xl border-b border-outline-variant bg-surface-container-lowest/90 docked full-width top-0 sticky z-50 shadow-md">
             <div className="marea-client-header-inner flex justify-between items-center px-4 md:px-margin-desktop w-full max-w-7xl mx-auto h-16">
               <div className="marea-client-header-start flex items-center gap-3">
@@ -3924,8 +3636,8 @@ export function App() {
                 <button className="marea-header-brand" type="button" onClick={() => navigateToView('cancha')} aria-label="Ir a La Cancha">
                   <span className="marea-header-brand-logo">{headerBrand}</span>
                   <span className="marea-header-brand-copy">
-                    <span className="marea-header-brand-kicker">PANAMA JUEGA</span>
-                    <strong>Y TU GANAS</strong>
+                    <span className="marea-header-brand-kicker">PROMOCION</span>
+                    <strong>SUPER CARNES 2026</strong>
                   </span>
                 </button>
               </div>
@@ -3997,7 +3709,7 @@ export function App() {
                       </button>
                       <button className="marea-header-user-item danger" role="menuitem" type="button" onClick={() => void handleLogout()}>
                         <span className="material-symbols-outlined">logout</span>
-                        <span>Cerrar sesión</span>
+                        <span>Cerrar sesion</span>
                       </button>
                     </div>
                   ) : null}
@@ -4070,7 +3782,7 @@ export function App() {
                   <div>
                     <div className="font-title-md text-title-md text-on-surface leading-tight">{playerName}</div>
                     <div className="font-label-caps text-label-caps text-primary-container">
-                      {sidebarIdentityLabel}
+                      Cedula: {sidebarIdentityLabel}
                     </div>
                   </div>
                 </div>
@@ -4108,7 +3820,7 @@ export function App() {
                 </button>
                 <button className="flex items-center gap-4 text-primary-container p-3 mx-2 hover:bg-primary-container/10 transition-all" type="button" onClick={() => void handleLogout()}>
                   <span className="material-symbols-outlined">logout</span>
-                  <span className="font-label-caps text-label-caps">Cerrar sesión</span>
+                  <span className="font-label-caps text-label-caps">Cerrar Sesión</span>
                 </button>
               </div>
             </aside>
@@ -4124,7 +3836,7 @@ export function App() {
                 )}
                 <div className="marea-hero-overlay" />
               </div>
-              <div className={`marea-content ${usesCanchaShell ? 'marea-content--cancha-reference' : ''} ${currentView === 'facturas' ? 'marea-content--facturas-reference' : ''}`}>
+              <div className={`marea-content ${currentView === 'cancha' ? 'marea-content--cancha-reference' : ''}`}>
                 <ClientDemoTour
                   showBanner={showDemoTourBanner}
                   step={demoTourStep}
@@ -4179,6 +3891,5 @@ export function App() {
     </div>
   )
 }
-
 
 

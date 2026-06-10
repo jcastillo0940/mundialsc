@@ -36,6 +36,7 @@
         <a class="pill" href="{{ route('admin.winners') }}">Editar ganadores</a>
         <a class="pill" href="{{ route('admin.users') }}">Dar de baja usuarios</a>
         <a class="pill" href="{{ route('admin.site') }}">Hero video y SEO</a>
+        <a class="pill" href="{{ route('admin.push-campaigns') }}">Campañas push</a>
     </div>
 </div>
 @endsection

@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\RedemptionController;
 use App\Http\Controllers\Api\TeamFlagController;
 use App\Http\Controllers\Api\PublicSettingsController;
 use App\Http\Controllers\Api\PushSubscriptionController;
+use App\Http\Controllers\Api\FcmTokenController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
@@ -74,6 +75,8 @@ Route::middleware(['auth:sanctum', 'registration.complete'])->group(function ():
     Route::get('push/subscriptions', [PushSubscriptionController::class, 'index'])->middleware('role:client');
     Route::post('push/subscriptions', [PushSubscriptionController::class, 'store'])->middleware('role:client');
     Route::delete('push/subscriptions', [PushSubscriptionController::class, 'destroy'])->middleware('role:client');
+    Route::post('push/fcm-token', [FcmTokenController::class, 'store'])->middleware('role:client');
+    Route::delete('push/fcm-token', [FcmTokenController::class, 'destroy'])->middleware('role:client');
 
     Route::prefix('cashier')->middleware('role:cashier,admin')->group(function (): void {
         Route::post('coupons/scan', [CashierCouponController::class, 'scan'])->middleware('throttle:cashier-scan');

@@ -96,6 +96,11 @@ class User extends Authenticatable
         return $this->hasMany(PushSubscription::class);
     }
 
+    public function fcmTokens(): HasMany
+    {
+        return $this->hasMany(FcmToken::class);
+    }
+
     public function fraudFlags(): HasMany
     {
         return $this->hasMany(FraudFlag::class);

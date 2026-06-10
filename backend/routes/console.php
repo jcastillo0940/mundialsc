@@ -14,3 +14,4 @@ Schedule::command('livescore:sync-commentary')->everyMinute();
 Schedule::command('livescore:sync-fixtures')->hourly();
 Schedule::command('contest:reverify-invoices')->weekly();
 Schedule::command('contest:expire-unresponsive-winners')->everyMinute();
+Schedule::command('push-campaigns:dispatch-scheduled')->everyMinute();

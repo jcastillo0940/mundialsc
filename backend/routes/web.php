@@ -131,6 +131,12 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::get('/site', [BackofficeController::class, 'site'])->name('admin.site');
         Route::put('/site', [BackofficeController::class, 'updateSiteSettings'])->name('admin.site.update');
         Route::post('/site/test-smtp', [BackofficeController::class, 'testSmtp'])->name('admin.site.test-smtp');
+        Route::get('/push-campaigns', [BackofficeController::class, 'pushCampaigns'])->name('admin.push-campaigns');
+        Route::post('/push-campaigns', [BackofficeController::class, 'storePushCampaign'])->name('admin.push-campaigns.store');
+        Route::put('/push-campaigns/{campaign}', [BackofficeController::class, 'updatePushCampaign'])->name('admin.push-campaigns.update');
+        Route::post('/push-campaigns/{campaign}/test', [BackofficeController::class, 'testPushCampaign'])->name('admin.push-campaigns.test');
+        Route::post('/push-campaigns/{campaign}/send', [BackofficeController::class, 'sendPushCampaign'])->name('admin.push-campaigns.send');
+        Route::delete('/push-campaigns/{campaign}', [BackofficeController::class, 'destroyPushCampaign'])->name('admin.push-campaigns.destroy');
         Route::get('/branches', [BackofficeController::class, 'branches'])->name('admin.branches');
         Route::post('/branches', [BackofficeController::class, 'storeBranch'])->name('admin.branches.store');
         Route::put('/branches/{branch}', [BackofficeController::class, 'updateBranch'])->name('admin.branches.update');

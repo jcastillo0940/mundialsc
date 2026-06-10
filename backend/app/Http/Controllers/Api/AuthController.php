@@ -8,7 +8,6 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Support\Audit;
-use App\Support\ContestRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -22,15 +21,8 @@ use RuntimeException;
 
 class AuthController extends Controller
 {
-    public function __construct(
-        private readonly ContestRules $contestRules,
-    ) {
-    }
-
     public function register(Request $request): JsonResponse
     {
-        $this->ensureRegistrationWindowIsOpen();
-
         $data = $request->validate([
             'full_name' => ['required', 'string', 'max:150'],
             'document_type' => ['required', 'in:cedula,passport,residente'],
@@ -194,7 +186,6 @@ class AuthController extends Controller
         }
 
         if (! $user || ! $this->isRegistrationComplete($user)) {
-            $this->ensureRegistrationWindowIsOpen();
         }
 
         if (! $user) {
@@ -262,8 +253,6 @@ class AuthController extends Controller
                 'account' => 'Esta cuenta no fue creada con Google.',
             ]);
         }
-
-        $this->ensureRegistrationWindowIsOpen();
 
         $data = $request->validate([
             'full_name' => ['required', 'string', 'max:150'],
@@ -477,15 +466,6 @@ class AuthController extends Controller
         if ($country !== '' && $country !== 'PA') {
             throw ValidationException::withMessages([
                 'country' => 'El registro esta habilitado solo para conexiones desde Panama.',
-            ]);
-        }
-    }
-
-    private function ensureRegistrationWindowIsOpen(): void
-    {
-        if (now('America/Panama')->greaterThan($this->contestRules->registrationDeadline())) {
-            throw ValidationException::withMessages([
-                'registration' => 'El registro para la promocion cerro el 10 de junio de 2026.',
             ]);
         }
     }
