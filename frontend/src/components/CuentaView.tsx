@@ -177,7 +177,7 @@ export function CuentaView({
           <p>
             {section === 'terminos'
               ? 'Consulta el documento legal completo de la promocion dentro de tu cuenta.'
-              : 'Gestiona tus datos, tu foto y tu contraseña desde un panel claro y rapido.'}
+              : 'Gestiona tus datos, tu foto y tu contrasena desde un panel mas sobrio y claro.'}
           </p>
         </div>
         {section === 'perfil' ? (
@@ -199,18 +199,10 @@ export function CuentaView({
       </header>
 
       <nav className="cuenta-section-tabs" aria-label="Secciones de mi cuenta">
-        <button
-          className={section === 'perfil' ? 'cuenta-section-tab active' : 'cuenta-section-tab'}
-          type="button"
-          onClick={() => onSectionChange('perfil')}
-        >
+        <button className={section === 'perfil' ? 'cuenta-section-tab active' : 'cuenta-section-tab'} type="button" onClick={() => onSectionChange('perfil')}>
           Perfil
         </button>
-        <button
-          className={section === 'terminos' ? 'cuenta-section-tab active' : 'cuenta-section-tab'}
-          type="button"
-          onClick={() => onSectionChange('terminos')}
-        >
+        <button className={section === 'terminos' ? 'cuenta-section-tab active' : 'cuenta-section-tab'} type="button" onClick={() => onSectionChange('terminos')}>
           Terminos y condiciones
         </button>
       </nav>
@@ -268,7 +260,7 @@ export function CuentaView({
               <div className="cuenta-panel-head">
                 <span className="cuenta-kicker">Perfil</span>
                 <h2>Datos de contacto</h2>
-                <p>Actualiza tu correo, telefono, sucursal y foto desde un formulario limpio.</p>
+                <p>Actualiza tu correo, telefono, sucursal y foto desde un formulario claro.</p>
               </div>
 
               <form className="cuenta-form" onSubmit={handleSubmit}>
@@ -309,68 +301,65 @@ export function CuentaView({
               </form>
             </section>
 
-            <section className="cuenta-panel cuenta-panel-password">
-              <div className="cuenta-panel-head">
-                <span className="cuenta-kicker">Seguridad</span>
-                <h2>Cambiar contraseña</h2>
-                <p>Si quieres actualizar tu acceso, completa la contraseña actual y define una nueva.</p>
-              </div>
-
-              <div className="cuenta-password-note">
-                <span className="material-symbols-outlined">lock</span>
-                <p>La contraseña se actualiza al mismo tiempo que guardas tu perfil.</p>
-              </div>
-
-              <div className="cuenta-form-grid">
-                <label className="cuenta-field">
-                  <span>Contraseña actual</span>
-                  <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
-                </label>
-
-                <label className="cuenta-field">
-                  <span>Nueva contraseña</span>
-                  <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-                </label>
-
-                <label className="cuenta-field cuenta-field-wide">
-                  <span>Confirmar nueva contraseña</span>
-                  <input type="password" value={newPasswordConfirmation} onChange={(event) => setNewPasswordConfirmation(event.target.value)} />
-                </label>
-              </div>
-            </section>
-
-            <section className="cuenta-panel cuenta-panel-push">
-              <div className="cuenta-panel-head">
-                <span className="cuenta-kicker">Avisos</span>
-                <h2>Notificaciones push web</h2>
-              </div>
-              <p className="cuenta-push-copy">
-                Recibe promociones, recordatorios y anuncios del concurso directamente en tu navegador.
-              </p>
-              <div className="cuenta-push-actions">
-                <button className="cuenta-save-button" type="button" onClick={() => void handleEnablePush()} disabled={pushStatus === 'checking'}>
-                  Activar notificaciones
-                </button>
-                <button className="cuenta-section-tab" type="button" onClick={() => void handleDisablePush()} disabled={pushStatus === 'checking'}>
-                  Desactivar
-                </button>
-              </div>
-              <div className="cuenta-push-status">
-                <span>Estado:</span>
-                <strong>{pushStatus === 'enabled' ? 'Activas' : pushStatus === 'checking' ? 'Verificando...' : pushStatus === 'error' ? 'Error' : pushStatus === 'blocked' ? 'Bloqueadas' : 'Inactivas'}</strong>
-              </div>
-              {pushStatus === 'blocked' && (
-                <div className="cuenta-push-blocked">
-                  <p>Tu navegador tiene las notificaciones <strong>bloqueadas</strong> para este sitio. Para activarlas:</p>
-                  <ol>
-                    <li>Haz clic en el <strong>candado 🔒</strong> en la barra de direccion del navegador</li>
-                    <li>Busca <strong>Notificaciones</strong> y cambia a <strong>Permitir</strong></li>
-                    <li>Recarga la pagina y vuelve a intentarlo</li>
-                  </ol>
+            <div className="cuenta-security-grid">
+              <section className="cuenta-panel cuenta-panel-password">
+                <div className="cuenta-panel-head">
+                  <span className="cuenta-kicker">Seguridad</span>
+                  <h2>Cambiar contrasena</h2>
+                  <p>Si quieres actualizar tu acceso, completa la contraseña actual y define una nueva.</p>
                 </div>
-              )}
-              {pushMessage ? <p className="cuenta-push-message">{pushMessage}</p> : null}
-            </section>
+
+                <div className="cuenta-form-grid cuenta-form-grid--tight">
+                  <label className="cuenta-field">
+                    <span>Contraseña actual</span>
+                    <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+                  </label>
+
+                  <label className="cuenta-field">
+                    <span>Nueva contraseña</span>
+                    <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+                  </label>
+
+                  <label className="cuenta-field cuenta-field-wide">
+                    <span>Confirmar nueva contraseña</span>
+                    <input type="password" value={newPasswordConfirmation} onChange={(event) => setNewPasswordConfirmation(event.target.value)} />
+                  </label>
+                </div>
+              </section>
+
+              <section className="cuenta-panel cuenta-panel-push">
+                <div className="cuenta-panel-head">
+                  <span className="cuenta-kicker">Avisos</span>
+                  <h2>Notificaciones push web</h2>
+                </div>
+                <p className="cuenta-push-copy">
+                  Recibe promociones, recordatorios y anuncios del concurso directamente en tu navegador.
+                </p>
+                <div className="cuenta-push-actions">
+                  <button className="cuenta-save-button" type="button" onClick={() => void handleEnablePush()} disabled={pushStatus === 'checking'}>
+                    Activar notificaciones
+                  </button>
+                  <button className="cuenta-section-tab" type="button" onClick={() => void handleDisablePush()} disabled={pushStatus === 'checking'}>
+                    Desactivar
+                  </button>
+                </div>
+                <div className="cuenta-push-status">
+                  <span>Estado:</span>
+                  <strong>{pushStatus === 'enabled' ? 'Activas' : pushStatus === 'checking' ? 'Verificando...' : pushStatus === 'error' ? 'Error' : pushStatus === 'blocked' ? 'Bloqueadas' : 'Inactivas'}</strong>
+                </div>
+                {pushStatus === 'blocked' && (
+                  <div className="cuenta-push-blocked">
+                    <p>Tu navegador tiene las notificaciones <strong>bloqueadas</strong> para este sitio. Para activarlas:</p>
+                    <ol>
+                      <li>Haz clic en el <strong>candado 🔒</strong> en la barra de direccion del navegador</li>
+                      <li>Busca <strong>Notificaciones</strong> y cambia a <strong>Permitir</strong></li>
+                      <li>Recarga la pagina y vuelve a intentarlo</li>
+                    </ol>
+                  </div>
+                )}
+                {pushMessage ? <p className="cuenta-push-message">{pushMessage}</p> : null}
+              </section>
+            </div>
           </div>
         </div>
       )}
