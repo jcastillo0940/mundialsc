@@ -7372,7 +7372,8 @@ a {
 
 .cuenta-hero,
 .cuenta-panel,
-.cuenta-readonly-grid article {
+.cuenta-readonly-grid article,
+.cuenta-meta-list div {
   border: 1px solid var(--outline-variant);
   box-shadow: var(--shadow);
 }
@@ -7522,8 +7523,9 @@ a {
 
 .cuenta-panel,
 .cuenta-hero,
-.cuenta-readonly-grid article {
-  border-radius: 20px;
+.cuenta-readonly-grid article,
+.cuenta-meta-list div {
+  border-radius: 8px;
 }
 
 .cuenta-panel-terms {
@@ -7538,7 +7540,12 @@ a {
 
 .cuenta-profile-top {
   display: grid;
-  gap: 18px;
+  gap: 16px;
+}
+
+.cuenta-profile-top--flat {
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+  align-items: start;
 }
 
 .cuenta-avatar-block {
@@ -7552,7 +7559,7 @@ a {
   place-items: center;
   width: 96px;
   height: 96px;
-  border-radius: 50%;
+  border-radius: 10px;
   overflow: hidden;
   border: 3px solid rgba(218, 199, 105, 0.5);
   background: linear-gradient(135deg, #233240, #0b0e15 58%, #004fa8);
@@ -7580,20 +7587,20 @@ a {
   line-height: 0.96;
 }
 
-.cuenta-readonly-grid {
+.cuenta-meta-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.cuenta-readonly-grid article {
-  padding: 18px;
-  border-radius: 22px;
-  background: rgba(11, 14, 21, 0.72);
+.cuenta-meta-list div {
+  padding: 14px 16px;
+  border: 1px solid var(--outline-variant);
+  background: rgba(11, 14, 21, 0.62);
 }
 
-.cuenta-readonly-grid article span,
-.cuenta-field span {
+.cuenta-field span,
+.cuenta-meta-list dt {
   color: var(--secondary);
   font-size: 11px;
   font-weight: 700;
@@ -7601,11 +7608,15 @@ a {
   text-transform: uppercase;
 }
 
-.cuenta-readonly-grid article strong {
-  display: block;
-  margin-top: 10px;
-  font-size: 28px;
+.cuenta-meta-list dd {
+  margin: 10px 0 0;
+  color: var(--text-main);
+  font-family: 'Archivo Narrow', sans-serif;
+  font-size: 24px;
+  font-style: italic;
+  font-weight: 700;
   line-height: 1;
+  text-transform: uppercase;
 }
 
 .cuenta-panel-head {
@@ -7641,10 +7652,19 @@ a {
   padding: 0 24px 24px;
 }
 
+.cuenta-form--inline,
+.cuenta-form--compact {
+  padding-top: 0;
+}
+
 .cuenta-form-grid {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cuenta-form-grid--flat {
+  gap: 12px;
 }
 
 .cuenta-form-grid--tight {
@@ -7668,7 +7688,7 @@ a {
   width: 100%;
   color: var(--text-main);
   border: 1px solid var(--outline-variant);
-  border-radius: 18px;
+  border-radius: 8px;
   background: rgba(11, 14, 21, 0.86);
   padding: 16px 18px;
   font-size: 16px;
@@ -7685,7 +7705,7 @@ a {
   width: 100%;
   color: var(--text-main);
   border: 1px solid var(--outline-variant);
-  border-radius: 18px;
+  border-radius: 8px;
   background: rgba(11, 14, 21, 0.86);
   padding: 16px 18px;
   font-size: 16px;
@@ -7706,13 +7726,13 @@ a {
 }
 
 .cuenta-form-actions {
-  padding-top: 4px;
+  padding-top: 2px;
 }
 
 .cuenta-save-button {
   min-height: 56px;
   padding: 0 24px;
-  border-radius: 18px;
+  border-radius: 8px;
   background: var(--primary-container);
   color: #fff;
   cursor: pointer;
@@ -7733,7 +7753,7 @@ a {
 .cuenta-push-blocked {
   background: rgba(255, 180, 0, 0.12);
   border: 1px solid rgba(255, 180, 0, 0.35);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 14px 16px;
   color: #f5d97a;
   font-size: 0.9rem;
@@ -7756,9 +7776,9 @@ a {
   gap: 18px;
 }
 
-.cuenta-security-grid {
+.cuenta-bottom-grid {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
 }
@@ -9701,24 +9721,12 @@ a {
     text-align: left;
   }
 
-  .cuenta-hero,
-  .cuenta-panel,
-  .cuenta-readonly-grid article {
-    border-radius: 22px;
-  }
-
   .cuenta-panel-profile,
   .cuenta-panel-head,
   .cuenta-form,
   .cuenta-hero {
     padding-left: 18px;
     padding-right: 18px;
-  }
-
-  .cuenta-avatar-block,
-  .cuenta-readonly-grid {
-    grid-template-columns: 1fr;
-    align-items: flex-start;
   }
 
   .cuenta-avatar-block {
@@ -9735,11 +9743,9 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .cuenta-profile-top--flat,
+  .cuenta-bottom-grid,
   .cuenta-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .cuenta-security-grid {
     grid-template-columns: 1fr;
   }
 }
