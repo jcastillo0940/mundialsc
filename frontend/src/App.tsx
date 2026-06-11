@@ -3296,13 +3296,13 @@ export function App() {
         </div>
       ) : null}
 
-      {/* Modal de TÃ©rminos y Condiciones */}
+      {/* Modal de Términos y Condiciones */}
       {termsModalOpen ? (
         <div className="terms-overlay" onClick={() => setTermsModalOpen(false)}>
           <div className="terms-modal" onClick={(e) => e.stopPropagation()}>
             <div className="terms-modal-header">
               <span className="material-symbols-outlined">gavel</span>
-              <span>TÃ©rminos y Condiciones</span>
+              <span>Términos y Condiciones</span>
               <button type="button" className="terms-modal-close" onClick={() => setTermsModalOpen(false)}>
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -3322,7 +3322,7 @@ export function App() {
               {!termsScrolledEnd ? (
                 <p className="terms-scroll-hint">
                   <span className="material-symbols-outlined">arrow_downward</span>
-                  DesplÃ¡zate hasta el final para habilitar la aceptaciÃ³n
+                  Desplázate hasta el final para habilitar la aceptación
                 </p>
               ) : null}
               <button
@@ -3334,7 +3334,7 @@ export function App() {
                   setTermsModalOpen(false)
                 }}
               >
-                {termsScrolledEnd ? 'Acepto los tÃ©rminos y condiciones' : 'Lee el documento completo primero'}
+                {termsScrolledEnd ? 'Acepto los términos y condiciones' : 'Lee el documento completo primero'}
               </button>
             </div>
           </div>
@@ -3405,20 +3405,9 @@ export function App() {
             </div>}
 
             {!isCompletingGoogleRegistration && (
-              <div style={{
-                background: 'rgba(0,122,255,0.15)',
-                border: '1px solid rgba(0,122,255,0.4)',
-                borderRadius: '12px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                fontSize: '13px',
-                color: '#d9ecff',
-                margin: '0 0 4px',
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '18px', flexShrink: 0 }}>lock</span>
-                <span>El registro sigue disponible. Si ya participas, inicia sesiÃ³n para ver tu posición y tus pronósticos.</span>
+              <div className="auth-login-notice">
+                <span className="material-symbols-outlined">lock</span>
+                <span>El registro sigue disponible. Si ya participas, inicia sesión para ver tu posición y tus pronósticos.</span>
               </div>
             )}
 
@@ -3457,17 +3446,6 @@ export function App() {
                         : 'Ingresa tus datos para continuar'}
               </span>
             </div>
-
-            {authMode === 'login' ? (
-              <div className="auth-helper-links">
-                <button type="button" className="auth-helper-link" onClick={() => setAuthMode('forgot-password')}>
-                  Olvidé mi contraseña
-                </button>
-                <button type="button" className="auth-helper-link" onClick={() => setNewsletterEmail(authForm.email)}>
-                  Recibir newsletter
-                </button>
-              </div>
-            ) : null}
 
             {authMode === 'forgot-password' ? (
               <div className="auth-mini-card">
@@ -3652,7 +3630,7 @@ export function App() {
                           <span className="material-symbols-outlined">
                             {dt === 'cedula' ? 'id_card' : dt === 'passport' ? 'flight' : 'description'}
                           </span>
-                          {dt === 'cedula' ? 'CÃ©dula' : dt === 'passport' ? 'Pasaporte' : 'Residente'}
+                          {dt === 'cedula' ? 'Cédula' : dt === 'passport' ? 'Pasaporte' : 'Residente'}
                         </button>
                       ))}
                     </div>
@@ -3681,7 +3659,7 @@ export function App() {
                           onChange={(event) => {
                             setAuthForm({ ...authForm, birthdate: event.target.value })
                             if (event.target.value && !isAtLeast18(event.target.value)) {
-                              setError('Debes ser mayor de 18 aÃ±os para participar.')
+                              setError('Debes ser mayor de 18 años para participar.')
                             } else {
                               setError(null)
                             }
@@ -3693,14 +3671,14 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* Paso 3: PronÃ³stico + sucursal */}
+                {/* Paso 3: Pronóstico + sucursal */}
                 {registerStep === 3 ? (
                   <>
                     <div className="auth-section-label">
                       <span className="material-symbols-outlined">sports_soccer</span>
-                      <span>PronÃ³stico de desempate</span>
+                      <span>Pronóstico de desempate</span>
                     </div>
-                    <p className="auth-goal-hint">Â¿CuÃ¡ntos goles totales habrÃ¡ en la fase de grupos del Mundial 2026?</p>
+                    <p className="auth-goal-hint">¿Cuántos goles totales habrá en la fase de grupos del Mundial 2026?</p>
                     <div className="auth-goal-stepper">
                       <button
                         type="button"
@@ -3758,7 +3736,7 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* â”€â”€ Paso 4: Confirmaciones â”€â”€ */}
+                {/* Paso 4: Confirmaciones */}
                 {registerStep === 4 ? (
                   <>
                     <div className="auth-section-label">
@@ -3772,7 +3750,7 @@ export function App() {
                     >
                       <span className="material-symbols-outlined auth-toggle-card-icon">location_on</span>
                       <div className="auth-toggle-card-text">
-                        <strong>Resido en PanamÃ¡ y soy mayor de 18 aÃ±os</strong>
+                        <strong>Resido en Panamá y soy mayor de 18 años</strong>
                         <span>Obligatorio para participar</span>
                       </div>
                       <div className="auth-toggle-switch" />
@@ -3786,9 +3764,9 @@ export function App() {
                       <span className="material-symbols-outlined auth-toggle-card-icon">gavel</span>
                       <div className="auth-toggle-card-text">
                         <strong>
-                          {authForm.accepted_terms ? 'TÃ©rminos aceptados' : 'Leer y aceptar tÃ©rminos y condiciones'}
+                          {authForm.accepted_terms ? 'Términos aceptados' : 'Leer y aceptar términos y condiciones'}
                         </strong>
-                        <span>Obligatorio Â· Toca para leer el documento completo</span>
+                        <span>Obligatorio · Toca para leer el documento completo</span>
                       </div>
                       {authForm.accepted_terms
                         ? <span className="material-symbols-outlined" style={{ color: 'var(--secondary)', flexShrink: 0 }}>check_circle</span>
@@ -3798,7 +3776,7 @@ export function App() {
                   </>
                 ) : null}
 
-                {/* â”€â”€ Paso 5: Cuenta â”€â”€ */}
+                {/* Paso 5: Cuenta */}
                 {!isCompletingGoogleRegistration && registerStep === 5 ? (
                   <div className="auth-section-label">
                     <span className="material-symbols-outlined">lock</span>
@@ -3808,7 +3786,7 @@ export function App() {
               </>
             ) : null}
 
-            {/* Campos de email/contraseÃ±a: login siempre, registro solo en paso 5 */}
+            {/* Campos de email/contraseña: login siempre, registro solo en paso 5 */}
             {!isCompletingGoogleRegistration && (authMode === 'login' || registerStep === 5) ? (
               <>
                 <label className={`auth-reference-field${authMode === 'register' && registrationStepErrors.email ? ' is-invalid' : ''}`}>
@@ -3819,27 +3797,43 @@ export function App() {
                   </div>
                   {authMode === 'register' && registrationStepErrors.email ? <span className="auth-field-error">{registrationStepErrors.email}</span> : null}
                 </label>
-                <label className={authMode === 'register' && registrationStepErrors.password ? 'is-invalid' : ''}>
-                  Contraseña *
-                  <input required type="password" value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} />
+                <label className={`auth-reference-field${authMode === 'register' && registrationStepErrors.password ? ' is-invalid' : ''}`}>
+                  <span>Contraseña *</span>
+                  <div className="auth-reference-input">
+                    <span className="material-symbols-outlined">lock</span>
+                    <input required type="password" value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} />
+                  </div>
                   {authMode === 'register' && registrationStepErrors.password ? <span className="auth-field-error">{registrationStepErrors.password}</span> : null}
                 </label>
+                {authMode === 'login' ? (
+                  <div className="auth-helper-links auth-helper-links-login">
+                    <button type="button" className="auth-helper-link" onClick={() => setAuthMode('forgot-password')}>
+                      Olvidé mi contraseña
+                    </button>
+                    <button type="button" className="auth-helper-link" onClick={() => setNewsletterEmail(authForm.email)}>
+                      Recibir newsletter
+                    </button>
+                  </div>
+                ) : null}
                 {authMode === 'register' ? (
-                  <label className={registrationStepErrors.password_confirmation ? 'is-invalid' : ''}>
-                    Confirmar contraseña *
-                    <input
-                      required
-                      type="password"
-                      value={authForm.password_confirmation}
-                      onChange={(event) => setAuthForm({ ...authForm, password_confirmation: event.target.value })}
-                    />
+                  <label className={`auth-reference-field${registrationStepErrors.password_confirmation ? ' is-invalid' : ''}`}>
+                    <span>Confirmar contraseña *</span>
+                    <div className="auth-reference-input">
+                      <span className="material-symbols-outlined">verified_user</span>
+                      <input
+                        required
+                        type="password"
+                        value={authForm.password_confirmation}
+                        onChange={(event) => setAuthForm({ ...authForm, password_confirmation: event.target.value })}
+                      />
+                    </div>
                     {registrationStepErrors.password_confirmation ? <span className="auth-field-error">{registrationStepErrors.password_confirmation}</span> : null}
                   </label>
                 ) : null}
               </>
             ) : null}
 
-            {/* NavegaciÃ³n de pasos / submit */}
+            {/* Navegación de pasos / submit */}
             {isCompletingGoogleRegistration || authMode === 'register' ? (
               <div className="auth-step-nav">
                 {registerStep > 1 ? (
@@ -3865,15 +3859,15 @@ export function App() {
                         const docError = validateDocumentNumber(authForm.document_type, authForm.cedula)
                         if (docError) { setError(docError); return }
                         if (!authForm.birthdate) { setError('Debes ingresar tu fecha de nacimiento.'); return }
-                        if (!isAtLeast18(authForm.birthdate)) { setError('Debes ser mayor de 18 aÃ±os para participar.'); return }
+                        if (!isAtLeast18(authForm.birthdate)) { setError('Debes ser mayor de 18 años para participar.'); return }
                       }
                       if (registerStep === 3) {
                         if (!authForm.group_stage_goal_prediction.trim()) { setError('Debes ingresar tu pronostico de desempate.'); return }
                         if (!authForm.branch_id) { setError('Debes seleccionar tu sucursal de preferencia.'); return }
                       }
                       if (registerStep === 4) {
-                        if (!authForm.resides_in_panama) { setError('Debes confirmar que resides en PanamÃ¡.'); return }
-                        if (!authForm.accepted_terms) { setError('Debes leer y aceptar los tÃ©rminos y condiciones.'); return }
+                        if (!authForm.resides_in_panama) { setError('Debes confirmar que resides en Panamá.'); return }
+                        if (!authForm.accepted_terms) { setError('Debes leer y aceptar los términos y condiciones.'); return }
                       }
                       setRegisterStep((s) => s + 1)
                     }}
@@ -3899,7 +3893,7 @@ export function App() {
                 ? `Registro hasta el ${REGISTRATION_DEADLINE}`
                 : authMode === 'forgot-password' || authMode === 'reset-password'
                   ? 'Recuperación de acceso segura'
-                  : 'Mundialista Â· Super Carnes 2026'}
+                  : 'Mundialista · Super Carnes 2026'}
             </p>
           </form>
           </div>

@@ -10520,12 +10520,12 @@ a {
   position: absolute;
   left: -8%;
   right: -8%;
-  bottom: 104px;
-  z-index: 1;
-  height: 64px;
+  bottom: 36px;
+  z-index: 3;
+  height: 58px;
   background: #fec600;
   border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-  transform: scaleX(1.08);
+  transform: scaleX(1.08) rotate(-0.4deg);
   pointer-events: none;
 }
 
@@ -10566,7 +10566,7 @@ a {
 
 .auth-reference-layout {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   flex: 1;
   width: min(1500px, calc(100% - 88px));
   height: calc(100vh - 104px);
@@ -10708,7 +10708,7 @@ a {
   right: 0;
   bottom: 0;
   height: 252px;
-  z-index: 1;
+  z-index: 4;
   pointer-events: none;
 }
 
@@ -10754,7 +10754,8 @@ a {
 .auth-reference-badge {
   position: absolute;
   right: 58px;
-  bottom: 48px;
+  bottom: 54px;
+  z-index: 6;
   display: flex;
   flex-direction: column;
   padding: 16px 22px;
@@ -10859,7 +10860,7 @@ a {
 
 .auth-panel-reference {
   position: relative;
-  z-index: 2;
+  z-index: 5;
   max-width: 504px;
   max-height: calc(100vh - 152px);
   padding: 24px 32px 28px;
@@ -10918,6 +10919,50 @@ a {
 .auth-tabs-reference button.active {
   background: #08347f;
   color: #fff;
+}
+
+.auth-login-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid #b8cff8;
+  border-radius: 12px;
+  background: #edf5ff;
+  color: #08347f;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.auth-login-notice .material-symbols-outlined {
+  flex: 0 0 auto;
+  color: #0b5fd7;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.auth-helper-links-login {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  justify-content: space-between;
+  margin: 8px 0 4px;
+}
+
+.auth-panel-reference .auth-helper-links-login .auth-helper-link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #08347f;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .auth-panel-header {
