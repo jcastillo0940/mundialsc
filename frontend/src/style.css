@@ -4359,15 +4359,16 @@ a {
   min-width: 0;
   padding: 15px 14px;
   background: transparent;
-  color: #fff;
+  color: #0057ff;
   font-family: monospace;
   font-size: 0.92rem;
+  font-weight: 700;
   border: 0;
   outline: none;
 }
 
 .marea-invoice-short-code-input::placeholder {
-  color: rgba(216, 230, 255, 0.34);
+  color: rgba(0, 87, 255, 0.48);
 }
 
 .marea-invoice-action-button {
