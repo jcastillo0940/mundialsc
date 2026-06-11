@@ -41,13 +41,24 @@ export function CuentaView({
   termsText: string
   section: CuentaSection
   onSectionChange: (section: CuentaSection) => void
-  onSave: (payload: { email: string; phone: string; avatarFile: File | null; branchId: string }) => Promise<void>
+  onSave: (payload: {
+    email: string
+    phone: string
+    avatarFile: File | null
+    branchId: string
+    currentPassword: string
+    newPassword: string
+    newPasswordConfirmation: string
+  }) => Promise<void>
 }) {
   const [email, setEmail] = useState(user.email)
   const [phone, setPhone] = useState(user.phone ?? '')
   const [branchId, setBranchId] = useState(String(user.branch?.id ?? ''))
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url ?? null)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('')
   const [pushStatus, setPushStatus] = useState<'idle' | 'checking' | 'enabled' | 'disabled' | 'error' | 'blocked'>('idle')
   const [pushMessage, setPushMessage] = useState<string | null>(null)
 
@@ -57,6 +68,9 @@ export function CuentaView({
     setBranchId(String(user.branch?.id ?? ''))
     setAvatarFile(null)
     setAvatarPreview(user.avatar_url ?? null)
+    setCurrentPassword('')
+    setNewPassword('')
+    setNewPasswordConfirmation('')
   }, [user.email, user.phone, user.avatar_url, user.branch])
 
   useEffect(() => {
@@ -97,7 +111,7 @@ export function CuentaView({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await onSave({ email, phone, avatarFile, branchId })
+    await onSave({ email, phone, avatarFile, branchId, currentPassword, newPassword, newPasswordConfirmation })
   }
 
   async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
@@ -155,17 +169,33 @@ export function CuentaView({
   }
 
   return (
-    <section className="cuenta-view">
-      <header className="cuenta-hero">
+    <section className="cuenta-view client-shell--cancha-reference">
+      <header className="cuenta-hero cuenta-hero--cancha">
         <div className="cuenta-hero-copy">
-          <span className="cuenta-kicker">Mi cuenta</span>
-          <h1>{section === 'terminos' ? 'Terminos y condiciones' : 'Datos personales'}</h1>
+          <span className="cuenta-kicker">SUPER CARNES</span>
+          <h1>{section === 'terminos' ? 'Terminos y condiciones' : 'Mi cuenta'}</h1>
           <p>
             {section === 'terminos'
               ? 'Consulta el documento legal completo de la promocion dentro de tu cuenta.'
-              : 'Administra tu informacion de cuenta y manten tus datos al dia.'}
+              : 'Gestiona tus datos, tu foto y tu contraseña desde un panel claro y rapido.'}
           </p>
         </div>
+        {section === 'perfil' ? (
+          <div className="cuenta-hero-summary">
+            <div>
+              <span>Correo</span>
+              <strong>{user.email}</strong>
+            </div>
+            <div>
+              <span>Telefono</span>
+              <strong>{user.phone ?? 'No registrado'}</strong>
+            </div>
+            <div>
+              <span>Sucursal</span>
+              <strong>{user.branch?.name ?? 'Sin preferencia'}</strong>
+            </div>
+          </div>
+        ) : null}
       </header>
 
       <nav className="cuenta-section-tabs" aria-label="Secciones de mi cuenta">
@@ -196,84 +226,122 @@ export function CuentaView({
       ) : (
         <div className="cuenta-layout">
           <section className="cuenta-panel cuenta-panel-profile">
-            <div className="cuenta-avatar-block">
-              <div className="cuenta-avatar-frame">
-                {avatarPreview ? (
-                  <img alt={`Avatar de ${user.full_name}`} className="cuenta-avatar-image" src={avatarPreview} />
-                ) : (
-                  <span>{user.full_name.slice(0, 1).toUpperCase()}</span>
-                )}
+            <div className="cuenta-profile-top">
+              <div className="cuenta-avatar-block">
+                <div className="cuenta-avatar-frame">
+                  {avatarPreview ? (
+                    <img alt={`Avatar de ${user.full_name}`} className="cuenta-avatar-image" src={avatarPreview} />
+                  ) : (
+                    <span>{user.full_name.slice(0, 1).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="cuenta-avatar-copy">
+                  <span className="cuenta-kicker">Participante</span>
+                  <strong>{user.full_name}</strong>
+                  <span>{user.branch?.name ?? 'Cuenta participante'}</span>
+                </div>
               </div>
-              <div className="cuenta-avatar-copy">
-                <strong>{user.full_name}</strong>
-                <span>{user.branch?.name ?? 'Cuenta participante'}</span>
-              </div>
-            </div>
 
-            <div className="cuenta-readonly-grid">
-              <article>
-                <span>Nombre</span>
-                <strong>{user.full_name}</strong>
-              </article>
-              <article>
-                <span>Fecha de nacimiento</span>
-                <strong>{formatBirthdate(user.birthdate)}</strong>
-              </article>
-              <article>
-                <span>{documentTypeLabel(user.document_type)}</span>
-                <strong>{user.cedula}</strong>
-              </article>
-              <article>
-                <span>Documento</span>
-                <strong>{documentTypeLabel(user.document_type)}</strong>
-              </article>
+              <div className="cuenta-readonly-grid">
+                <article>
+                  <span>Nombre</span>
+                  <strong>{user.full_name}</strong>
+                </article>
+                <article>
+                  <span>Fecha de nacimiento</span>
+                  <strong>{formatBirthdate(user.birthdate)}</strong>
+                </article>
+                <article>
+                  <span>Documento</span>
+                  <strong>{user.cedula}</strong>
+                </article>
+                <article>
+                  <span>Tipo</span>
+                  <strong>{documentTypeLabel(user.document_type)}</strong>
+                </article>
+              </div>
             </div>
           </section>
 
-          <section className="cuenta-panel">
-            <div className="cuenta-panel-head">
-              <span className="cuenta-kicker">Campos editables</span>
-              <h2>Contacto y foto</h2>
-            </div>
-
-            <form className="cuenta-form" onSubmit={handleSubmit}>
-              <label className="cuenta-field">
-                <span>Correo electronico</span>
-                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-              </label>
-
-              <label className="cuenta-field">
-                <span>Numero de telefono</span>
-                <input type="text" value={phone} onChange={(event) => setPhone(event.target.value)} />
-              </label>
-
-              <label className="cuenta-field">
-                <span>Sucursal de preferencia</span>
-                <select value={branchId} onChange={(event) => setBranchId(event.target.value)} className="cuenta-select">
-                  <option value="">- Selecciona una sucursal -</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={String(branch.id)}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="cuenta-field">
-                <span>Fotografia</span>
-                <input accept="image/png,image/jpeg,image/webp" type="file" onChange={handleAvatarChange} />
-              </label>
-
-              <div className="cuenta-form-actions">
-                <button className="cuenta-save-button" disabled={saving} type="submit">
-                  {saving ? 'Guardando...' : 'Guardar cambios'}
-                </button>
-              </div>
-            </form>
-
-            <div className="cuenta-push-panel">
+          <div className="cuenta-stack">
+            <section className="cuenta-panel cuenta-panel-form">
               <div className="cuenta-panel-head">
-                <span className="cuenta-kicker">Publicidad y avisos</span>
+                <span className="cuenta-kicker">Perfil</span>
+                <h2>Datos de contacto</h2>
+                <p>Actualiza tu correo, telefono, sucursal y foto desde un formulario limpio.</p>
+              </div>
+
+              <form className="cuenta-form" onSubmit={handleSubmit}>
+                <div className="cuenta-form-grid">
+                  <label className="cuenta-field">
+                    <span>Correo electronico</span>
+                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+                  </label>
+
+                  <label className="cuenta-field">
+                    <span>Numero de telefono</span>
+                    <input type="text" value={phone} onChange={(event) => setPhone(event.target.value)} />
+                  </label>
+
+                  <label className="cuenta-field">
+                    <span>Sucursal de preferencia</span>
+                    <select value={branchId} onChange={(event) => setBranchId(event.target.value)} className="cuenta-select">
+                      <option value="">- Selecciona una sucursal -</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={String(branch.id)}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="cuenta-field cuenta-field-upload">
+                    <span>Fotografia</span>
+                    <input accept="image/png,image/jpeg,image/webp" type="file" onChange={handleAvatarChange} />
+                  </label>
+                </div>
+
+                <div className="cuenta-form-actions">
+                  <button className="cuenta-save-button" disabled={saving} type="submit">
+                    {saving ? 'Guardando...' : 'Guardar cambios'}
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section className="cuenta-panel cuenta-panel-password">
+              <div className="cuenta-panel-head">
+                <span className="cuenta-kicker">Seguridad</span>
+                <h2>Cambiar contraseña</h2>
+                <p>Si quieres actualizar tu acceso, completa la contraseña actual y define una nueva.</p>
+              </div>
+
+              <div className="cuenta-password-note">
+                <span className="material-symbols-outlined">lock</span>
+                <p>La contraseña se actualiza al mismo tiempo que guardas tu perfil.</p>
+              </div>
+
+              <div className="cuenta-form-grid">
+                <label className="cuenta-field">
+                  <span>Contraseña actual</span>
+                  <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+                </label>
+
+                <label className="cuenta-field">
+                  <span>Nueva contraseña</span>
+                  <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+                </label>
+
+                <label className="cuenta-field cuenta-field-wide">
+                  <span>Confirmar nueva contraseña</span>
+                  <input type="password" value={newPasswordConfirmation} onChange={(event) => setNewPasswordConfirmation(event.target.value)} />
+                </label>
+              </div>
+            </section>
+
+            <section className="cuenta-panel cuenta-panel-push">
+              <div className="cuenta-panel-head">
+                <span className="cuenta-kicker">Avisos</span>
                 <h2>Notificaciones push web</h2>
               </div>
               <p className="cuenta-push-copy">
@@ -295,15 +363,15 @@ export function CuentaView({
                 <div className="cuenta-push-blocked">
                   <p>Tu navegador tiene las notificaciones <strong>bloqueadas</strong> para este sitio. Para activarlas:</p>
                   <ol>
-                    <li>Haz clic en el <strong>candado 🔒</strong> en la barra de dirección del navegador</li>
+                    <li>Haz clic en el <strong>candado 🔒</strong> en la barra de direccion del navegador</li>
                     <li>Busca <strong>Notificaciones</strong> y cambia a <strong>Permitir</strong></li>
-                    <li>Recarga la página y vuelve a intentarlo</li>
+                    <li>Recarga la pagina y vuelve a intentarlo</li>
                   </ol>
                 </div>
               )}
               {pushMessage ? <p className="cuenta-push-message">{pushMessage}</p> : null}
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
       )}
     </section>

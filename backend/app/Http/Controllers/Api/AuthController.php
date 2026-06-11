@@ -326,7 +326,17 @@ class AuthController extends Controller
             'phone' => ['nullable', 'string', 'max:12', 'regex:/^\+507[0-9]{8}$/', Rule::unique('users', 'phone')->ignore($user->id)],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'current_password' => ['nullable', 'string'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ]);
+
+        if (! empty($data['password'])) {
+            if (! isset($data['current_password']) || ! Hash::check($data['current_password'], $user->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => 'La contraseña actual no coincide.',
+                ]);
+            }
+        }
 
         $previousAvatarPath = $user->avatar_path;
 
@@ -341,6 +351,7 @@ class AuthController extends Controller
             'phone' => $data['phone'] ?? null,
             'avatar_path' => $data['avatar_path'] ?? $user->avatar_path,
             'branch_id' => $data['branch_id'] ?? $user->branch_id,
+            'password' => ! empty($data['password']) ? Hash::make($data['password']) : $user->password,
         ])->save();
 
         if (! empty($data['avatar_path']) && $previousAvatarPath && $previousAvatarPath !== $data['avatar_path']) {

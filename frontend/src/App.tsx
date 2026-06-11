@@ -2502,16 +2502,41 @@ export function App() {
     }
   }
 
-  async function handleProfileSave(payload: { email: string; phone: string; avatarFile: File | null; branchId: string }) {
+  async function handleProfileSave(payload: {
+    email: string
+    phone: string
+    avatarFile: File | null
+    branchId: string
+    currentPassword: string
+    newPassword: string
+    newPasswordConfirmation: string
+  }) {
     setProfileSaving(true)
     setError(null)
     setMessage(null)
 
     try {
+      if (payload.newPassword || payload.newPasswordConfirmation || payload.currentPassword) {
+        if (!payload.currentPassword) {
+          throw new Error('Debes escribir tu contraseña actual para cambiarla.')
+        }
+        if (!payload.newPassword) {
+          throw new Error('Debes escribir la nueva contraseña.')
+        }
+        if (payload.newPassword !== payload.newPasswordConfirmation) {
+          throw new Error('Las contraseñas nuevas no coinciden.')
+        }
+      }
+
       const formData = new FormData()
       formData.append('email', payload.email)
       formData.append('phone', payload.phone)
       if (payload.branchId) formData.append('branch_id', payload.branchId)
+      if (payload.currentPassword) formData.append('current_password', payload.currentPassword)
+      if (payload.newPassword) {
+        formData.append('password', payload.newPassword)
+        formData.append('password_confirmation', payload.newPasswordConfirmation)
+      }
 
       if (payload.avatarFile) {
         formData.append('avatar', payload.avatarFile)
@@ -2606,6 +2631,11 @@ export function App() {
   }
 
   async function handlePredictionSubmit(match: TournamentMatch) {
+    if (match.status !== 'scheduled' || matchTimeValue(match.kickoff_at) <= Date.now()) {
+      setError('El partido ya inicio y el pronostico esta cerrado.')
+      return
+    }
+
     setSavingPredictionIds((current) => [...current, match.id])
     setError(null)
     setMessage(null)
@@ -2849,6 +2879,7 @@ export function App() {
                 const prediction = predictionMap.get(match.id)
                 const isSaving = savingPredictionIds.includes(match.id)
                 const isReadonlyPrediction = predictionMode === 'mine' && Boolean(prediction)
+                const isPredictionClosed = match.status !== 'scheduled' || matchTimeValue(match.kickoff_at) <= Date.now()
                 const homeDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_home_score ?? 0) : draft.home
                 const awayDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_away_score ?? 0) : draft.away
 
@@ -2953,8 +2984,8 @@ export function App() {
                     </div>
 
                     <div className="marea-card-action">
-                      <button className="marea-card-send-button" disabled={isSaving || Boolean(prediction)} type="button" onClick={() => void handlePredictionSubmit(match)}>
-                        <span>{prediction ? 'Pronostico enviado' : isSaving ? 'Enviando...' : 'Enviar pronostico'}</span>
+                      <button className="marea-card-send-button" disabled={isSaving || Boolean(prediction) || isPredictionClosed} type="button" onClick={() => void handlePredictionSubmit(match)}>
+                        <span>{prediction ? 'Pronostico enviado' : isPredictionClosed ? 'Pronostico cerrado' : isSaving ? 'Enviando...' : 'Enviar pronostico'}</span>
                         <span className="material-symbols-outlined cancha-button-arrow">arrow_forward</span>
                       </button>
                     </div>
