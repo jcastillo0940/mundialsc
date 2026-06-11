@@ -249,6 +249,12 @@ export function CuentaView({
             </div>
 
             <form className="cuenta-form cuenta-form--inline" onSubmit={handleSubmit}>
+              <div className="cuenta-form-intro">
+                <span className="cuenta-kicker">Perfil</span>
+                <h2>Datos de contacto</h2>
+                <p>Actualiza correo, telefono, sucursal y fotografia desde un formulario simple.</p>
+              </div>
+
               <div className="cuenta-form-grid cuenta-form-grid--flat">
                 <label className="cuenta-field">
                   <span>Correo electronico</span>
@@ -291,24 +297,31 @@ export function CuentaView({
               <div className="cuenta-panel-head">
                 <span className="cuenta-kicker">Seguridad</span>
                 <h2>Cambiar contrasena</h2>
+                <p>Completa estos campos solamente si quieres actualizar tu clave de acceso.</p>
               </div>
 
               <form className="cuenta-form cuenta-form--compact" onSubmit={handleSubmit}>
                 <div className="cuenta-form-grid cuenta-form-grid--flat">
                   <label className="cuenta-field">
-                    <span>Contraseña actual</span>
+                    <span>Contrasena actual</span>
                     <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
                   </label>
 
                   <label className="cuenta-field">
-                    <span>Nueva contraseña</span>
+                    <span>Nueva contrasena</span>
                     <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
                   </label>
 
                   <label className="cuenta-field cuenta-field-wide">
-                    <span>Confirmar nueva contraseña</span>
+                    <span>Confirmar nueva contrasena</span>
                     <input type="password" value={newPasswordConfirmation} onChange={(event) => setNewPasswordConfirmation(event.target.value)} />
                   </label>
+                </div>
+
+                <div className="cuenta-form-actions">
+                  <button className="cuenta-save-button cuenta-save-button--secondary" disabled={saving} type="submit">
+                    {saving ? 'Guardando...' : 'Guardar contrasena'}
+                  </button>
                 </div>
               </form>
             </section>
