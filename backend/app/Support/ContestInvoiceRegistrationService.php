@@ -146,6 +146,7 @@ class ContestInvoiceRegistrationService
         $minimumAmount = $settings ? (float) $settings->min_purchase_amount : $this->rules->minimumInvoiceAmount();
         $purchaseAmount = round((float) $resolvedInvoice['purchase_amount'], 2);
         $now = now('America/Panama');
+        $enforceIssueDateRules = $registrationSource !== 'admin_assisted';
         $officialIssuerRucs = config('contest.official_issuer_rucs', []);
         $issuerRuc = strtoupper(trim((string) ($resolvedInvoice['issuer_ruc'] ?? '')));
 
@@ -178,7 +179,7 @@ class ContestInvoiceRegistrationService
         $maxInvoiceAgeDays = $settings ? (int) $settings->max_invoice_age_days : $this->rules->maxInvoiceAgeDays();
         $oldestAllowed = $now->copy()->startOfDay()->subDays($maxInvoiceAgeDays);
 
-        if ($issuedAt->lt($oldestAllowed)) {
+        if ($enforceIssueDateRules && $issuedAt->lt($oldestAllowed)) {
             $this->fraudDetection->flag(
                 user: $targetUser,
                 type: 'invoice_outside_allowed_age',
@@ -198,7 +199,7 @@ class ContestInvoiceRegistrationService
             ]);
         }
 
-        if ($issuedAt->gt($now->copy()->endOfDay())) {
+        if ($enforceIssueDateRules && $issuedAt->gt($now->copy()->endOfDay())) {
             throw ValidationException::withMessages([
                 'issued_at' => 'La fecha de la factura no puede ser futura.',
             ]);

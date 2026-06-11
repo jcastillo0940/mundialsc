@@ -238,6 +238,104 @@ class AdminAssistedInvoiceBackofficeTest extends TestCase
         $this->assertSame($admin->id, data_get($movement->meta, 'registered_by_user_id'));
     }
 
+    public function test_admin_assisted_invoice_can_be_registered_even_if_it_is_old(): void
+    {
+        $admin = $this->createAdmin();
+        $player = $this->createClient('+50768887777');
+
+        $campaign = Campaign::query()->create([
+            'name' => 'Promo activa',
+            'description' => 'Campana de pruebas',
+            'status' => 'active',
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addDay(),
+            'invoice_min_amount_for_shot' => 25,
+            'amount_per_point' => 25,
+            'points_per_block' => 1,
+            'daily_max_points' => 100,
+            'daily_max_invoices' => 100,
+            'coupon_ttl_hours' => 72,
+            'games_enabled' => false,
+            'major_prizes_enabled' => false,
+            'invoice_scan_enabled' => true,
+            'redemption_enabled' => false,
+        ]);
+
+        InvoiceGoalSetting::query()->create([
+            'is_enabled' => true,
+            'goal_value' => 1,
+            'min_purchase_amount' => 25,
+            'max_invoice_age_days' => 1,
+            'one_invoice_per_day' => false,
+            'validation_mode' => 'api',
+        ]);
+
+        TournamentPhase::query()->firstOrCreate(
+            ['slug' => 'fase-grupos'],
+            [
+                'name' => 'Fase de Grupos',
+                'stage_order' => 1,
+                'starts_at' => now()->subDays(3),
+                'ends_at' => now()->addDays(3),
+                'exact_score_points' => 3,
+                'outcome_points' => 1,
+                'reset_phase_table' => false,
+                'is_active' => true,
+            ],
+        );
+
+        $flag = FraudFlag::query()->create([
+            'user_id' => $player->id,
+            'flag_type' => 'dgi_invoice_resolution_failed',
+            'source' => 'system',
+            'severity' => 'critical',
+            'status' => 'open',
+            'title' => 'CUFE no confirmado por DGI',
+            'description' => 'Registro asistido por admin.',
+        ]);
+
+        $verifier = Mockery::mock(ContestInvoiceVerifier::class);
+        $verifier->shouldReceive('resolve')
+            ->once()
+            ->andReturn([
+                'cufe' => 'FE01200000032812-2-249262-XYZ987654321ABC',
+                'invoice_number' => 'FAC-9002',
+                'purchase_amount' => 55.40,
+                'issued_at' => now('America/Panama')->subDays(5),
+                'issuer_ruc' => '',
+                'issuer_name' => 'SUPER CARNES',
+                'payload' => ['status' => 'approved'],
+            ]);
+        $verifier->shouldReceive('verify')
+            ->once()
+            ->andReturn([
+                'status' => 'approved',
+                'notes' => 'Factura validada contra DGI.',
+                'canonical_cufe' => 'FE01200000032812-2-249262-XYZ987654321ABC',
+                'payload' => ['status' => 'approved'],
+            ]);
+        $this->app->instance(ContestInvoiceVerifier::class, $verifier);
+
+        $response = $this->actingAs($admin)->post("/adminrepus1car/users/{$player->id}/assisted-invoices", [
+            'qr_raw_text' => 'FE01200000032812-2-249262-XYZ987654321ABC',
+            'branch_id' => null,
+            'fraud_flag_id' => $flag->id,
+            'assistance_notes' => 'Factura del cliente que no pudo cargar a tiempo por el sistema.',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status', function (string $status): bool {
+            return str_contains($status, 'Factura asistida aprobada');
+        });
+
+        $invoice = RegisteredInvoice::query()->first();
+        $this->assertNotNull($invoice);
+        $this->assertSame('admin_assisted', $invoice->registration_source);
+        $this->assertSame('approved', $invoice->validation_status);
+        $this->assertSame(1, $invoice->points_awarded);
+        $this->assertTrue($invoice->issued_at->isSameDay(now()->subDays(5)));
+    }
+
     private function createAdmin(): User
     {
         return User::query()->create([

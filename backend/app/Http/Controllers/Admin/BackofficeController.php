@@ -1471,7 +1471,7 @@ class BackofficeController extends Controller
         $data['show_auth_ticker']   = $request->boolean('show_auth_ticker') ? '1' : '0';
         $data['recaptcha_enabled']  = $request->boolean('recaptcha_enabled') ? '1' : '0';
         $data['mail_port']          = isset($data['mail_port']) ? (string) $data['mail_port'] : null;
-        $data['mail_encryption']    = $data['mail_encryption'] === '' ? null : ($data['mail_encryption'] ?? null);
+        $data['mail_encryption']    = ($data['mail_encryption'] ?? '') === '' ? null : $data['mail_encryption'];
 
         foreach ($data as $key => $value) {
             SiteSetting::set($key, $value);
