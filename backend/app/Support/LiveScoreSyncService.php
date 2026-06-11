@@ -148,10 +148,7 @@ class LiveScoreSyncService
         try {
             $matches = $match
                 ? collect([$match])
-                : TournamentMatch::query()
-                    ->whereNotNull('external_match_id')
-                    ->where('provider', 'live_score_api')
-                    ->get();
+                : $this->commentaryCandidates($filters);
 
             $created = 0;
             $updated = 0;
@@ -227,6 +224,36 @@ class LiveScoreSyncService
         return LiveScoreSetting::query()->firstOrFail();
     }
 
+    public function liveSyncIntervalMinutes(): int
+    {
+        return max(1, (int) ($this->settings()->live_sync_interval_minutes ?: config('services.live_score.live_sync_interval_minutes', 3)));
+    }
+
+    public function commentarySyncIntervalMinutes(): int
+    {
+        return max(1, (int) ($this->settings()->commentary_sync_interval_minutes ?: config('services.live_score.commentary_sync_interval_minutes', 3)));
+    }
+
+    public function fixturesSyncIntervalHours(): int
+    {
+        return max(1, (int) ($this->settings()->fixtures_sync_interval_hours ?: config('services.live_score.fixtures_sync_interval_hours', 24)));
+    }
+
+    public function shouldRunNow(string $syncType, int $intervalSeconds): bool
+    {
+        $lastRun = LiveScoreSyncRun::query()
+            ->where('sync_type', $syncType)
+            ->where('status', 'completed')
+            ->orderByDesc('finished_at')
+            ->first();
+
+        if (! $lastRun?->finished_at) {
+            return true;
+        }
+
+        return $lastRun->finished_at->diffInSeconds(now()) >= $intervalSeconds;
+    }
+
     private function startRun(string $type, array $context, ?int $requestedByUserId): LiveScoreSyncRun
     {
         return LiveScoreSyncRun::query()->create([
@@ -250,6 +277,22 @@ class LiveScoreSyncService
         ]);
 
         return $run->fresh();
+    }
+
+    private function commentaryCandidates(array $filters): Collection
+    {
+        $now = now();
+        $windowHours = (int) ($filters['window_hours'] ?? 6);
+        $windowHours = max(1, min($windowHours, 24));
+        $from = $filters['from'] ?? $now->copy()->subHours($windowHours)->toDateTimeString();
+        $to = $filters['to'] ?? $now->copy()->addHours($windowHours)->toDateTimeString();
+
+        return TournamentMatch::query()
+            ->whereNotNull('external_match_id')
+            ->where('provider', 'live_score_api')
+            ->where('status', 'locked')
+            ->whereBetween('kickoff_at', [$from, $to])
+            ->get();
     }
 
     private function buildFixtureParams(array $filters): array

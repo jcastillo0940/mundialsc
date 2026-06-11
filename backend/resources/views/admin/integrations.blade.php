@@ -31,6 +31,9 @@
                 <option value="1" @selected($settings?->auto_sync_commentary)>Auto commentary on</option>
                 <option value="0" @selected(! $settings?->auto_sync_commentary)>Auto commentary off</option>
             </select>
+            <input type="number" min="1" max="168" name="fixtures_sync_interval_hours" value="{{ $settings?->fixtures_sync_interval_hours ?? 24 }}" placeholder="Fixtures cada horas">
+            <input type="number" min="1" max="60" name="live_sync_interval_minutes" value="{{ $settings?->live_sync_interval_minutes ?? 3 }}" placeholder="Live cada minutos">
+            <input type="number" min="1" max="60" name="commentary_sync_interval_minutes" value="{{ $settings?->commentary_sync_interval_minutes ?? 3 }}" placeholder="Commentary cada minutos">
         </div>
         <button type="submit">Guardar configuración</button>
     </form>

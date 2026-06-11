@@ -18,6 +18,9 @@ class LiveScoreSetting extends Model
         'sync_from_date',
         'sync_to_date',
         'auto_sync_commentary',
+        'fixtures_sync_interval_hours',
+        'live_sync_interval_minutes',
+        'commentary_sync_interval_minutes',
     ];
 
     protected function casts(): array
@@ -27,6 +30,9 @@ class LiveScoreSetting extends Model
             'auto_sync_commentary' => 'boolean',
             'sync_from_date' => 'date',
             'sync_to_date' => 'date',
+            'fixtures_sync_interval_hours' => 'integer',
+            'live_sync_interval_minutes' => 'integer',
+            'commentary_sync_interval_minutes' => 'integer',
         ];
     }
 }

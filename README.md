@@ -33,6 +33,10 @@ Backoffice:
 
 - `http://127.0.0.1:8000/admin/integrations`
 
+Guia de operacion para servidor:
+
+- [docs/livescore-cron-admin.md](E:\fureact\docs\livescore-cron-admin.md)
+
 Comandos:
 
 ```powershell

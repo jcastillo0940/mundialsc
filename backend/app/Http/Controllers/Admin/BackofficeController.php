@@ -848,6 +848,9 @@ class BackofficeController extends Controller
             'sync_from_date' => ['nullable', 'date'],
             'sync_to_date' => ['nullable', 'date'],
             'auto_sync_commentary' => ['required', 'boolean'],
+            'fixtures_sync_interval_hours' => ['required', 'integer', 'min:1', 'max:168'],
+            'live_sync_interval_minutes' => ['required', 'integer', 'min:1', 'max:60'],
+            'commentary_sync_interval_minutes' => ['required', 'integer', 'min:1', 'max:60'],
         ]);
 
         $settings->update($data);

@@ -13,6 +13,11 @@ class LiveScoreSyncCommentaryCommand extends Command
 
     public function handle(LiveScoreSyncService $service): int
     {
+        if (! $service->shouldRunNow('commentary', $service->commentarySyncIntervalMinutes() * 60)) {
+            $this->info('Saltado: todavia no corresponde al siguiente intervalo configurado.');
+            return self::SUCCESS;
+        }
+
         $run = $service->syncCommentary();
         $this->info('Estado: '.$run->status);
         if ($run->error_message) {

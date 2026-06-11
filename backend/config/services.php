@@ -43,6 +43,9 @@ return [
         'competition_id' => env('LIVE_SCORE_API_COMPETITION_ID'),
         'competition_ids' => env('LIVE_SCORE_API_COMPETITION_IDS'),
         'season' => env('LIVE_SCORE_API_SEASON'),
+        'fixtures_sync_interval_hours' => env('LIVE_SCORE_FIXTURES_SYNC_INTERVAL_HOURS', 24),
+        'live_sync_interval_minutes' => env('LIVE_SCORE_LIVE_SYNC_INTERVAL_MINUTES', 3),
+        'commentary_sync_interval_minutes' => env('LIVE_SCORE_COMMENTARY_SYNC_INTERVAL_MINUTES', 3),
     ],
 
     'google' => [

@@ -13,6 +13,11 @@ class LiveScoreSyncFixturesCommand extends Command
 
     public function handle(LiveScoreSyncService $service): int
     {
+        if (! $service->shouldRunNow('fixtures', $service->fixturesSyncIntervalHours() * 3600)) {
+            $this->info('Saltado: todavia no corresponde al siguiente intervalo configurado.');
+            return self::SUCCESS;
+        }
+
         $run = $service->syncFixtures();
         $this->info('Estado: '.$run->status);
         if ($run->error_message) {
