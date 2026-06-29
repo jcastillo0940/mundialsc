@@ -131,6 +131,10 @@ export function VitrinaView({
   )
   const totalGoalsWon = movements.reduce((total, movement) => total + Math.max(Number(movement.goals_delta ?? 0), 0), 0)
   const phaseGoalsWon = Number(overview?.phase_goals ?? invoiceTotals?.phase_goals ?? 0)
+  const groupStageContest = overview?.group_stage_contest ?? null
+  const knockoutContest = overview?.knockout_contest ?? null
+  const groupStagePoints = Number(groupStageContest?.user_points ?? 0)
+  const knockoutPoints = Number(knockoutContest?.user_points ?? phaseGoalsWon)
   const activePhaseInvoiceCount = activePhaseInvoices.length
 
   // Build unified history: non-prediction wallet movements + all scored predictions
@@ -199,10 +203,19 @@ export function VitrinaView({
         <aside className="marea-vitrina-hero-stats">
           <article className="marea-vitrina-stat-card is-primary">
             <span>
-              Goles de fase
-              <InfoTooltip compact content="Goles que cuentan para la fase actual. Los goles de fases anteriores quedan guardados en el historial, pero no se suman aquí." />
+              Fase de Grupos
+              <InfoTooltip compact content="Puntos oficiales de la primera competencia. No se suman a las Fases Finales." />
             </span>
-            <strong>{formatCompactNumber(phaseGoalsWon)} G</strong>
+            <strong>{formatCompactNumber(groupStagePoints)} G</strong>
+            <small>{groupStageContest?.user_rank ? `Pos. #${groupStageContest.user_rank}` : 'Ranking cerrado'}</small>
+          </article>
+          <article className="marea-vitrina-stat-card is-primary">
+            <span>
+              Fases Finales
+              <InfoTooltip compact content="Puntos acumulados de la segunda competencia, desde dieciseisavos hasta la final. No incluye Fase de Grupos ni facturas." />
+            </span>
+            <strong>{formatCompactNumber(knockoutPoints)} G</strong>
+            <small>{knockoutContest?.user_rank ? `Pos. #${knockoutContest.user_rank}` : 'En juego'}</small>
           </article>
           <article className="marea-vitrina-stat-card">
             <span>Facturas aprobadas</span>
@@ -252,7 +265,7 @@ export function VitrinaView({
             <span>20 certificados de regalo de USD 200 cada uno</span>
           </div>
           <p className="marea-vitrina-prize-note">
-            Las facturas válidas también fortalecen tu posición en los criterios oficiales de desempate.
+            Esta segunda competencia suma solo pronosticos de Fases Finales. La Fase de Grupos queda separada.
           </p>
         </article>
       </section>

@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type {
   ClientBootstrap,
+  ContestSummary,
   DashboardSnapshot,
   LeaderboardEntry,
   Prediction,
@@ -65,13 +66,29 @@ export function VestuarioView({
   predictions: Prediction[]
   invoices: unknown[]
 }) {
+  const [selectedContestKey, setSelectedContestKey] = useState<'group_stage' | 'knockout'>('knockout')
   const avatarUrl = user.avatar_url ?? null
-  const leaderboard = overview?.leaderboard ?? []
+  const contestOptions = useMemo(
+    () => [
+      overview?.group_stage_contest
+        ? { key: 'group_stage' as const, label: 'Fase de Grupos', contest: overview.group_stage_contest }
+        : null,
+      overview?.knockout_contest
+        ? { key: 'knockout' as const, label: 'Fases Finales', contest: overview.knockout_contest }
+        : null,
+    ].filter(Boolean) as Array<{ key: 'group_stage' | 'knockout'; label: string; contest: ContestSummary }>,
+    [overview?.group_stage_contest, overview?.knockout_contest],
+  )
+  const selectedContest = contestOptions.find((option) => option.key === selectedContestKey)?.contest
+    ?? contestOptions[0]?.contest
+    ?? null
+  const selectedContestLabel = contestOptions.find((option) => option.contest === selectedContest)?.label ?? 'Ranking oficial'
+  const leaderboard = selectedContest?.leaderboard ?? overview?.leaderboard ?? []
   const topThree = leaderboard.slice(0, 3)
   const userEntry = leaderboard.find((entry) => entry.user_id === user.id) ?? null
-  const userGoals = Number(userEntry?.goals ?? overview?.general_goals ?? 0)
-  const userPosition = userEntry?.position ?? overview?.user_rank ?? null
-  const totalParticipants = overview?.total_participants ?? leaderboard.length
+  const userGoals = Number(selectedContest?.user_points ?? userEntry?.goals ?? overview?.general_goals ?? 0)
+  const userPosition = selectedContest?.user_rank ?? userEntry?.position ?? overview?.user_rank ?? null
+  const totalParticipants = selectedContest?.total_participants ?? overview?.total_participants ?? leaderboard.length
   const maxGoals = leaderboard.reduce((currentMax, entry) => Math.max(currentMax, entry.goals), 0)
   const podiumEntries = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : topThree
   const userIndex = leaderboard.findIndex((entry) => entry.user_id === user.id)
@@ -112,7 +129,7 @@ export function VestuarioView({
             </div>
             <div className="marea-ranking-user-copy">
               <strong>{user.full_name}</strong>
-              <span>{user.branch?.name ?? 'Participante registrado'}</span>
+              <span>{selectedContestLabel}</span>
               <small>
                 {userPosition
                   ? `Posicion #${positionLabel(userPosition)} de ${totalParticipants.toLocaleString('es')} participantes`
@@ -163,8 +180,22 @@ export function VestuarioView({
         <div className="marea-ranking-table-head">
           <div>
             <span className="marea-kicker">Ranking oficial</span>
-            <h2>Tu posicion</h2>
+            <h2>{selectedContestLabel}</h2>
           </div>
+          {contestOptions.length > 1 ? (
+            <div className="marea-vitrina-chip-row">
+              {contestOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`marea-vitrina-chip is-filter${selectedContest === option.contest ? ' is-active' : ''}`}
+                  onClick={() => setSelectedContestKey(option.key)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {userEntry ? (

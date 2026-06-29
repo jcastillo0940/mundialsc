@@ -2307,6 +2307,15 @@ export function App() {
       setPhases(nextPhases)
       setMatches(nextMatches)
       setPredictionsList(nextPredictions)
+      const normalizeContest = (contest: ClientBootstrapResponse['group_stage_contest']) => contest
+        ? {
+            ...contest,
+            user_points: Number(contest.user_points ?? 0),
+            user_rank: contest.user_rank ?? null,
+            total_participants: Number(contest.total_participants ?? 0),
+            leaderboard: contest.leaderboard ?? [],
+          }
+        : null
       setClientOverview({
         active_phase: overviewResponse.data.active_phase,
         phase_goals: Number(overviewResponse.data.phase_goals ?? 0),
@@ -2314,6 +2323,8 @@ export function App() {
         leaderboard: overviewResponse.data.leaderboard ?? [],
         user_rank: overviewResponse.data.user_rank ?? null,
         total_participants: Number(overviewResponse.data.total_participants ?? 0),
+        group_stage_contest: normalizeContest(overviewResponse.data.group_stage_contest),
+        knockout_contest: normalizeContest(overviewResponse.data.knockout_contest),
       })
       setDashboardSnapshot(dashboardResponse.data)
       setWalletSnapshot(walletResponse.data)

@@ -14,6 +14,15 @@ use Illuminate\Http\Request;
 
 class ClientTournamentController extends Controller
 {
+    private const KNOCKOUT_PHASE_SLUGS = [
+        'dieciseisavos',
+        'octavos',
+        'cuartos',
+        'semifinal',
+        'final',
+        'semifinal-final',
+    ];
+
     public function __construct(
         private readonly PromotionRankingService $rankingService,
     ) {
@@ -29,6 +38,8 @@ class ClientTournamentController extends Controller
         $fullRanking = $activePhase ? $this->rankingService->fullRankedLeaderboard($activePhase->id) : collect();
         $winnerSlots = $activePhase ? $this->rankingService->winnerSlotsForPhase($activePhase->id) : 20;
         $userRankEntry = $fullRanking->first(fn ($row) => $row['user_id'] === $user->id);
+        $groupStageContest = $this->contestSummaryForUser($user->id, $this->groupStagePhase(), 'group_stage');
+        $knockoutContest = $this->contestSummaryForUser($user->id, $this->knockoutPhase(), 'knockout');
 
         return response()->json([
             'user' => $user->loadMissing('wallet'),
@@ -39,6 +50,8 @@ class ClientTournamentController extends Controller
             'leaderboard' => $fullRanking->take($winnerSlots)->values()->all(),
             'user_rank' => $userRankEntry ? $userRankEntry['position'] : null,
             'total_participants' => $fullRanking->count(),
+            'group_stage_contest' => $groupStageContest,
+            'knockout_contest' => $knockoutContest,
         ]);
     }
 
@@ -110,6 +123,44 @@ class ClientTournamentController extends Controller
             ->sum('points_awarded');
 
         return $predictionGoals + $invoiceGoals;
+    }
+
+    private function contestSummaryForUser(int $userId, ?TournamentPhase $phase, string $key): ?array
+    {
+        if (! $phase) {
+            return null;
+        }
+
+        $fullRanking = $this->rankingService->fullRankedLeaderboard($phase->id);
+        $winnerSlots = $this->rankingService->winnerSlotsForPhase($phase->id);
+        $userRankEntry = $fullRanking->first(fn ($row) => $row['user_id'] === $userId);
+
+        return [
+            'key' => $key,
+            'phase' => $phase,
+            'user_points' => (float) ($userRankEntry['goals'] ?? 0),
+            'user_rank' => $userRankEntry['position'] ?? null,
+            'total_participants' => $fullRanking->count(),
+            'leaderboard' => $fullRanking->take($winnerSlots)->values()->all(),
+        ];
+    }
+
+    private function groupStagePhase(): ?TournamentPhase
+    {
+        return TournamentPhase::query()
+            ->where('slug', 'fase-grupos')
+            ->first();
+    }
+
+    private function knockoutPhase(): ?TournamentPhase
+    {
+        return TournamentPhase::query()
+            ->where('slug', 'final')
+            ->first()
+            ?? TournamentPhase::query()
+                ->whereIn('slug', self::KNOCKOUT_PHASE_SLUGS)
+                ->orderByDesc('stage_order')
+                ->first();
     }
 
     private function clientPhasesQuery()

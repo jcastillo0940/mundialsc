@@ -128,6 +128,15 @@ export interface LeaderboardEntry {
   is_prize_eligible?: boolean
 }
 
+export interface ContestSummary {
+  key: 'group_stage' | 'knockout' | string
+  phase: TournamentPhase | null
+  user_points: number
+  user_rank: number | null
+  total_participants: number
+  leaderboard: LeaderboardEntry[]
+}
+
 export interface RegisteredInvoice {
   id: number
   cufe: string
@@ -158,6 +167,8 @@ export interface ClientBootstrap {
   leaderboard: LeaderboardEntry[]
   user_rank: number | null
   total_participants: number
+  group_stage_contest?: ContestSummary | null
+  knockout_contest?: ContestSummary | null
 }
 
 export interface DashboardStats {

@@ -306,6 +306,36 @@ class KnockoutPhaseRulesTest extends TestCase
             ->assertJsonPath('phase_goals', 9);
     }
 
+    public function test_client_bootstrap_returns_group_and_knockout_contests_separately(): void
+    {
+        $groupPhase = TournamentPhase::query()->where('slug', 'fase-grupos')->firstOrFail();
+        $roundOf32 = $this->activatePhase('dieciseisavos');
+        $finalPhase = $this->activatePhase('final');
+
+        $player = $this->createClient('Dos Concursos', 'dos-concursos@example.com', '8-111-0013');
+        $rival = $this->createClient('Rival Dos Concursos', 'rival-dos@example.com', '8-111-0014');
+
+        $this->createPrediction($this->createMatch($groupPhase), $player, 50);
+        $this->createPrediction($this->createMatch($roundOf32), $player, 4);
+        $this->createPrediction($this->createMatch($finalPhase), $player, 5);
+        $this->createPrediction($this->createMatch($finalPhase), $rival, 12);
+
+        Sanctum::actingAs($player);
+
+        $response = $this->getJson('/api/client/bootstrap');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('group_stage_contest.key', 'group_stage')
+            ->assertJsonPath('group_stage_contest.phase.slug', 'fase-grupos')
+            ->assertJsonPath('group_stage_contest.user_points', 50)
+            ->assertJsonPath('group_stage_contest.user_rank', 1)
+            ->assertJsonPath('knockout_contest.key', 'knockout')
+            ->assertJsonPath('knockout_contest.phase.slug', 'final')
+            ->assertJsonPath('knockout_contest.user_points', 9)
+            ->assertJsonPath('knockout_contest.user_rank', 2);
+    }
+
     public function test_prediction_closes_fifteen_minutes_before_kickoff_in_panama_time(): void
     {
         $user = $this->createClient('Participante Puntual', 'puntual@example.com', '8-111-0003');

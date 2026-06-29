@@ -8559,6 +8559,17 @@ a {
   color: #0a2579;
 }
 
+.marea-vitrina-stat-card small {
+  display: block;
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 800;
+}
+
+.marea-vitrina-stat-card.is-primary small {
+  color: rgba(10, 37, 121, 0.72);
+}
+
 .marea-vitrina-prizes-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.88fr);
