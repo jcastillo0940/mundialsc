@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DailyInvoiceGoal;
+use App\Models\Employee;
 use App\Models\FraudFlag;
 use App\Models\InvoiceGoalSetting;
-use App\Models\LiveScoreCommentaryEvent;
 use App\Models\LiveScoreSetting;
 use App\Models\LiveScoreSyncRun;
 use App\Models\MatchPrediction;
@@ -29,9 +29,11 @@ use App\Models\User;
 use App\Notifications\NewsletterConfirmationNotification;
 use App\Support\Audit;
 use App\Support\ContestInvoiceRegistrationService;
+use App\Support\EmployeeRosterService;
 use App\Support\LiveScoreSyncService;
 use App\Support\PointsAuditService;
 use App\Support\PromotionRankingService;
+use App\Support\SystemDiagnosticsService;
 use App\Support\TournamentScoring;
 use App\Services\FirebaseMessagingService;
 use App\Services\PushCampaignDispatcher;
@@ -56,6 +58,8 @@ class BackofficeController extends Controller
         private readonly ContestInvoiceRegistrationService $invoiceRegistrationService,
         private readonly FirebaseMessagingService $firebaseMessaging,
         private readonly PushCampaignDispatcher $pushCampaignDispatcher,
+        private readonly SystemDiagnosticsService $diagnosticsService,
+        private readonly EmployeeRosterService $employeeRoster,
     ) {
     }
 
@@ -70,6 +74,141 @@ class BackofficeController extends Controller
             'usersCount' => User::query()->where('role', 'client')->count(),
             'disqualifiedUsersCount' => User::query()->whereNotNull('disqualified_at')->count(),
         ]);
+    }
+
+    public function diagnostics(): View
+    {
+        return view('admin.diagnostics', [
+            'report' => $this->diagnosticsService->build(),
+        ]);
+    }
+
+    public function diagnosticsExportTxt(): \Symfony\Component\HttpFoundation\Response
+    {
+        $report = $this->diagnosticsService->build();
+        $filename = 'diagnostico-sistema-' . now()->format('Y-m-d_H-i') . '.txt';
+
+        return response($this->diagnosticsService->toText($report), 200, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    public function employees(Request $request): View
+    {
+        $filter = (string) $request->query('participates', 'all');
+        $report = $this->employeeRoster->report();
+
+        return view('admin.employees', [
+            'employees' => $this->filterEmployeeReport($report, $filter),
+            'summary' => $this->employeeRoster->summary($report),
+            'filter' => $filter,
+        ]);
+    }
+
+    public function importEmployees(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:15360'],
+        ]);
+
+        try {
+            $result = $this->employeeRoster->importFromCsv($request->file('csv_file'));
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['csv_file' => $e->getMessage()]);
+        }
+
+        $message = "Se importaron {$result['imported']} empleados.";
+        if ($result['skipped'] > 0) {
+            $message .= " Se omitieron {$result['skipped']} filas sin cedula valida.";
+        }
+
+        return back()->with('status', $message);
+    }
+
+    public function exportEmployees(Request $request): StreamedResponse
+    {
+        $filter = (string) $request->query('participates', 'all');
+        $report = $this->filterEmployeeReport($this->employeeRoster->report(), $filter);
+        $filename = 'empleados-participacion-'.now()->format('Y-m-d_H-i').'.csv';
+
+        return response()->streamDownload(function () use ($report): void {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($out, ['Cedula', 'Nombre', 'Participando', 'Fecha de registro', 'Facturas', 'Puntos por facturas', 'Puntos por pronosticos', 'Puntos totales', 'Posicion', 'Dentro de ganadores', 'Cliente real desplazado', 'Descalificado']);
+
+            foreach ($report as $row) {
+                fputcsv($out, [
+                    $row['cedula'],
+                    $row['name'],
+                    $row['is_participating'] ? 'Si' : 'No',
+                    optional($row['registered_at'])->format('Y-m-d H:i') ?? '',
+                    $row['invoice_count'],
+                    $row['invoice_points'],
+                    $row['prediction_points'],
+                    $row['total_points'],
+                    $row['position'] ?? '',
+                    $row['is_winner'] ? 'Si' : 'No',
+                    $row['displaced_client']['name'] ?? '',
+                    $row['is_disqualified'] ? 'Si' : 'No',
+                ]);
+            }
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    public function employeesPrint(Request $request): View
+    {
+        $filter = (string) $request->query('participates', 'all');
+        $report = $this->employeeRoster->report();
+
+        return view('admin.employees-print', [
+            'employees' => $this->filterEmployeeReport($report, $filter),
+            'summary' => $this->employeeRoster->summary($report),
+            'filter' => $filter,
+            'generatedAt' => now()->format('d/m/Y H:i'),
+        ]);
+    }
+
+    public function disqualifyEmployeeMatch(Request $request, Employee $employee): RedirectResponse
+    {
+        $user = $this->employeeRoster->findMatchedUser($employee);
+
+        if (! $user) {
+            return back()->withErrors(['employee' => 'Este empleado no tiene una cuenta de cliente registrada.']);
+        }
+
+        if ($user->disqualified_at !== null) {
+            return back()->with('status', "{$user->name} ya estaba descalificado.");
+        }
+
+        $before = $user->only(['disqualified_at', 'disqualification_reason']);
+
+        $user->update([
+            'disqualified_at' => now(),
+            'disqualification_reason' => 'Es empleado',
+        ]);
+
+        Audit::log('user.disqualified', 'user', $user->id, $request->user(), $request, [
+            'before' => $before,
+            'after' => $user->only(['disqualified_at', 'disqualification_reason']),
+            'source' => 'employees_roster',
+        ]);
+
+        return back()->with('status', "Se descalifico a {$user->name} (cedula {$user->cedula}) por ser empleado.");
+    }
+
+    private function filterEmployeeReport(\Illuminate\Support\Collection $report, string $filter): \Illuminate\Support\Collection
+    {
+        return match ($filter) {
+            'yes' => $report->where('is_participating', true)->values(),
+            'no' => $report->where('is_participating', false)->values(),
+            default => $report,
+        };
     }
 
     public function matches(Request $request): View
@@ -827,11 +966,21 @@ class BackofficeController extends Controller
 
     public function integrations(): View
     {
+        $filterType = request('type');
+
+        $runsQuery = LiveScoreSyncRun::query()->latest('id');
+        if ($filterType) {
+            $runsQuery->where('sync_type', $filterType);
+        }
+
         return view('admin.integrations', [
             'settings' => LiveScoreSetting::query()->first(),
-            'runs' => LiveScoreSyncRun::query()->latest('id')->limit(20)->get(),
+            'runs' => $runsQuery->limit(100)->get(),
+            'filterType' => $filterType,
             'importedMatchesCount' => TournamentMatch::query()->where('provider', 'live_score_api')->count(),
-            'commentaryEventsCount' => LiveScoreCommentaryEvent::query()->count(),
+            'lastLiveRun' => LiveScoreSyncRun::query()->where('sync_type', 'live')->where('status', 'completed')->latest('id')->first(),
+            'lastFixturesRun' => LiveScoreSyncRun::query()->where('sync_type', 'fixtures')->where('status', 'completed')->latest('id')->first(),
+            'failedRunsCount' => LiveScoreSyncRun::query()->where('status', 'failed')->where('started_at', '>=', now()->subHours(24))->count(),
         ]);
     }
 
@@ -847,10 +996,8 @@ class BackofficeController extends Controller
             'lang' => ['required', 'string', 'max:10'],
             'sync_from_date' => ['nullable', 'date'],
             'sync_to_date' => ['nullable', 'date'],
-            'auto_sync_commentary' => ['required', 'boolean'],
             'fixtures_sync_interval_hours' => ['required', 'integer', 'min:1', 'max:168'],
             'live_sync_interval_minutes' => ['required', 'integer', 'min:1', 'max:60'],
-            'commentary_sync_interval_minutes' => ['required', 'integer', 'min:1', 'max:60'],
         ]);
 
         $settings->update($data);
@@ -874,15 +1021,6 @@ class BackofficeController extends Controller
         return back()->with('status', $run->status === 'completed'
             ? 'Sincronización de partidos en vivo completada.'
             : 'Sincronización live falló: '.$run->error_message);
-    }
-
-    public function syncCommentary(Request $request): RedirectResponse
-    {
-        $run = $this->liveScoreSync->syncCommentary(null, [], $request->user()?->id);
-
-        return back()->with('status', $run->status === 'completed'
-            ? 'Sincronización de commentary completada.'
-            : 'Sincronización commentary falló: '.$run->error_message);
     }
 
     public function users(): View
@@ -1265,10 +1403,13 @@ class BackofficeController extends Controller
     public function storeAssistedInvoice(Request $request, User $user): RedirectResponse
     {
         $data = $request->validate([
-            'qr_raw_text' => ['required', 'string', 'max:2048'],
-            'branch_id' => ['nullable', 'integer'],
-            'fraud_flag_id' => ['nullable', 'integer', 'exists:fraud_flags,id'],
+            'qr_raw_text'      => ['required', 'string', 'max:2048'],
+            'branch_id'        => ['nullable', 'integer'],
+            'fraud_flag_id'    => ['nullable', 'integer', 'exists:fraud_flags,id'],
             'assistance_notes' => ['required', 'string', 'max:1500'],
+            'purchase_amount'  => ['nullable', 'numeric', 'min:0.01'],
+            'issued_at'        => ['nullable', 'date'],
+            'force_override'   => ['nullable', 'boolean'],
         ]);
 
         $flag = null;
@@ -1302,6 +1443,26 @@ class BackofficeController extends Controller
         };
 
         return back()->with('status', "Factura asistida {$verificationLabel}. Puntos acreditados: {$pointsAwarded}. ".($result['message'] ?? ''));
+    }
+
+    public function storeManualInvoice(Request $request, User $user): RedirectResponse
+    {
+        $data = $request->validate([
+            'invoice_serial'   => ['required', 'string', 'max:100'],
+            'purchase_amount'  => ['required', 'numeric', 'min:0.01'],
+            'issued_at'        => ['required', 'date'],
+            'branch_id'        => ['nullable', 'integer', 'exists:branches,id'],
+            'assistance_notes' => ['nullable', 'string', 'max:1500'],
+        ]);
+
+        $result = $this->invoiceRegistrationService->registerManualBySerial(
+            targetUser: $user,
+            data: $data,
+            actor: $request->user(),
+            request: $request,
+        );
+
+        return back()->with('status', $result['message'] ?? 'Factura manual registrada. Punto acreditado.');
     }
 
     public function site(): View
@@ -1867,13 +2028,27 @@ class BackofficeController extends Controller
 
     public function playerPoints(): View
     {
-        $query   = trim((string) request('query'));
-        $phaseId = request()->integer('phase_id') ?: null;
-        $phases  = TournamentPhase::orderBy('stage_order')->get();
+        $query       = trim((string) request('query'));
+        $phaseId     = request()->integer('phase_id') ?: null;
+        $phases      = TournamentPhase::orderBy('stage_order')->get();
+        $activePhase = $phaseId ? TournamentPhase::find($phaseId) : null;
+
+        $invoiceSubquery = DB::table('registered_invoices')
+            ->selectRaw('user_id, SUM(points_awarded) as invoice_pts, COUNT(*) as invoice_cnt')
+            ->where('validation_status', 'approved')
+            ->when($activePhase, fn ($q) => $q->whereBetween('issued_at', [$activePhase->starts_at, $activePhase->ends_at]))
+            ->groupBy('user_id');
+
+        $predSubquery = DB::table('match_predictions')
+            ->selectRaw('user_id, SUM(points_awarded) as pred_pts, COUNT(*) as pred_hits')
+            ->where('points_awarded', '>', 0)
+            ->when($phaseId, fn ($q) => $q->where('phase_id', $phaseId))
+            ->groupBy('user_id');
 
         $users = DB::table('users')
-            ->leftJoin('wallets', 'wallets.user_id', '=', 'users.id')
             ->leftJoin('branches', 'branches.id', '=', 'users.branch_id')
+            ->leftJoinSub($invoiceSubquery, 'inv', fn ($j) => $j->on('inv.user_id', '=', 'users.id'))
+            ->leftJoinSub($predSubquery, 'pred', fn ($j) => $j->on('pred.user_id', '=', 'users.id'))
             ->where('users.role', 'client')
             ->when($query, fn ($q) => $q->where(function ($w) use ($query) {
                 $w->where('users.name', 'like', "%{$query}%")
@@ -1888,46 +2063,18 @@ class BackofficeController extends Controller
                 users.phone,
                 users.disqualified_at,
                 branches.name as branch_name,
-                COALESCE(wallets.goals_balance, 0) as total_points,
-                COALESCE(wallets.lifetime_goals_earned, 0) as lifetime_points
+                COALESCE(inv.invoice_pts, 0)  as invoice_points,
+                COALESCE(inv.invoice_cnt, 0)  as invoice_count,
+                COALESCE(pred.pred_pts, 0)    as pred_points,
+                COALESCE(pred.pred_hits, 0)   as pred_hits,
+                COALESCE(inv.invoice_pts, 0) + COALESCE(pred.pred_pts, 0) as total_points
             ")
             ->orderByDesc('total_points')
             ->paginate(50)
             ->withQueryString();
 
-        $userIds = collect($users->items())->pluck('id')->all();
-
-        $invoiceSums = DB::table('registered_invoices')
-            ->whereIn('user_id', $userIds)
-            ->where('validation_status', 'approved')
-            ->selectRaw('user_id, SUM(points_awarded) as pts, COUNT(*) as cnt')
-            ->groupBy('user_id')
-            ->pluck('pts', 'user_id');
-
-        $invoiceCounts = DB::table('registered_invoices')
-            ->whereIn('user_id', $userIds)
-            ->where('validation_status', 'approved')
-            ->selectRaw('user_id, COUNT(*) as cnt')
-            ->groupBy('user_id')
-            ->pluck('cnt', 'user_id');
-
-        $predictionQuery = DB::table('match_predictions')
-            ->whereIn('user_id', $userIds)
-            ->where('points_awarded', '>', 0);
-
-        if ($phaseId) {
-            $predictionQuery->where('phase_id', $phaseId);
-        }
-
-        $predSums = $predictionQuery
-            ->selectRaw('user_id, SUM(points_awarded) as pts, COUNT(*) as hits')
-            ->groupBy('user_id')
-            ->get()
-            ->keyBy('user_id');
-
         return view('admin.player-points', compact(
-            'users', 'query', 'phases', 'phaseId',
-            'invoiceSums', 'invoiceCounts', 'predSums'
+            'users', 'query', 'phases', 'phaseId'
         ));
     }
 

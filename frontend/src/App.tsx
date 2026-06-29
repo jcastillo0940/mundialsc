@@ -4,11 +4,15 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { createWorker, PSM } from 'tesseract.js'
 import { api, setApiToken } from './api'
+import { onMessage } from 'firebase/messaging'
+import { firebaseMessagingPromise } from './firebase'
+import { isPushSupported, registerPushSubscription } from './utils/pushNotifications'
 import { InvoiceRegistrationView } from './components/InvoiceRegistrationView'
 import { TerminosPage } from './components/TerminosPage'
 import { PrivacidadPage } from './components/PrivacidadPage'
 import { ContactoPage } from './components/ContactoPage'
 import { CuentaView } from './components/CuentaView'
+import { ResultadosView } from './components/ResultadosView'
 import { ClientDemoTour } from './components/ClientDemoTour'
 import { VestuarioView } from './components/VestuarioView'
 import { VitrinaView } from './components/VitrinaView'
@@ -30,7 +34,6 @@ import type {
 
 const TOKEN_KEY = 'super-carnes-token'
 const REGISTRATION_DEADLINE = '10 de junio de 2026 a las 11:59 p. m.'
-const WINNERS_ANNOUNCEMENT = 'dentro de los 5 dias calendario siguientes al cierre de cada ronda'
 const PANAMA_TIMEZONE = 'America/Panama'
 const DEFAULT_AUTH_BG_YOUTUBE_ID = import.meta.env.VITE_AUTH_BG_YOUTUBE_ID ?? 'O9diw9_5pys'
 const DEFAULT_AUTH_LOGO_URL = import.meta.env.VITE_AUTH_LOGO_URL ?? ''
@@ -48,7 +51,7 @@ const AUTH_REFERENCE_ASSETS = {
 const STADIUM_IMAGE_URL = AUTH_REFERENCE_ASSETS.stadium
 
 type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password'
-type MainView = 'cancha' | 'reglas' | 'facturas' | 'perfil' | 'cuenta'
+type MainView = 'cancha' | 'reglas' | 'facturas' | 'perfil' | 'cuenta' | 'resultados'
 type PredictionMode = 'pending' | 'mine'
 type InvoiceEntryMode = 'scan' | 'manual'
 type AccountSection = 'perfil' | 'terminos'
@@ -147,6 +150,7 @@ const CLIENT_VIEW_PATHS: Record<MainView, string> = {
   perfil: '/ranking',
   reglas: '/vitrina',
   cuenta: '/cuenta',
+  resultados: '/resultados',
 }
 
 const CLIENT_VIEW_LABELS: Record<MainView, string> = {
@@ -155,6 +159,7 @@ const CLIENT_VIEW_LABELS: Record<MainView, string> = {
   perfil: 'Ranking',
   reglas: 'Vitrina',
   cuenta: 'Mi Cuenta',
+  resultados: 'Resultados',
 }
 
 const VIEW_DEMO_TARGETS: Record<MainView, string> = {
@@ -163,6 +168,7 @@ const VIEW_DEMO_TARGETS: Record<MainView, string> = {
   perfil: 'demo-view-perfil',
   reglas: 'demo-view-reglas',
   cuenta: 'demo-view-cuenta',
+  resultados: 'demo-view-resultados',
 }
 
 const ALL_GROUPS_KEY = '__all__'
@@ -739,7 +745,12 @@ function normalizeStructuredCufeCandidate(value: string) {
 
 function isAtLeast18(dateStr: string): boolean {
   if (!dateStr) return false
-  const birth = new Date(dateStr)
+  // Parse YYYY-MM-DD as components to avoid UTC midnight interpretation,
+  // which would shift the date for Panama (UTC-5) users during validation.
+  const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!parts) return false
+  const [, y, m, d] = parts.map(Number)
+  const birth = new Date(y, m - 1, d)
   if (Number.isNaN(birth.getTime())) return false
   const today = new Date()
   const cutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate())
@@ -855,20 +866,6 @@ function invoiceStatusMeta(status: string) {
   return { label: 'No valida', badge: 'X', tone: 'rejected' as const }
 }
 
-function formatCountdown(totalSeconds: number) {
-  const safeSeconds = Math.max(0, totalSeconds)
-  const days = Math.floor(safeSeconds / 86400)
-  const hours = Math.floor((safeSeconds % 86400) / 3600)
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
-  const seconds = safeSeconds % 60
-
-  return [
-    { label: 'Dias', value: String(days).padStart(2, '0') },
-    { label: 'Horas', value: String(hours).padStart(2, '0') },
-    { label: 'Min', value: String(minutes).padStart(2, '0') },
-    { label: 'Seg', value: String(seconds).padStart(2, '0') },
-  ]
-}
 
 function groupLabelValue(groupLabel: string | null | undefined) {
   if (!groupLabel) return ''
@@ -992,6 +989,7 @@ function currentViewFromPath(pathname: string): MainView {
   if (pathname === CLIENT_VIEW_PATHS.perfil) return 'perfil'
   if (pathname === CLIENT_VIEW_PATHS.reglas) return 'reglas'
   if (pathname === CLIENT_VIEW_PATHS.cuenta) return 'cuenta'
+  if (pathname === CLIENT_VIEW_PATHS.resultados) return 'resultados'
   return 'cancha'
 }
 
@@ -1162,6 +1160,12 @@ export function App() {
   const [invoiceGalleryProcessing, setInvoiceGalleryProcessing] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false)
+  const [inAppNotifications, setInAppNotifications] = useState<Array<{ id: number; title: string; body: string; url?: string; ts: Date }>>([])
+  const [notifsRead, setNotifsRead] = useState(false)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushEnabling, setPushEnabling] = useState(false)
+  const notifPanelRef = useRef<HTMLDivElement | null>(null)
   const [mobileUserSidebarOpen, setMobileUserSidebarOpen] = useState(false)
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string | null>(null)
   const [predictionDrafts, setPredictionDrafts] = useState<Record<number, PredictionDraft>>({})
@@ -1195,7 +1199,6 @@ export function App() {
   const [termsScrolledEnd, setTermsScrolledEnd] = useState(false)
   const [accountSection, setAccountSection] = useState<AccountSection>('perfil')
   const [savingPredictionIds, setSavingPredictionIds] = useState<number[]>([])
-  const [now, setNow] = useState(() => Date.now())
   const [demoTourState, setDemoTourState] = useState(() => loadDemoTourState())
   const invoiceScannerRef = useRef<InvoiceScannerRef | null>(null)
 
@@ -1215,6 +1218,7 @@ export function App() {
   const isAuthRoute = location.pathname === '/login'
   const authSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
   const resetPasswordTokenFromUrl = authSearchParams.get('token') ?? ''
+  const resetPasswordEmailFromUrl = authSearchParams.get('email') ?? ''
   const newsletterTokenFromUrl = authSearchParams.get('newsletter_token') ?? ''
   const isPublicPage = ['/terminos', '/privacidad', '/contacto'].includes(location.pathname)
   const isCompletingGoogleRegistration = Boolean(token && user && !isRegistrationComplete(user))
@@ -1316,8 +1320,67 @@ export function App() {
 
   useEffect(() => {
     setUserMenuOpen(false)
+    setNotifPanelOpen(false)
     setMobileUserSidebarOpen(false)
   }, [location.pathname])
+
+  // Firebase foreground message handler
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null
+    void (async () => {
+      const messaging = await firebaseMessagingPromise
+      if (!messaging) return
+      unsubscribe = onMessage(messaging, (payload) => {
+        const title = payload.notification?.title ?? payload.data?.['title'] ?? 'Super Carnes'
+        const body = payload.notification?.body ?? payload.data?.['body'] ?? ''
+        const url = (payload.fcmOptions as { link?: string } | undefined)?.link ?? payload.data?.['button_url']
+        setInAppNotifications((prev) => [
+          { id: Date.now(), title, body, url, ts: new Date() },
+          ...prev.slice(0, 19),
+        ])
+        setNotifsRead(false)
+      })
+    })()
+    return () => { unsubscribe?.() }
+  }, [])
+
+  // Detect if push is already enabled on load
+  useEffect(() => {
+    if (!isPushSupported()) return
+    if (Notification.permission === 'granted') setPushEnabled(true)
+  }, [])
+
+  // Click-outside closes notif panel
+  useEffect(() => {
+    if (!notifPanelOpen) return
+    function handlePointerDown(event: MouseEvent) {
+      if (!notifPanelRef.current?.contains(event.target as Node)) {
+        setNotifPanelOpen(false)
+      }
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setNotifPanelOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [notifPanelOpen])
+
+  async function handleEnablePushFromBell() {
+    if (pushEnabling) return
+    setPushEnabling(true)
+    try {
+      await registerPushSubscription()
+      setPushEnabled(true)
+    } catch {
+      // user denied or error — silent
+    } finally {
+      setPushEnabling(false)
+    }
+  }
 
   useEffect(() => {
     if (!mobileUserSidebarOpen) return
@@ -1597,6 +1660,9 @@ export function App() {
     if (isAuthRoute && resetPasswordTokenFromUrl) {
       setAuthMode('reset-password')
       setResetPasswordToken(resetPasswordTokenFromUrl)
+      if (resetPasswordEmailFromUrl) {
+        setResetPasswordEmail(resetPasswordEmailFromUrl)
+      }
       return
     }
     const isKnownClientRoute = Object.values(CLIENT_VIEW_PATHS).includes(location.pathname)
@@ -1624,7 +1690,7 @@ export function App() {
     if (user && !isKnownClientRoute) {
       navigate(CLIENT_VIEW_PATHS.cancha, { replace: true })
     }
-  }, [authBootstrapping, authMode, isAuthRoute, location.pathname, navigate, resetPasswordTokenFromUrl, token, user])
+  }, [authBootstrapping, authMode, isAuthRoute, location.pathname, navigate, resetPasswordEmailFromUrl, resetPasswordTokenFromUrl, token, user])
 
   useEffect(() => {
     if (!isAuthRoute || !newsletterTokenFromUrl) return
@@ -1648,13 +1714,6 @@ export function App() {
     setAccountSection(section === 'terminos' ? 'terminos' : 'perfil')
   }, [currentView, location.search])
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(Date.now())
-    }, 1000)
-
-    return () => window.clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     saveDemoTourState(demoTourState)
@@ -2173,16 +2232,7 @@ export function App() {
     return { total, completed, percentage }
   }, [activePhaseMatches, predictionMap])
 
-  const nextDeadlineMatch = useMemo(() => {
-    return activePhaseMatches.find((match) => !predictionMap.has(match.id) && matchTimeValue(match.kickoff_at) > now) ?? null
-  }, [activePhaseMatches, now, predictionMap])
 
-  const countdownParts = useMemo(() => {
-    if (!nextDeadlineMatch) return null
-
-    const seconds = Math.floor((matchTimeValue(nextDeadlineMatch.kickoff_at) - now) / 1000)
-    return formatCountdown(seconds)
-  }, [nextDeadlineMatch, now])
 
   async function bootstrap() {
     try {
@@ -2227,6 +2277,8 @@ export function App() {
         phase_goals: Number(overviewResponse.data.phase_goals ?? 0),
         general_goals: Number(overviewResponse.data.general_goals ?? 0),
         leaderboard: overviewResponse.data.leaderboard ?? [],
+        user_rank: overviewResponse.data.user_rank ?? null,
+        total_participants: Number(overviewResponse.data.total_participants ?? 0),
       })
       setDashboardSnapshot(dashboardResponse.data)
       setWalletSnapshot(walletResponse.data)
@@ -2760,43 +2812,6 @@ export function App() {
             </div>
           </div>
 
-          <div className="marea-alert-banner cancha-alert-banner">
-            <div className="marea-alert-icon">
-              <span className="material-symbols-outlined">campaign</span>
-            </div>
-            <div className="marea-alert-copy">
-              <p className="marea-alert-message">
-                <strong>Atención, seleccionado.</strong>{' '}
-                {nextDeadlineMatch
-                  ? `Tienes hasta el ${formatDateTime(nextDeadlineMatch.kickoff_at)} para enviar tus resultados de ${activeGroupTitle}.`
-                  : `Registro legal hasta el ${REGISTRATION_DEADLINE}. Los ganadores por fase se anuncian el ${WINNERS_ANNOUNCEMENT}.`}
-              </p>
-              {(nextDeadlineMatch || countdownParts) ? (
-                <div className="marea-alert-meta">
-                  {nextDeadlineMatch ? (
-                    <div className="marea-deadline-global">
-                      <span className="material-symbols-outlined">warning</span>
-                      <strong>Cierre</strong>
-                      <span>{formatUpperDate(nextDeadlineMatch.kickoff_at).toUpperCase()} - {formatTime(nextDeadlineMatch.kickoff_at)}</span>
-                    </div>
-                  ) : null}
-                  {countdownParts ? (
-                    <div className="marea-countdown" aria-label="Cuenta regresiva para cierre de pronosticos">
-                      {countdownParts.map((part) => (
-                        <div key={part.label} className="marea-countdown-chip">
-                          <strong>{part.value}</strong>
-                          <span>{part.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            <div className="cancha-alert-side-icon" aria-hidden="true">
-              <img alt="" src="/redesign/cancha-board-icon.svg" />
-            </div>
-          </div>
 
           <div className="marea-subnav-tabs">
             <button className={predictionMode === 'pending' ? 'subnav-tab active' : 'subnav-tab'} type="button" onClick={() => setPredictionMode('pending')}>
@@ -2884,7 +2899,11 @@ export function App() {
                 const awayDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_away_score ?? 0) : draft.away
 
                 return (
-                  <article key={match.id} className={favoriteTeam ? 'marea-match-card featured cancha-match-card' : 'marea-match-card cancha-match-card'}>
+                  <article key={match.id} className={[
+                    'marea-match-card cancha-match-card',
+                    favoriteTeam ? 'featured' : '',
+                    isPredictionClosed ? 'closed' : '',
+                  ].filter(Boolean).join(' ')}>
                     <div className="marea-match-topline">
                       <div className="marea-match-banner">
                         <span>{matchBucket(match, activePredictionPhase?.name).label}</span>
@@ -3203,6 +3222,7 @@ export function App() {
           invoices={invoices}
           invoiceTotals={invoiceTotals}
           overview={clientOverview}
+          predictions={predictionsList}
           user={user!}
           walletSnapshot={walletSnapshot}
         />
@@ -3229,6 +3249,10 @@ export function App() {
 
     if (currentView === 'cuenta') {
       return user ? <CuentaView user={user} saving={profileSaving} branches={branches} termsText={TERMS_TEXT} section={accountSection} onSectionChange={openAccountSection} onSave={handleProfileSave} /> : null
+    }
+
+    if (currentView === 'resultados') {
+      return <ResultadosView initialMatches={matches} phases={phases} />
     }
 
     return renderCancha()
@@ -3653,7 +3677,9 @@ export function App() {
                           max={(() => {
                             const d = new Date()
                             d.setFullYear(d.getFullYear() - 18)
-                            return d.toISOString().split('T')[0]
+                            const mm = String(d.getMonth() + 1).padStart(2, '0')
+                            const dd = String(d.getDate()).padStart(2, '0')
+                            return `${d.getFullYear()}-${mm}-${dd}`
                           })()}
                           value={authForm.birthdate}
                           onChange={(event) => {
@@ -3970,6 +3996,9 @@ export function App() {
                 <button className={topNavButton('reglas')} type="button" onClick={() => navigateToView('reglas')}>
                   Vitrina
                 </button>
+                <button className={topNavButton('resultados')} type="button" onClick={() => navigateToView('resultados')}>
+                  Resultados
+                </button>
               </nav>
               <div className="marea-client-header-end flex items-center gap-4">
                 <button
@@ -3981,10 +4010,74 @@ export function App() {
                   <span className="material-symbols-outlined">assistant_navigation</span>
                   <span>Ver tour</span>
                 </button>
-                <button className="marea-header-icon marea-header-notifications text-on-surface-variant hover:text-primary transition-all" type="button" aria-label="Notificaciones">
-                  <span className="material-symbols-outlined">notifications</span>
-                  <span className="cancha-notification-dot" />
-                </button>
+                <div className="notif-bell-wrapper" ref={notifPanelRef}>
+                  <button
+                    className="marea-header-icon marea-header-notifications text-on-surface-variant hover:text-primary transition-all"
+                    type="button"
+                    aria-label="Notificaciones"
+                    aria-expanded={notifPanelOpen}
+                    onClick={() => {
+                      setNotifPanelOpen((v) => !v)
+                      setNotifsRead(true)
+                    }}
+                  >
+                    <span className="material-symbols-outlined">notifications</span>
+                    {inAppNotifications.length > 0 && !notifsRead ? (
+                      <span className="cancha-notification-dot" />
+                    ) : null}
+                  </button>
+
+                  {notifPanelOpen ? (
+                    <div className="notif-panel" role="dialog" aria-label="Notificaciones">
+                      <div className="notif-panel-header">
+                        <span>Notificaciones</span>
+                        {inAppNotifications.length > 0 ? (
+                          <button className="notif-clear-button" type="button" onClick={() => setInAppNotifications([])}>
+                            Limpiar
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {inAppNotifications.length > 0 ? (
+                        <ul className="notif-list">
+                          {inAppNotifications.map((n) => (
+                            <li key={n.id} className="notif-item">
+                              {n.url ? (
+                                <a className="notif-item-link" href={n.url} onClick={() => setNotifPanelOpen(false)}>
+                                  <strong className="notif-item-title">{n.title}</strong>
+                                  {n.body ? <span className="notif-item-body">{n.body}</span> : null}
+                                  <time className="notif-item-time">{n.ts.toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Panama' })}</time>
+                                </a>
+                              ) : (
+                                <div className="notif-item-link">
+                                  <strong className="notif-item-title">{n.title}</strong>
+                                  {n.body ? <span className="notif-item-body">{n.body}</span> : null}
+                                  <time className="notif-item-time">{n.ts.toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Panama' })}</time>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="notif-empty">
+                          <span className="material-symbols-outlined">notifications_none</span>
+                          <p>Aún no tienes notificaciones</p>
+                          {!pushEnabled && isPushSupported() && Notification.permission !== 'denied' ? (
+                            <button
+                              className="notif-enable-button"
+                              type="button"
+                              disabled={pushEnabling}
+                              onClick={() => void handleEnablePushFromBell()}
+                            >
+                              <span className="material-symbols-outlined">add_alert</span>
+                              {pushEnabling ? 'Activando...' : 'Activar notificaciones'}
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
                 <button
                   className="marea-header-icon marea-header-invoice-mobile material-symbols-outlined text-on-surface-variant hover:text-primary transition-all md:hidden"
                   type="button"
@@ -4121,6 +4214,10 @@ export function App() {
                   <span className="material-symbols-outlined">leaderboard</span>
                   <span className="font-label-caps text-label-caps">Ranking</span>
                 </button>
+                <button className={sideNavButton('resultados')} type="button" onClick={() => navigateToView('resultados')}>
+                  <span className="material-symbols-outlined">scoreboard</span>
+                  <span className="font-label-caps text-label-caps">Resultados</span>
+                </button>
               </nav>
               <div className="mt-auto border-t border-outline-variant pt-4 flex flex-col gap-1">
                 <button className="demo-tour-side-button" type="button" onClick={startDemoTour}>
@@ -4190,9 +4287,9 @@ export function App() {
               <span className="material-symbols-outlined">leaderboard</span>
               <span className="text-[10px] font-bold">Ranking</span>
             </button>
-            <button className={`flex flex-col items-center gap-1 ${currentView === 'reglas' ? 'text-primary-container' : 'text-on-surface-variant'}`} type="button" onClick={() => navigateToView('reglas')}>
-              <span className="material-symbols-outlined">storefront</span>
-              <span className="text-[10px] font-bold">Vitrina</span>
+            <button className={`flex flex-col items-center gap-1 ${currentView === 'resultados' ? 'text-primary-container' : 'text-on-surface-variant'}`} type="button" onClick={() => navigateToView('resultados')}>
+              <span className="material-symbols-outlined">scoreboard</span>
+              <span className="text-[10px] font-bold">Resultados</span>
             </button>
           </nav>
 

@@ -154,6 +154,8 @@ export interface ClientBootstrap {
   phase_goals: number
   general_goals: number
   leaderboard: LeaderboardEntry[]
+  user_rank: number | null
+  total_participants: number
 }
 
 export interface DashboardStats {

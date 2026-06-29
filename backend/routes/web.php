@@ -78,6 +78,13 @@ Route::prefix('adminrepus1car')->group(function (): void {
 
     Route::middleware(['auth', 'role:admin'])->group(function (): void {
         Route::get('/', [BackofficeController::class, 'dashboard'])->name('admin.dashboard');
+        Route::get('/diagnostics', [BackofficeController::class, 'diagnostics'])->name('admin.diagnostics');
+        Route::get('/diagnostics/export', [BackofficeController::class, 'diagnosticsExportTxt'])->name('admin.diagnostics.export');
+        Route::get('/employees', [BackofficeController::class, 'employees'])->name('admin.employees');
+        Route::post('/employees/import', [BackofficeController::class, 'importEmployees'])->name('admin.employees.import');
+        Route::get('/employees/export', [BackofficeController::class, 'exportEmployees'])->name('admin.employees.export');
+        Route::get('/employees/print', [BackofficeController::class, 'employeesPrint'])->name('admin.employees.print');
+        Route::post('/employees/{employee}/disqualify', [BackofficeController::class, 'disqualifyEmployeeMatch'])->name('admin.employees.disqualify');
         Route::get('/teams', [BackofficeController::class, 'teams'])->name('admin.teams');
         Route::put('/teams/{team}/ranking', [BackofficeController::class, 'updateTeamRanking'])->name('admin.teams.ranking');
         Route::post('/teams/import-rankings', [BackofficeController::class, 'importTeamRankings'])->name('admin.teams.import-rankings');
@@ -112,7 +119,6 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::put('/integrations/live-score', [BackofficeController::class, 'updateIntegrationSettings'])->name('admin.integrations.live-score');
         Route::post('/integrations/live-score/sync-fixtures', [BackofficeController::class, 'syncFixtures'])->name('admin.integrations.live-score.sync-fixtures');
         Route::post('/integrations/live-score/sync-live', [BackofficeController::class, 'syncLive'])->name('admin.integrations.live-score.sync-live');
-        Route::post('/integrations/live-score/sync-commentary', [BackofficeController::class, 'syncCommentary'])->name('admin.integrations.live-score.sync-commentary');
         Route::get('/users', [BackofficeController::class, 'users'])->name('admin.users');
         Route::get('/users/{user}/edit', [BackofficeController::class, 'editUser'])->name('admin.users.edit');
         Route::get('/users/{user}/audit', [BackofficeController::class, 'userAudit'])->name('admin.users.audit');
@@ -125,6 +131,7 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::get('/player-points', [BackofficeController::class, 'playerPoints'])->name('admin.player-points');
         Route::get('/player-points/{user}', [BackofficeController::class, 'playerPointsDetail'])->name('admin.player-points.detail');
         Route::post('/users/{user}/assisted-invoices', [BackofficeController::class, 'storeAssistedInvoice'])->name('admin.users.assisted-invoices.store');
+        Route::post('/users/{user}/manual-invoices', [BackofficeController::class, 'storeManualInvoice'])->name('admin.users.manual-invoices.store');
         Route::get('/fraud', [BackofficeController::class, 'fraud'])->name('admin.fraud');
         Route::get('/fraud/export', [BackofficeController::class, 'exportFraudFlags'])->name('admin.fraud.export');
         Route::put('/fraud/{flag}', [BackofficeController::class, 'updateFraudFlag'])->name('admin.fraud.update');

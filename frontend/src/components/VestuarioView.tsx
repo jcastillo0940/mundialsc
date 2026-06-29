@@ -69,12 +69,14 @@ export function VestuarioView({
   const leaderboard = overview?.leaderboard ?? []
   const topThree = leaderboard.slice(0, 3)
   const userEntry = leaderboard.find((entry) => entry.user_id === user.id) ?? null
-  const userGoals = Number(userEntry?.goals ?? 0)
+  const userGoals = Number(userEntry?.goals ?? overview?.general_goals ?? 0)
+  const userPosition = userEntry?.position ?? overview?.user_rank ?? null
+  const totalParticipants = overview?.total_participants ?? leaderboard.length
   const maxGoals = leaderboard.reduce((currentMax, entry) => Math.max(currentMax, entry.goals), 0)
   const podiumEntries = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : topThree
   const userIndex = leaderboard.findIndex((entry) => entry.user_id === user.id)
   const leader = leaderboard[0] ?? null
-  const goalsToFirst = leader && userEntry && userEntry.position > 1 ? Math.max(Number(leader.goals) - userGoals, 0) : 0
+  const goalsToFirst = leader ? Math.max(Number(leader.goals) - userGoals, 0) : 0
 
   const contextRows = useMemo(() => {
     if (userIndex < 0) return []
@@ -112,7 +114,9 @@ export function VestuarioView({
               <strong>{user.full_name}</strong>
               <span>{user.branch?.name ?? 'Participante registrado'}</span>
               <small>
-                {userEntry ? `Posicion #${positionLabel(userEntry.position)} en el ranking oficial` : 'Esperando tu aparicion en el ranking'}
+                {userPosition
+                  ? `Posicion #${positionLabel(userPosition)} de ${totalParticipants.toLocaleString('es')} participantes`
+                  : 'Calculando tu posicion...'}
               </small>
             </div>
           </div>
@@ -212,26 +216,52 @@ export function VestuarioView({
                 </tbody>
               </table>
             </div>
-
-            {userEntry.position > 1 && (
-              <div className="vestuario-ranking-footer">
-                <span className="material-symbols-outlined">trending_up</span>
-                <span>Te faltan <strong>{formatCompactNumber(goalsToFirst)} goles</strong> para alcanzar el 1er lugar.</span>
-              </div>
-            )}
-
-            {userEntry.position === 1 && (
-              <div className="vestuario-ranking-footer vestuario-ranking-footer--leader">
-                <span className="material-symbols-outlined">emoji_events</span>
-                <span>Eres el lider del ranking con <strong>{formatCompactNumber(userGoals)} goles</strong>.</span>
-              </div>
-            )}
           </>
         ) : (
-          <div className="vestuario-empty-state">
-            <span className="material-symbols-outlined">leaderboard</span>
-            <h3>Todavia no apareces en el ranking</h3>
-            <p>Registra tus facturas para acumular goles y entrar en la tabla oficial.</p>
+          <div className="vestuario-table-wrap">
+            <table className="vestuario-table">
+              <thead>
+                <tr>
+                  <th>Pos</th>
+                  <th>Participante</th>
+                  <th>Rendimiento</th>
+                  <th className="is-right">Goles</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="is-current-user">
+                  <td className="vestuario-rank-cell">{userPosition ? positionLabel(userPosition) : '—'}</td>
+                  <td>
+                    <div className="vestuario-row-player">
+                      <div className="vestuario-row-player-badge">{userInitials(user.full_name)}</div>
+                      <div><strong>{user.full_name}</strong></div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="vestuario-performance">
+                      <div className="vestuario-performance-track">
+                        <span className="vestuario-performance-fill" style={{ width: `${maxGoals > 0 ? Math.max(14, Math.round((userGoals / maxGoals) * 100)) : 14}%` }} />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="vestuario-goals-cell">{formatCompactNumber(userGoals)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {(userPosition ?? 0) > 1 && (
+          <div className="vestuario-ranking-footer">
+            <span className="material-symbols-outlined">trending_up</span>
+            <span>Te faltan <strong>{formatCompactNumber(goalsToFirst)} goles</strong> para alcanzar el 1er lugar.</span>
+          </div>
+        )}
+
+        {(userPosition === 1) && (
+          <div className="vestuario-ranking-footer vestuario-ranking-footer--leader">
+            <span className="material-symbols-outlined">emoji_events</span>
+            <span>Eres el lider del ranking con <strong>{formatCompactNumber(userGoals)} goles</strong>.</span>
           </div>
         )}
       </section>

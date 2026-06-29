@@ -1,5 +1,12 @@
-﻿import type { ClientBootstrap, RegisteredInvoice, TournamentPhase, User, WalletMovement, WalletSnapshot } from '../types'
+import { useState } from 'react'
+import type { ClientBootstrap, Prediction, RegisteredInvoice, TournamentPhase, User, WalletMovement, WalletSnapshot } from '../types'
 import { InfoTooltip } from './InfoTooltip'
+
+type HistoryFilter = 'todos' | 'facturas' | 'acertados' | 'no_acertados'
+
+type UnifiedItem =
+  | { kind: 'movement'; data: WalletMovement; sortDate: number }
+  | { kind: 'prediction'; data: Prediction; sortDate: number }
 
 function formatCompactNumber(value: number | string | null | undefined) {
   const amount = Number(value ?? 0)
@@ -61,6 +68,22 @@ function movementIcon(movement: WalletMovement) {
   return 'monitoring'
 }
 
+function predictionIcon(resultType: string) {
+  if (resultType === 'exact') return 'workspace_premium'
+  return 'sports_soccer'
+}
+
+function predictionTone(resultType: string) {
+  if (resultType === 'exact' || resultType === 'outcome') return 'positive'
+  return 'neutral'
+}
+
+function predictionLabel(resultType: string) {
+  if (resultType === 'exact') return 'Pronóstico exacto acertado'
+  if (resultType === 'outcome') return 'Resultado correcto'
+  return 'Pronóstico no acertado'
+}
+
 function dateInPhase(dateValue: string | null | undefined, phase: TournamentPhase | null | undefined) {
   if (!dateValue || !phase) return false
 
@@ -77,6 +100,7 @@ export function VitrinaView({
   invoices,
   invoiceTotals,
   overview,
+  predictions,
 }: {
   user: User
   walletSnapshot: WalletSnapshot | null
@@ -88,7 +112,10 @@ export function VitrinaView({
     phase_amount?: number
   } | null
   overview: ClientBootstrap | null
+  predictions: Prediction[]
 }) {
+  const [activeFilter, setActiveFilter] = useState<HistoryFilter>('todos')
+
   const wallet = walletSnapshot?.wallet ?? user.wallet ?? null
   const movements = walletSnapshot?.movements ?? []
   const activePhase = overview?.active_phase ?? null
@@ -102,19 +129,37 @@ export function VitrinaView({
     invoiceTotals?.amount
       ?? approvedInvoices.reduce((total, invoice) => total + Number(invoice.purchase_amount ?? 0), 0),
   )
-  const invoiceById = new Map(approvedInvoices.map((invoice) => [invoice.id, invoice]))
-  const activePhaseMovements = movements.filter((movement) => {
-    const movementPhaseId = Number(movement.meta?.phase_id ?? 0)
-    if (activePhase && movementPhaseId > 0) return movementPhaseId === activePhase.id
-    if (movement.resource_type === 'registered_invoice' && movement.resource_id) {
-      return dateInPhase(invoiceById.get(movement.resource_id)?.issued_at, activePhase)
-    }
-    return false
-  })
   const totalGoalsWon = movements.reduce((total, movement) => total + Math.max(Number(movement.goals_delta ?? 0), 0), 0)
   const phaseGoalsWon = Number(overview?.phase_goals ?? invoiceTotals?.phase_goals ?? 0)
-  const phaseGoalsSpent = activePhaseMovements.reduce((total, movement) => total + Math.abs(Math.min(Number(movement.goals_delta ?? 0), 0)), 0)
   const activePhaseInvoiceCount = activePhaseInvoices.length
+
+  // Build unified history: non-prediction wallet movements + all scored predictions
+  const nonPredictionMovements = movements.filter((m) => m.type !== 'prediction_points_awarded')
+  const scoredPredictions = predictions.filter((p) => p.result_type !== 'pending')
+
+  const unifiedItems: UnifiedItem[] = [
+    ...nonPredictionMovements.map((m) => ({
+      kind: 'movement' as const,
+      data: m,
+      sortDate: m.created_at ? new Date(m.created_at).getTime() : 0,
+    })),
+    ...scoredPredictions.map((p) => ({
+      kind: 'prediction' as const,
+      data: p,
+      sortDate: p.match?.kickoff_at ? new Date(p.match.kickoff_at).getTime() : 0,
+    })),
+  ].sort((a, b) => b.sortDate - a.sortDate)
+
+  const hitCount = scoredPredictions.filter((p) => p.result_type === 'exact' || p.result_type === 'outcome').length
+  const missCount = scoredPredictions.filter((p) => p.result_type === 'miss').length
+  const invoiceMovementCount = nonPredictionMovements.filter((m) => m.type === 'invoice_goal_awarded').length
+
+  const filteredItems = unifiedItems.filter((item) => {
+    if (activeFilter === 'facturas') return item.kind === 'movement' && item.data.type === 'invoice_goal_awarded'
+    if (activeFilter === 'acertados') return item.kind === 'prediction' && (item.data.result_type === 'exact' || item.data.result_type === 'outcome')
+    if (activeFilter === 'no_acertados') return item.kind === 'prediction' && item.data.result_type === 'miss'
+    return true
+  })
 
   return (
     <section className="vitrina-view marea-vitrina-page">
@@ -223,19 +268,80 @@ export function VitrinaView({
           </div>
 
           <div className="marea-vitrina-chip-row">
-            <span className="marea-vitrina-chip">{formatCompactNumber(movements.length)} movimientos</span>
-            <span className="marea-vitrina-chip positive">+{formatCompactNumber(phaseGoalsWon)} G fase</span>
-            <span className="marea-vitrina-chip negative">-{formatCompactNumber(phaseGoalsSpent)} G fase</span>
+            <button
+              type="button"
+              className={`marea-vitrina-chip is-filter${activeFilter === 'todos' ? ' is-active' : ''}`}
+              onClick={() => setActiveFilter('todos')}
+            >
+              Todos ({formatCompactNumber(unifiedItems.length)})
+            </button>
+            <button
+              type="button"
+              className={`marea-vitrina-chip is-filter${activeFilter === 'acertados' ? ' is-active positive' : ''}`}
+              onClick={() => setActiveFilter('acertados')}
+            >
+              Acertados ({formatCompactNumber(hitCount)})
+            </button>
+            <button
+              type="button"
+              className={`marea-vitrina-chip is-filter${activeFilter === 'no_acertados' ? ' is-active' : ''}`}
+              onClick={() => setActiveFilter('no_acertados')}
+            >
+              No acertados ({formatCompactNumber(missCount)})
+            </button>
+            <button
+              type="button"
+              className={`marea-vitrina-chip is-filter${activeFilter === 'facturas' ? ' is-active positive' : ''}`}
+              onClick={() => setActiveFilter('facturas')}
+            >
+              Facturas ({formatCompactNumber(invoiceMovementCount)})
+            </button>
           </div>
         </div>
 
-        {movements.length ? (
+        {filteredItems.length ? (
           <div className="marea-vitrina-history-list">
-            {movements.map((movement) => {
+            {filteredItems.map((item) => {
+              if (item.kind === 'prediction') {
+                const prediction = item.data
+                const match = prediction.match
+                const tone = predictionTone(prediction.result_type)
+                const homeCode = match?.home_team?.code ?? match?.homeTeam?.code ?? match?.home_team?.name ?? 'Local'
+                const awayCode = match?.away_team?.code ?? match?.awayTeam?.code ?? match?.away_team?.name ?? 'Visitante'
+
+                return (
+                  <article key={`pred-${prediction.id}`} className={`marea-vitrina-history-card ${tone}`}>
+                    <div className="marea-vitrina-history-icon">
+                      <span className="material-symbols-outlined">{predictionIcon(prediction.result_type)}</span>
+                    </div>
+
+                    <div className="marea-vitrina-history-copy">
+                      <strong>{predictionLabel(prediction.result_type)}</strong>
+                      <p>{formatUpperDate(match?.kickoff_at)}</p>
+                      <small>
+                        {homeCode} vs {awayCode}
+                        {match?.home_score != null && match?.away_score != null
+                          ? ` · Pronós. ${prediction.predicted_home_score}-${prediction.predicted_away_score} · Real ${match.home_score}-${match.away_score}`
+                          : ''}
+                      </small>
+                    </div>
+
+                    <div className="marea-vitrina-history-score">
+                      <strong>
+                        {prediction.points_awarded > 0 ? '+' : ''}
+                        {formatCompactNumber(prediction.points_awarded)} G
+                      </strong>
+                      <span>0 T</span>
+                    </div>
+                  </article>
+                )
+              }
+
+              const movement = item.data
               const tone = movementTone(movement)
 
               return (
-                <article key={movement.id} className={`marea-vitrina-history-card ${tone}`}>
+                <article key={`mov-${movement.id}`} className={`marea-vitrina-history-card ${tone}`}>
                   <div className="marea-vitrina-history-icon">
                     <span className="material-symbols-outlined">{movementIcon(movement)}</span>
                   </div>
@@ -267,11 +373,10 @@ export function VitrinaView({
           <div className="marea-vitrina-empty-state">
             <span className="material-symbols-outlined">monitoring</span>
             <h3>Sin movimientos registrados</h3>
-            <p>Cuando sumes goles o se validen nuevas facturas, el historial oficial aparecerÃ¡ aquí.</p>
+            <p>Cuando sumes goles o se validen nuevas facturas, el historial oficial aparecerá aquí.</p>
           </div>
         )}
       </section>
     </section>
   )
 }
-

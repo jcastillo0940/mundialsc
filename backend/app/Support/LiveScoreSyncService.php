@@ -92,6 +92,10 @@ class LiveScoreSyncService
     {
         $run = $this->startRun('live', $filters, $requestedByUserId);
 
+        if (empty($filters) && ! $this->hasLiveCandidates()) {
+            return $this->finishRun($run, 'completed', 0, 0, 0);
+        }
+
         try {
             $items = $this->client->live($this->buildLiveParams($filters));
             $updated = 0;
@@ -277,6 +281,20 @@ class LiveScoreSyncService
         ]);
 
         return $run->fresh();
+    }
+
+    private function hasLiveCandidates(): bool
+    {
+        return TournamentMatch::query()
+            ->where('provider', 'live_score_api')
+            ->where(function ($q) {
+                $q->where('status', 'locked')
+                    ->orWhere(function ($q) {
+                        $q->where('status', 'scheduled')
+                            ->where('kickoff_at', '<=', now()->addMinutes(30));
+                    });
+            })
+            ->exists();
     }
 
     private function commentaryCandidates(array $filters): Collection

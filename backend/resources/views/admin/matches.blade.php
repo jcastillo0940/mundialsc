@@ -153,8 +153,10 @@
             </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-            @if($match->status === 'final')
+            @if($match->status === 'final' && $match->home_score !== null)
                 <span class="score-display">{{ $match->home_score }} - {{ $match->away_score }}</span>
+            @elseif($match->status === 'locked' && $match->home_score !== null)
+                <span class="score-display" style="color:#f0c040">{{ $match->home_score }} - {{ $match->away_score }}</span>
             @endif
             <span class="status-badge {{ $match->status }}">{{ $match->status }}</span>
         </div>
@@ -170,14 +172,14 @@
                     <div style="flex:1;text-align:center">
                         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">{{ Str::limit($match->homeTeam->name, 12) }}</div>
                         <input name="home_score" type="number" min="0" max="20"
-                               value="{{ $match->status === 'final' ? $match->home_score : '' }}"
+                               value="{{ in_array($match->status, ['final', 'locked']) ? $match->home_score : '' }}"
                                placeholder="0" required>
                     </div>
                     <span class="score-sep">-</span>
                     <div style="flex:1;text-align:center">
                         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">{{ Str::limit($match->awayTeam->name, 12) }}</div>
                         <input name="away_score" type="number" min="0" max="20"
-                               value="{{ $match->status === 'final' ? $match->away_score : '' }}"
+                               value="{{ in_array($match->status, ['final', 'locked']) ? $match->away_score : '' }}"
                                placeholder="0" required>
                     </div>
                 </div>

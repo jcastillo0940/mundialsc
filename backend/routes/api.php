@@ -9,7 +9,6 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DailyInvoiceGoalController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\InvoiceController;
-use App\Http\Controllers\Api\MatchCommentaryController;
 use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PredictionController;
@@ -48,7 +47,6 @@ Route::middleware(['auth:sanctum', 'registration.complete'])->group(function ():
     Route::get('client/bootstrap', [ClientTournamentController::class, 'bootstrap']);
     Route::get('client/phases', [ClientTournamentController::class, 'phases']);
     Route::get('client/matches', [ClientTournamentController::class, 'matches']);
-    Route::get('client/matches/{match}/commentary', [MatchCommentaryController::class, 'index']);
     Route::get('client/leaderboard', [ClientTournamentController::class, 'leaderboard']);
     Route::get('client/invoices', [DailyInvoiceGoalController::class, 'index'])->middleware('role:client');
     Route::get('client/predictions', [PredictionController::class, 'index'])->middleware('role:client');

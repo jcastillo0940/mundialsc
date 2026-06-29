@@ -75,6 +75,24 @@ class ContestInvoiceRegistrationService
             ]);
         }
 
+        if ($registrationSource === 'client') {
+            $todayPanama = now('America/Panama');
+            $todayCount = RegisteredInvoice::query()
+                ->where('user_id', $targetUser->id)
+                ->whereBetween('created_at', [
+                    $todayPanama->copy()->startOfDay()->utc(),
+                    $todayPanama->copy()->endOfDay()->utc(),
+                ])
+                ->whereNotIn('validation_status', ['rejected'])
+                ->count();
+
+            if ($todayCount >= 1) {
+                throw ValidationException::withMessages([
+                    'invoice' => 'Ya registraste una factura hoy. Solo puedes registrar una factura por dia.',
+                ]);
+            }
+        }
+
         $campaign = $this->campaignManager->activeOrFail();
         $settings = InvoiceGoalSetting::query()->first();
 
@@ -102,45 +120,69 @@ class ContestInvoiceRegistrationService
             ]);
         }
 
-        try {
-            $cacheKey = 'dgi_v2_cufe_' . strtolower($cufe);
-            $cached = Cache::remember($cacheKey, now()->addMinutes(15), function () use ($cufe) {
-                $r = $this->verifier->resolve($cufe);
-                return array_merge($r, ['issued_at' => $r['issued_at']->toIso8601String()]);
-            });
-            $issuedAtRaw = $cached['issued_at'];
-            $resolvedInvoice = array_merge($cached, [
-                'issued_at' => is_string($issuedAtRaw)
-                    ? CarbonImmutable::parse($issuedAtRaw, 'America/Panama')
-                    : CarbonImmutable::now('America/Panama'),
-            ]);
-        } catch (ConnectionException) {
-            throw ValidationException::withMessages([
-                'qr_raw_text' => 'No fue posible conectar con el servicio DGI. Intenta de nuevo en unos segundos.',
-            ]);
-        } catch (ValidationException $exception) {
-            $this->fraudDetection->flag(
-                user: $targetUser,
-                type: 'dgi_invoice_resolution_failed',
-                title: 'CUFE no confirmado por DGI',
-                description: 'DGI rechazo o no confirmo el CUFE durante la resolucion inicial.',
-                severity: 'critical',
-                evidence: [
+        $forceOverride = $registrationSource === 'admin_assisted' && ! empty($data['force_override']);
+        $resolvedInvoice = null;
+
+        if (! $forceOverride) {
+            try {
+                $cacheKey = 'dgi_v2_cufe_' . strtolower($cufe);
+                $cached = Cache::remember($cacheKey, now()->addMinutes(15), function () use ($cufe) {
+                    $r = $this->verifier->resolve($cufe);
+                    return array_merge($r, ['issued_at' => $r['issued_at']->toIso8601String()]);
+                });
+                $issuedAtRaw = $cached['issued_at'];
+                $resolvedInvoice = array_merge($cached, [
+                    'issued_at' => is_string($issuedAtRaw)
+                        ? CarbonImmutable::parse($issuedAtRaw, 'America/Panama')
+                        : CarbonImmutable::now('America/Panama'),
+                ]);
+            } catch (ConnectionException) {
+                throw ValidationException::withMessages([
+                    'qr_raw_text' => 'No fue posible conectar con el servicio DGI. Intenta de nuevo en unos segundos.',
+                ]);
+            } catch (ValidationException $exception) {
+                $this->fraudDetection->flag(
+                    user: $targetUser,
+                    type: 'dgi_invoice_resolution_failed',
+                    title: 'CUFE no confirmado por DGI',
+                    description: 'DGI rechazo o no confirmo el CUFE durante la resolucion inicial.',
+                    severity: 'critical',
+                    evidence: [
+                        'cufe' => strtoupper($cufe),
+                        'errors' => $exception->errors(),
+                    ],
+                    request: $request,
+                );
+
+                Audit::log('invoice.dgi_resolution_failed', 'registered_invoice', null, $actor, $request, [
                     'cufe' => strtoupper($cufe),
                     'errors' => $exception->errors(),
-                ],
-                request: $request,
-            );
+                    'participant_user_id' => $targetUser->id,
+                    'registration_source' => $registrationSource,
+                ]);
 
-            Audit::log('invoice.dgi_resolution_failed', 'registered_invoice', null, $actor, $request, [
-                'cufe' => strtoupper($cufe),
-                'errors' => $exception->errors(),
-                'participant_user_id' => $targetUser->id,
-                'registration_source' => $registrationSource,
-            ]);
-
-            throw $exception;
+                throw $exception;
+            }
         }
+
+        // Override admin: usar datos manuales en lugar de los de DGI
+        if ($forceOverride || $resolvedInvoice === null) {
+            if (empty($data['purchase_amount'])) {
+                throw ValidationException::withMessages([
+                    'purchase_amount' => 'Debes indicar el monto de la factura para el registro forzado.',
+                ]);
+            }
+            $resolvedInvoice = [
+                'cufe'            => strtoupper($cufe),
+                'invoice_number'  => strtoupper($cufe),
+                'purchase_amount' => round((float) $data['purchase_amount'], 2),
+                'issued_at'       => CarbonImmutable::parse($data['issued_at'] ?? now(), 'America/Panama'),
+                'issuer_ruc'      => '',
+                'issuer_name'     => '',
+                'payload'         => null,
+            ];
+        }
+
         $canonicalCufe = strtoupper((string) $resolvedInvoice['cufe']);
         $issuedAt = $resolvedInvoice['issued_at'];
         $minimumAmount = $settings ? (float) $settings->min_purchase_amount : $this->rules->minimumInvoiceAmount();
@@ -358,6 +400,104 @@ class ContestInvoiceRegistrationService
             'invoice' => $invoice,
             'verification_status' => $verification['status'],
             'message' => $this->messageForStatus($verification['status']),
+        ];
+    }
+
+    public function registerManualBySerial(
+        User $targetUser,
+        array $data,
+        User $actor,
+        ?Request $request = null,
+    ): array {
+        if ($targetUser->disqualified_at) {
+            throw ValidationException::withMessages([
+                'account' => 'Tu cuenta fue descalificada y no puede registrar facturas.',
+            ]);
+        }
+
+        $campaign = $this->campaignManager->activeOrFail();
+        $invoiceSerial = strtoupper(trim((string) ($data['invoice_serial'] ?? '')));
+        $purchaseAmount = round((float) ($data['purchase_amount'] ?? 0), 2);
+        $issuedAt = CarbonImmutable::parse((string) ($data['issued_at'] ?? now()), 'America/Panama');
+        $notes = (string) ($data['assistance_notes'] ?? 'Factura registrada manualmente sin CUFE por administrador.');
+
+        if ($purchaseAmount <= 0) {
+            throw ValidationException::withMessages([
+                'purchase_amount' => 'El monto debe ser mayor a cero.',
+            ]);
+        }
+
+        // CUFE sintetico — no se consulta DGI, esta factura no tiene CUFE real
+        $canonicalCufe = 'MANUAL-'.preg_replace('/[^A-Z0-9]/', '', $invoiceSerial).'-'.$targetUser->id.'-'.now()->format('Ymd');
+
+        $invoicePhase = $this->phaseResolver->phaseForDate($issuedAt);
+
+        try {
+            $invoice = DB::transaction(function () use ($targetUser, $campaign, $data, $canonicalCufe, $invoiceSerial, $purchaseAmount, $issuedAt, $notes, $actor, $invoicePhase): RegisteredInvoice {
+                $invoice = RegisteredInvoice::query()->create([
+                    'user_id'               => $targetUser->id,
+                    'campaign_id'           => $campaign->id,
+                    'branch_id'             => $data['branch_id'] ?? null,
+                    'cufe'                  => $canonicalCufe,
+                    'qr_raw_text'           => 'MANUAL:'.$invoiceSerial,
+                    'invoice_number'        => $invoiceSerial,
+                    'issued_at'             => $issuedAt,
+                    'purchase_amount'       => $purchaseAmount,
+                    'points_awarded'        => 1,
+                    'shots_awarded'         => 0,
+                    'daily_points_capped'   => false,
+                    'daily_invoice_limit_hit' => false,
+                    'status'                => 'accepted',
+                    'validation_status'     => 'manual_approved',
+                    'validation_notes'      => 'Registrada manualmente sin CUFE por administrador. '.$notes,
+                    'dgi_checked_at'        => null,
+                    'dgi_response_payload'  => null,
+                    'registration_source'   => 'admin_manual_no_qr',
+                    'registered_by_user_id' => $actor->id,
+                    'assistance_notes'      => $notes,
+                ]);
+
+                $this->syncDailyInvoiceGoal($targetUser, $invoice, $invoicePhase);
+                $this->walletService->creditGoals(
+                    user: $targetUser,
+                    amount: 1,
+                    type: 'invoice_goal_awarded',
+                    resourceType: 'registered_invoice',
+                    resourceId: $invoice->id,
+                    campaignId: $campaign->id,
+                    notes: 'Factura manual sin CUFE aprobada por administrador.',
+                    meta: [
+                        'source'                 => 'manual_invoice',
+                        'registration_source'    => 'admin_manual_no_qr',
+                        'registered_by_user_id'  => $actor->id,
+                        'invoice_serial'         => $invoiceSerial,
+                        'phase_id'               => $invoicePhase?->id,
+                        'phase_slug'             => $invoicePhase?->slug,
+                    ],
+                );
+
+                Audit::log('invoice.registered', 'registered_invoice', $invoice->id, $actor, null, [
+                    'participant_user_id'  => $targetUser->id,
+                    'cufe'                => $invoice->cufe,
+                    'invoice_serial'      => $invoiceSerial,
+                    'points_awarded'      => 1,
+                    'registration_source' => 'admin_manual_no_qr',
+                ]);
+
+                return $invoice;
+            });
+        } catch (QueryException $exception) {
+            if ((int) $exception->getCode() === 23000) {
+                throw ValidationException::withMessages([
+                    'invoice_serial' => 'Ese numero de serie ya fue registrado previamente para este participante.',
+                ]);
+            }
+            throw $exception;
+        }
+
+        return [
+            'invoice' => $invoice,
+            'message' => 'Factura manual registrada. Punto acreditado.',
         ];
     }
 

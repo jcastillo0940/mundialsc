@@ -52,16 +52,16 @@
                 <td>{{ $row->cedula ?: '—' }}</td>
                 <td>{{ $row->branch_name ?: '—' }}</td>
                 <td style="text-align:right">
-                    <strong>{{ number_format($invoiceSums[$row->id] ?? 0) }}</strong>
+                    <strong>{{ number_format($row->invoice_points) }}</strong>
                 </td>
                 <td style="text-align:right">
-                    <span class="pill">{{ $invoiceCounts[$row->id] ?? 0 }}</span>
+                    <span class="pill">{{ $row->invoice_count }}</span>
                 </td>
                 <td style="text-align:right">
-                    <strong>{{ number_format($predSums[$row->id]->pts ?? 0) }}</strong>
+                    <strong>{{ number_format($row->pred_points) }}</strong>
                 </td>
                 <td style="text-align:right">
-                    <span class="pill">{{ $predSums[$row->id]->hits ?? 0 }}</span>
+                    <span class="pill">{{ $row->pred_hits }}</span>
                 </td>
                 <td style="text-align:right">
                     <strong style="font-size:18px;color:#ffd27a">{{ number_format($row->total_points) }}</strong>

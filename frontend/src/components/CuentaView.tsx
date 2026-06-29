@@ -12,16 +12,21 @@ function documentTypeLabel(documentType: User['document_type']) {
   return 'Pasaporte'
 }
 
+const MONTH_NAMES_ES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+]
+
 function formatBirthdate(dateValue: string | null | undefined) {
   if (!dateValue) return 'No registrada'
-  const date = new Date(dateValue)
-  if (Number.isNaN(date.getTime())) return dateValue
-  return date.toLocaleDateString('es-PA', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'America/Panama',
-  })
+  // Parse YYYY-MM-DD directly to avoid JavaScript treating it as UTC midnight,
+  // which would shift the date back one day for Panama (UTC-5) users.
+  const parts = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!parts) return dateValue
+  const [, year, month, day] = parts
+  const monthName = MONTH_NAMES_ES[parseInt(month, 10) - 1]
+  if (!monthName) return dateValue
+  return `${parseInt(day, 10)} de ${monthName} de ${year}`
 }
 
 export function CuentaView({

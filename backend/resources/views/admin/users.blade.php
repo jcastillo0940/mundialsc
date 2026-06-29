@@ -41,6 +41,7 @@
                 <td>
                     <a class="pill" href="{{ route('admin.users.edit', $user) }}" style="display:inline-block;margin-bottom:10px">Editar participante</a>
                     <a class="pill" href="{{ route('admin.users.audit', $user) }}" style="display:inline-block;margin-bottom:10px">Ver auditoria</a>
+                    <a class="pill" href="{{ route('admin.player-points.detail', $user) }}" style="display:inline-block;margin-bottom:10px;background:linear-gradient(135deg,#1f8f63,#166344);border:0">Añadir puntos factura</a>
                     <form method="post" action="{{ route('admin.users.update', $user) }}" class="grid">
                         @csrf
                         @method('put')

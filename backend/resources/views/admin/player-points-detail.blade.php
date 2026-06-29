@@ -43,6 +43,14 @@
 <div class="card">
     <h2>Registrar factura asistida</h2>
     <p class="muted">Esta carga queda marcada como asistencia administrativa, con responsable, notas y enlace opcional al caso antifraude.</p>
+
+    @if($errors->has('cufe'))
+        <div style="margin-bottom:14px;padding:12px 16px;background:#2d1a1a;border:1px solid #7a2020;border-radius:10px;color:#f87171;font-size:13px">
+            <strong>Error de DGI:</strong> {{ $errors->first('cufe') }}
+            <br><small style="color:#9ca3af;margin-top:4px;display:block">Si la factura es válida, activa el <strong>registro forzado</strong> abajo e ingresa el monto y fecha manualmente.</small>
+        </div>
+    @endif
+
     <form method="post" action="{{ route('admin.users.assisted-invoices.store', $user) }}" class="grid">
         @csrf
         <div class="row">
@@ -65,14 +73,54 @@
             </select>
         </div>
         <textarea name="assistance_notes" placeholder="Describe la ayuda prestada y el canal de contacto.">{{ old('assistance_notes', 'Cliente asistido por soporte para registrar la factura.') }}</textarea>
+
+        <details @if(old('force_override')) open @endif style="border:1px solid #2d3f50;border-radius:10px;padding:14px">
+            <summary style="cursor:pointer;font-size:13px;font-weight:600;color:#f0c040;user-select:none">⚠ Registro forzado (omitir validación DGI)</summary>
+            <p style="color:#9ca3af;font-size:12px;margin:8px 0 12px">Usar solo cuando DGI rechaza la factura pero el admin confirma que es válida. El punto se acredita con estado <em>manual_approved</em>.</p>
+            <div class="row">
+                <input name="purchase_amount" type="number" step="0.01" min="0.01" placeholder="Monto pagado (obligatorio si forzado)" value="{{ old('purchase_amount') }}">
+                <input name="issued_at" type="date" value="{{ old('issued_at', now()->toDateString()) }}">
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;cursor:pointer">
+                <input type="checkbox" name="force_override" value="1" @checked(old('force_override'))>
+                Confirmo que esta factura es válida y autorizo el registro sin DGI
+            </label>
+        </details>
+
         <button type="submit">Registrar factura asistida</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Registrar factura sin CUFE (por numero de serie)</h2>
+    <p class="muted">Para facturas internas que no tienen CUFE registrado. Se consulta la API de DGI con el numero de autorizacion. Si DGI no la encuentra se genera un CUFE sintetico y queda registrada igualmente.</p>
+    @if(session('status') && str_contains(session('status'), 'manual'))
+        <div class="alert alert-success" style="margin-bottom:12px">{{ session('status') }}</div>
+    @endif
+    <form method="post" action="{{ route('admin.users.manual-invoices.store', $user) }}" class="grid">
+        @csrf
+        <div class="row">
+            <input name="invoice_serial" placeholder="Numero interno de factura (ej. BCCT-412146)" value="{{ old('invoice_serial') }}" required>
+            <input name="purchase_amount" type="number" step="0.01" min="0.01" placeholder="Monto pagado (ej. 25.50)" value="{{ old('purchase_amount') }}" required>
+        </div>
+        <div class="row">
+            <input name="issued_at" type="date" value="{{ old('issued_at', now()->toDateString()) }}" required>
+            <select name="branch_id">
+                <option value="">Sucursal opcional</option>
+                @foreach($branches as $branch)
+                    <option value="{{ $branch->id }}" @selected((string) old('branch_id') === (string) $branch->id)>{{ $branch->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <textarea name="assistance_notes" placeholder="Notas adicionales (opcional)">{{ old('assistance_notes') }}</textarea>
+        <button type="submit">Registrar factura manual</button>
     </form>
 </div>
 
 <div class="grid cols-3">
     <div class="card">
         <span class="muted">Total de puntos</span>
-        <div class="metric" style="color:#ffd27a">{{ number_format($wallet->goals_balance ?? 0) }}</div>
+        <div class="metric" style="color:#ffd27a">{{ number_format($invoicePoints + $predictionPoints) }}</div>
     </div>
     <div class="card">
         <span class="muted">Puntos por facturas</span>
@@ -172,8 +220,8 @@
     <table>
         <thead>
             <tr>
-                <th>Fecha</th>
                 <th>Partido</th>
+                <th>Enviado</th>
                 <th>Fase</th>
                 <th>Pronostico</th>
                 <th>Resultado real</th>
@@ -185,9 +233,15 @@
         @foreach($predictions as $pred)
             @php $match = $pred->match; @endphp
             <tr>
-                <td>{{ $pred->updated_at?->format('d/m/Y') }}</td>
                 <td>
                     <strong>{{ $match?->homeTeam?->name ?? '?' }} vs {{ $match?->awayTeam?->name ?? '?' }}</strong>
+                    @if($match?->kickoff_at)
+                        <br><small class="muted">{{ $match->kickoff_at->setTimezone('America/Panama')->format('d/m/Y H:i') }}</small>
+                    @endif
+                </td>
+                <td>
+                    {{ $pred->created_at?->setTimezone('America/Panama')->format('d/m/Y') }}<br>
+                    <small class="muted">{{ $pred->created_at?->setTimezone('America/Panama')->format('H:i') }}</small>
                 </td>
                 <td>{{ $match?->phase?->name ?? '-' }}</td>
                 <td style="text-align:center">

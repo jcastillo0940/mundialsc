@@ -39,7 +39,7 @@ class ContestInvoiceVerifier
 
         if (! $response->successful() || $apiError) {
             throw ValidationException::withMessages([
-                'cufe' => $apiError ? 'La factura no pudo ser validada por DGI.' : 'No fue posible consultar la factura en este momento.',
+                'cufe' => $apiError ? 'DGI: ' . $apiError : 'No fue posible consultar la factura en este momento.',
             ]);
         }
 
@@ -54,6 +54,49 @@ class ContestInvoiceVerifier
             'issuer_ruc'        => (string) ($datos['emisor_ruc'] ?? $datos['ruc_emisor'] ?? $datos['ruc'] ?? ''),
             'issuer_name'      => (string) ($datos['emisor_nombre'] ?? ''),
             'payload'          => $body,
+        ];
+    }
+
+    public function resolveBySerial(string $invoiceSerial): array
+    {
+        $endpoint = config('contest.dgi_verifier_url');
+
+        if (! $endpoint) {
+            throw ValidationException::withMessages([
+                'invoice_serial' => 'La verificacion automatica de facturas no esta configurada.',
+            ]);
+        }
+
+        $request = Http::acceptJson()->timeout(45)->connectTimeout(10)->withHeaders(['Connection' => 'close']);
+        $token = (string) config('contest.dgi_verifier_token');
+
+        if ($token !== '') {
+            $request = $request->withToken($token);
+        }
+
+        $response = $request->get($endpoint, [
+            'numero_autorizacion' => $invoiceSerial,
+        ]);
+
+        /** @var array<string, mixed> $body */
+        $body = $response->json() ?? [];
+        $apiError = data_get($body, 'error') ?? data_get($body, 'mensaje') ?? data_get($body, 'message');
+
+        if (! $response->successful() || $apiError) {
+            return ['found' => false, 'payload' => $body];
+        }
+
+        $datos = data_get($body, 'datos') ?? [];
+
+        return [
+            'found'           => true,
+            'cufe'            => strtoupper((string) ($datos['cufe'] ?? '')),
+            'invoice_number'  => strtoupper((string) ($datos['cufe'] ?? $invoiceSerial)),
+            'purchase_amount' => round((float) ($datos['total_pagado'] ?? 0), 2),
+            'issued_at'       => (string) ($datos['fecha_autorizacion'] ?? ''),
+            'issuer_ruc'      => (string) ($datos['emisor_ruc'] ?? $datos['ruc_emisor'] ?? $datos['ruc'] ?? ''),
+            'issuer_name'     => (string) ($datos['emisor_nombre'] ?? ''),
+            'payload'         => $body,
         ];
     }
 

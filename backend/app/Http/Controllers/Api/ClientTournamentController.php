@@ -26,13 +26,19 @@ class ClientTournamentController extends Controller
         $activePhase = $phases->first(fn (TournamentPhase $phase) => now()->between($phase->starts_at, $phase->ends_at))
             ?? $phases->first();
 
+        $fullRanking = $activePhase ? $this->rankingService->fullRankedLeaderboard($activePhase->id) : collect();
+        $winnerSlots = $activePhase ? $this->rankingService->winnerSlotsForPhase($activePhase->id) : 20;
+        $userRankEntry = $fullRanking->first(fn ($row) => $row['user_id'] === $user->id);
+
         return response()->json([
             'user' => $user->loadMissing('wallet'),
             'invoice_settings' => InvoiceGoalSetting::query()->first(),
             'active_phase' => $activePhase,
             'phase_goals' => $activePhase ? $this->phaseGoalsForUser($user->id, $activePhase) : 0,
             'general_goals' => $this->generalGoalsForUser($user->id),
-            'leaderboard' => $activePhase ? $this->rankingService->leaderboardForPhase($activePhase->id)->all() : [],
+            'leaderboard' => $fullRanking->take($winnerSlots)->values()->all(),
+            'user_rank' => $userRankEntry ? $userRankEntry['position'] : null,
+            'total_participants' => $fullRanking->count(),
         ]);
     }
 

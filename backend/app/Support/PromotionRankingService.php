@@ -35,6 +35,12 @@ class PromotionRankingService
     public function leaderboardForPhase(int $phaseId, ?int $limit = null): Collection
     {
         $limit ??= $this->winnerSlotsForPhase($phaseId);
+
+        return $this->fullRankedLeaderboard($phaseId)->take($limit)->values();
+    }
+
+    public function fullRankedLeaderboard(int $phaseId): Collection
+    {
         $phase = TournamentPhase::findOrFail($phaseId);
 
         // Exclude winners from OTHER phases (not disqualified) so they can't win twice.
@@ -136,7 +142,6 @@ class PromotionRankingService
                 return 0;
             })
             ->values()
-            ->take($limit)
             ->map(function (array $row, int $index) {
                 $row['position'] = $index + 1;
                 $row['football_role'] = $this->footballRole($index);

@@ -1,0 +1,3 @@
+branch=codex/auth-redesign-exact
+commit=ba092c6
+date=2026-06-04 20:55:28

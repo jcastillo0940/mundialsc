@@ -46,6 +46,8 @@
         <p>{{ auth()->user()->full_name ?? 'Operador' }}</p>
         <nav class="nav">
             <a href="{{ route('admin.dashboard') }}">Dashboard</a>
+            <a href="{{ route('admin.diagnostics') }}">Diagnóstico del sistema</a>
+            <a href="{{ route('admin.employees') }}">Empleados</a>
             <a href="{{ route('admin.teams') }}">Ranking FIFA</a>
             <a href="{{ route('admin.matches') }}">Partidos</a>
             <a href="{{ route('admin.rules') }}">Reglas</a>

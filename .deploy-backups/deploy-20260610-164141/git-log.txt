@@ -1,0 +1,10 @@
+3fed82c Add secure email flows and SMTP admin tools
+1a075a1 Refine client experience and campaign views
+0835090 Rename campaign copy to pronostica el mundial y gana
+eef4256 Polish auth copy and fraud form feedback
+ee2cfe2 Add support invoice tools and auth captcha controls
+ba092c6 Finalize auth redesign exact
+32dcc1a Update contest copy for rounds and prizes
+05e5219 Actualizar branding azul y assets del login
+9708de1 style: overlay login azul/morado más visible con mayor opacidad
+e4d9b52 style: overlay login en azul #007aff con bordes morados #543faa
