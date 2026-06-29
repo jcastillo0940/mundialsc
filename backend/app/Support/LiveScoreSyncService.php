@@ -38,6 +38,12 @@ class LiveScoreSyncService
                     continue;
                 }
 
+                $match = TournamentMatch::query()->where('external_fixture_id', $fixtureId)->first();
+                if ($match && $this->fixtureSyncShouldNotOverwrite($match)) {
+                    $skipped++;
+                    continue;
+                }
+
                 $home = $item['home'] ?? [];
                 $away = $item['away'] ?? [];
                 if (! is_array($home) || ! is_array($away) || $home === [] || $away === []) {
@@ -49,7 +55,6 @@ class LiveScoreSyncService
                 $group = $externalGroupId ? ($competitionCatalog['groups'][$externalGroupId] ?? null) : null;
                 $homeTeam = $this->upsertTeam($home, $competitionCatalog['participants'][(int) ($home['id'] ?? 0)] ?? null, $group);
                 $awayTeam = $this->upsertTeam($away, $competitionCatalog['participants'][(int) ($away['id'] ?? 0)] ?? null, $group);
-                $match = TournamentMatch::query()->where('external_fixture_id', $fixtureId)->first();
 
                 $payload = [
                     'phase_id' => $this->resolvePhaseFromFixture($item)->id,
@@ -86,6 +91,11 @@ class LiveScoreSyncService
         } catch (\Throwable $exception) {
             return $this->finishRun($run, 'failed', 0, 0, 0, $exception->getMessage());
         }
+    }
+
+    private function fixtureSyncShouldNotOverwrite(TournamentMatch $match): bool
+    {
+        return in_array($match->status, ['locked', 'final', 'void'], true);
     }
 
     public function syncLive(array $filters = [], ?int $requestedByUserId = null): LiveScoreSyncRun
@@ -406,11 +416,29 @@ class LiveScoreSyncService
         if (str_contains($stageName, 'quarter')) {
             return TournamentPhase::query()->where('slug', 'cuartos')->firstOrFail();
         }
-        if (str_contains($stageName, 'semi') || str_contains($stageName, 'third') || str_contains($stageName, 'final')) {
-            return TournamentPhase::query()->where('slug', 'semifinal-final')->firstOrFail();
+        if (str_contains($stageName, 'semi')) {
+            return $this->phaseBySlug('semifinal', 'semifinal-final');
+        }
+        if (str_contains($stageName, 'final')) {
+            return $this->phaseBySlug('final', 'semifinal-final');
         }
 
         return TournamentPhase::query()->orderBy('stage_order')->firstOrFail();
+    }
+
+    private function phaseBySlug(string $slug, ?string $fallbackSlug = null): TournamentPhase
+    {
+        $phase = TournamentPhase::query()->where('slug', $slug)->first();
+
+        if ($phase) {
+            return $phase;
+        }
+
+        if ($fallbackSlug) {
+            return TournamentPhase::query()->where('slug', $fallbackSlug)->firstOrFail();
+        }
+
+        return TournamentPhase::query()->where('slug', $slug)->firstOrFail();
     }
 
     private function upsertTeam(array $providerTeam, ?array $participant = null, ?array $group = null): Team

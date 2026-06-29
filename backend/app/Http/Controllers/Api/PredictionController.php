@@ -40,9 +40,9 @@ class PredictionController extends Controller
             ]);
         }
 
-        if ($match->status !== 'scheduled' || $match->kickoff_at->isPast()) {
+        if ($match->status !== 'scheduled' || now()->greaterThanOrEqualTo($match->kickoff_at->copy()->subMinutes(15))) {
             throw ValidationException::withMessages([
-                'match' => 'El partido ya esta cerrado para pronosticos.',
+                'match' => 'El partido ya esta cerrado para pronosticos. Puedes participar hasta 15 minutos antes del inicio, hora de Panama.',
             ]);
         }
 

@@ -14,6 +14,19 @@ class ContestTermsAlignmentTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_public_terms_describe_knockout_phase_as_separate_contest(): void
+    {
+        $response = $this->getJson('/api/public/settings');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('terms_and_conditions', fn (string $terms) => str_contains($terms, 'La primera fase y la segunda fase son competencias separadas')
+                && str_contains($terms, 'desde dieciseisavos de final hasta la final')
+                && str_contains($terms, 'cerrara 15 minutos antes')
+                && str_contains($terms, 'no podran ganar premio nuevamente en la segunda fase')
+                && str_contains($terms, 'Los puntos obtenidos en la Fase de Grupos no se acumulan'));
+    }
+
     public function test_client_bootstrap_lists_active_elimination_phase(): void
     {
         $user = $this->createEligibleClient();

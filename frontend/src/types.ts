@@ -65,6 +65,7 @@ export interface TournamentPhase {
   id: number
   name: string
   slug: string
+  contest_round?: 'group_stage' | 'knockout' | string
   stage_order: number
   starts_at: string
   ends_at: string
@@ -124,6 +125,7 @@ export interface LeaderboardEntry {
   invoice_total_amount: number
   goal_prediction_delta: number
   football_role: string
+  is_prize_eligible?: boolean
 }
 
 export interface RegisteredInvoice {

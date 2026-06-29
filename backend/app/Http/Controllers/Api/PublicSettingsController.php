@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\SiteSetting;
+use App\Support\OfficialContestTerms;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 
@@ -108,6 +109,8 @@ class PublicSettingsController extends Controller
 
     private function officialTerms(): string
     {
+        return OfficialContestTerms::text();
+
         return <<<'TERMS'
 TÉRMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
 

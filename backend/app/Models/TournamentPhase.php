@@ -10,6 +10,7 @@ class TournamentPhase extends Model
     protected $fillable = [
         'name',
         'slug',
+        'contest_round',
         'stage_order',
         'starts_at',
         'ends_at',

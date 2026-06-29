@@ -144,6 +144,7 @@ export function VestuarioView({
                   </span>
                   <h3>{entry.full_name}</h3>
                   <p>{roleLabel(entry.football_role)}</p>
+                  {entry.is_prize_eligible === false ? <p>Sin premio adicional</p> : null}
                   <strong>{formatCompactNumber(entry.goals)} goles</strong>
                 </article>
               )
@@ -199,6 +200,7 @@ export function VestuarioView({
                             <div className="vestuario-row-player-badge">{userInitials(entry.full_name)}</div>
                             <div>
                               <strong>{displayName}</strong>
+                              {entry.is_prize_eligible === false ? <small>Sin premio adicional</small> : null}
                             </div>
                           </div>
                         </td>

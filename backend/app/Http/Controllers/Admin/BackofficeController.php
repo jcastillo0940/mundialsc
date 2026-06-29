@@ -708,6 +708,12 @@ class BackofficeController extends Controller
         $phase = $this->rankingService->activeRankingPhase($phaseId);
         abort_if(! $phase, 404);
 
+        if ($this->rankingService->isKnockoutPhase($phase) && $phase->slug !== 'final') {
+            throw ValidationException::withMessages([
+                'phase' => 'Los ganadores del segundo concurso se generan unicamente en la fase Final, cuando ya se hayan acumulado los puntos desde dieciseisavos hasta la final.',
+            ]);
+        }
+
         $existingActive = PromoWinner::query()
             ->where('phase_id', $phase->id)
             ->whereIn('status', ['selected', 'contacting', 'confirmed', 'delivered'])
@@ -718,8 +724,16 @@ class BackofficeController extends Controller
         }
 
         $winnerSlots = $this->rankingService->winnerSlotsForPhase($phase->id);
+        $tieContext = $this->rankingService->tieContextForPhase($phase->id, $winnerSlots);
+
+        if ($tieContext['requires_draw'] ?? false) {
+            throw ValidationException::withMessages([
+                'draw' => 'Hay un empate exacto en el corte de ganadores. Debe resolverse antes de generar la seleccion inicial.',
+            ]);
+        }
+
         $this->ensurePrizeTokensForPhase($phase->id, $winnerSlots);
-        $rows = $this->rankingService->leaderboardForPhase($phase->id, $winnerSlots);
+        $rows = $this->rankingService->prizeEligibleLeaderboardForPhase($phase->id, $winnerSlots);
 
         DB::transaction(function () use ($rows, $phase, $request): void {
             foreach ($rows as $row) {

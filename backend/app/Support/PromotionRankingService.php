@@ -14,6 +14,14 @@ use Illuminate\Support\Facades\DB;
 class PromotionRankingService
 {
     public const WINNER_SLOTS = 20;
+    private const KNOCKOUT_PHASE_SLUGS = [
+        'dieciseisavos',
+        'octavos',
+        'cuartos',
+        'semifinal',
+        'final',
+        'semifinal-final',
+    ];
 
     public function __construct(
         private readonly ContestRules $contestRules,
@@ -39,16 +47,26 @@ class PromotionRankingService
         return $this->fullRankedLeaderboard($phaseId)->take($limit)->values();
     }
 
+    public function prizeEligibleLeaderboardForPhase(int $phaseId, ?int $limit = null): Collection
+    {
+        $limit ??= $this->winnerSlotsForPhase($phaseId);
+        $priorWinnerUserIds = $this->priorWinnerUserIds($phaseId);
+
+        return $this->fullRankedLeaderboard($phaseId)
+            ->reject(fn (array $row) => in_array($row['user_id'], $priorWinnerUserIds, true))
+            ->take($limit)
+            ->values();
+    }
+
     public function fullRankedLeaderboard(int $phaseId): Collection
     {
         $phase = TournamentPhase::findOrFail($phaseId);
-
-        // Exclude winners from OTHER phases (not disqualified) so they can't win twice.
-        $priorWinnerUserIds = PromoWinner::query()
-            ->whereNotIn('status', ['disqualified'])
-            ->where('phase_id', '!=', $phaseId)
-            ->pluck('user_id')
-            ->all();
+        $leaderboardPhaseIds = $this->leaderboardPhaseIds($phase);
+        $leaderboardPhases = TournamentPhase::query()
+            ->whereIn('id', $leaderboardPhaseIds)
+            ->get();
+        $priorWinnerUserIds = $this->priorWinnerUserIds($phaseId);
+        $countsInvoices = ! $this->isKnockoutPhase($phase);
 
         $predictionTotals = MatchPrediction::query()
             ->selectRaw("
@@ -56,10 +74,10 @@ class PromotionRankingService
                 SUM(points_awarded) as prediction_points,
                 SUM(CASE WHEN result_type = 'exact' THEN 1 ELSE 0 END) as exact_hits
             ")
-            ->where('phase_id', $phaseId)
+            ->whereIn('phase_id', $leaderboardPhaseIds)
             ->groupBy('user_id');
 
-        // Only count invoices issued during this phase's date window.
+        // Only count invoices issued during this leaderboard's date window.
         $invoiceTotals = RegisteredInvoice::query()
             ->selectRaw("
                 user_id,
@@ -68,11 +86,15 @@ class PromotionRankingService
                 SUM(purchase_amount) as invoice_total_amount
             ")
             ->where('validation_status', 'approved')
-            ->whereBetween('issued_at', [$phase->starts_at, $phase->ends_at])
+            ->when(! $countsInvoices, fn ($query) => $query->whereRaw('1 = 0'))
+            ->whereBetween('issued_at', [
+                $leaderboardPhases->min('starts_at') ?? $phase->starts_at,
+                $leaderboardPhases->max('ends_at') ?? $phase->ends_at,
+            ])
             ->groupBy('user_id');
 
         $actualGoals = (int) TournamentMatch::query()
-            ->where('phase_id', $phaseId)
+            ->whereIn('phase_id', $leaderboardPhaseIds)
             ->where('status', 'final')
             ->sum(DB::raw('COALESCE(home_score, 0) + COALESCE(away_score, 0)'));
 
@@ -81,7 +103,6 @@ class PromotionRankingService
             ->leftJoinSub($invoiceTotals, 'invoice_totals', fn ($join) => $join->on('users.id', '=', 'invoice_totals.user_id'))
             ->where('users.role', 'client')
             ->whereNull('users.disqualified_at')
-            ->when($priorWinnerUserIds !== [], fn ($query) => $query->whereNotIn('users.id', $priorWinnerUserIds))
             ->selectRaw("
                 users.id,
                 users.name,
@@ -99,7 +120,8 @@ class PromotionRankingService
                 COALESCE(invoice_totals.invoice_total_amount, 0) as invoice_total_amount
             ")
             ->get()
-            ->map(function ($row) use ($actualGoals, $phase) {
+            ->map(function ($row) use ($actualGoals, $phase, $priorWinnerUserIds) {
+                $isPrizeEligible = ! in_array((int) $row->id, $priorWinnerUserIds, true);
                 $goalPrediction = $phase->slug === 'fase-grupos' && $row->group_stage_goal_prediction !== null
                     ? (int) $row->group_stage_goal_prediction
                     : null;
@@ -123,6 +145,7 @@ class PromotionRankingService
                     'goal_prediction_delta' => $goalPredictionDelta,
                     'ranking_timestamp' => $rankingTimestamp,
                     'ranking_order_key' => $rankingOrderKey,
+                    'is_prize_eligible' => $isPrizeEligible,
                 ];
             })
             ->sort(function (array $left, array $right) {
@@ -154,7 +177,7 @@ class PromotionRankingService
     {
         $slots ??= $this->winnerSlots();
 
-        $rows = $this->leaderboardForPhase($phaseId)
+        $rows = $this->prizeEligibleLeaderboardForPhase($phaseId, 1000)
             ->reject(fn (array $row) => in_array($row['user_id'], $excludedUserIds, true))
             ->values();
 
@@ -218,8 +241,38 @@ class PromotionRankingService
 
     public function nextEligibleCandidate(int $phaseId, array $excludedUserIds): ?array
     {
-        return $this->leaderboardForPhase($phaseId, 1000)
+        return $this->prizeEligibleLeaderboardForPhase($phaseId, 1000)
             ->first(fn (array $row) => ! in_array($row['user_id'], $excludedUserIds, true));
+    }
+
+    private function priorWinnerUserIds(int $phaseId): array
+    {
+        return PromoWinner::query()
+            ->whereNotIn('status', ['disqualified'])
+            ->where('phase_id', '!=', $phaseId)
+            ->pluck('user_id')
+            ->map(fn ($userId) => (int) $userId)
+            ->all();
+    }
+
+    public function leaderboardPhaseIds(TournamentPhase $phase): array
+    {
+        if (! $this->isKnockoutPhase($phase)) {
+            return [$phase->id];
+        }
+
+        $phaseIds = TournamentPhase::query()
+            ->whereIn('slug', self::KNOCKOUT_PHASE_SLUGS)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return $phaseIds !== [] ? $phaseIds : [$phase->id];
+    }
+
+    public function isKnockoutPhase(TournamentPhase $phase): bool
+    {
+        return in_array($phase->slug, self::KNOCKOUT_PHASE_SLUGS, true);
     }
 
     private function sameTieMetrics(array $left, array $right): bool

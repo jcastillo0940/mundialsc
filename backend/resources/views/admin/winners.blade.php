@@ -31,9 +31,14 @@
     <h2>Ranking oficial — {{ $phase ? $phase->name : 'sin fase' }}</h2>
     @if($phase)
         <p style="font-size:0.85em;color:#666">
-            Solo se cuentan facturas emitidas entre <strong>{{ \Carbon\Carbon::parse($phase->starts_at)->format('d/m/Y') }}</strong>
-            y <strong>{{ \Carbon\Carbon::parse($phase->ends_at)->format('d/m/Y') }}</strong>.
-            Los ganadores de fases anteriores no aparecen aqui.
+            @if($phase->contest_round === 'knockout')
+                Ranking acumulado de fases finales: suma solo pronosticos desde dieciseisavos hasta la final. No suma Fase de Grupos ni facturas.
+                Los ganadores de fases anteriores pueden aparecer aqui, pero no son elegibles para premio adicional.
+            @else
+                Solo se cuentan facturas emitidas entre <strong>{{ \Carbon\Carbon::parse($phase->starts_at)->format('d/m/Y') }}</strong>
+                y <strong>{{ \Carbon\Carbon::parse($phase->ends_at)->format('d/m/Y') }}</strong>.
+                Los ganadores de otras fases pueden aparecer aqui, pero no son elegibles para premio adicional.
+            @endif
         </p>
     @endif
     <table>
@@ -56,6 +61,9 @@
                 <td>
                     <div>{{ $row['full_name'] }}</div>
                     <small>{{ $row['email'] }} | {{ $row['phone'] ?: 'sin telefono' }}</small>
+                    @if(($row['is_prize_eligible'] ?? true) === false)
+                        <br><small>Sin premio adicional por premio previo</small>
+                    @endif
                 </td>
                 <td><strong>{{ number_format($row['total_points'], 2) }}</strong></td>
                 <td>{{ number_format($row['prediction_points'], 2) }}</td>

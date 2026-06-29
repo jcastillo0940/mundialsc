@@ -924,6 +924,15 @@ function matchTimeValue(dateValue: string) {
   return Number.isNaN(date.getTime()) ? Number.MAX_SAFE_INTEGER : date.getTime()
 }
 
+function predictionCutoffValue(dateValue: string) {
+  const kickoff = matchTimeValue(dateValue)
+  return kickoff === Number.MAX_SAFE_INTEGER ? kickoff : kickoff - 15 * 60 * 1000
+}
+
+function isMatchPredictionClosed(match: TournamentMatch) {
+  return match.status !== 'scheduled' || predictionCutoffValue(match.kickoff_at) <= Date.now()
+}
+
 function getFavoriteTeam(match: TournamentMatch) {
   const homeTeam = match.homeTeam ?? match.home_team
   const awayTeam = match.awayTeam ?? match.away_team
@@ -1101,6 +1110,32 @@ Los datos personales suministrados serÃ¡n utilizados exclusivamente para la ad
 12. ACEPTACIÃ“N DE LOS TÃ‰RMINOS Y CONDICIONES
 La participaciÃ³n en la promociÃ³n implica el conocimiento, aceptaciÃ³n plena e incondicional de los presentes tÃ©rminos y condiciones.`
 
+const OFFICIAL_TERMS_TEXT_KNOCKOUT = `TERMINOS Y CONDICIONES: POLLA MUNDIALISTA SUPER CARNES 2026
+
+1. GENERALIDADES DEL CONCURSO
+La promocion comercial denominada "PRONOSTICA EL MUNDIAL Y GANA" es organizada por Super Carnes y se desarrolla en dos fases independientes dentro de la plataforma oficial.
+La primera fase corresponde a la Fase de Grupos y ya se encuentra cerrada para efectos de nuevos pronosticos.
+La segunda fase corresponde a las Fases Finales, desde dieciseisavos de final hasta la final.
+
+2. MECANICA DE PARTICIPACION
+La primera fase y la segunda fase son competencias separadas. Los puntos obtenidos en la Fase de Grupos no se acumulan ni se trasladan a las Fases Finales.
+Para la segunda fase, los participantes podran registrar pronosticos para los partidos habilitados desde dieciseisavos de final, octavos de final, cuartos de final, semifinal y final.
+Cada pronostico de la segunda fase cerrara 15 minutos antes del inicio oficial del partido correspondiente, tomando como referencia la hora de Panama.
+
+3. GANADORES DE LA PRIMERA FASE
+Los ganadores de la Fase de Grupos pueden participar y registrar pronosticos en la segunda fase.
+Sin embargo, quienes hayan sido seleccionados como ganadores de premio en la Fase de Grupos no podran ganar premio nuevamente en la segunda fase.
+Si un ganador de la Fase de Grupos aparece dentro de las primeras posiciones del ranking de Fases Finales, el sistema lo mantendra visible en el ranking, pero lo saltara para efectos de seleccion de ganadores de premio.
+
+4. PUNTUACION Y PREMIOS
+El ranking de la segunda fase sumara exclusivamente los puntos de pronosticos obtenidos desde dieciseisavos de final hasta la final.
+Para la segunda fase no se sumaran puntos, marcadores exactos, facturas, desempates ni beneficios obtenidos en la Fase de Grupos. Las facturas no sumaran puntos ni serviran como desempate para la adjudicacion del premio de Fases Finales.
+Al finalizar las Fases Finales, los 20 participantes elegibles con mayor puntuacion acumulada desde dieciseisavos de final hasta la final recibiran un bono o tarjeta de regalo para compras en Super Carnes por USD 200.00 cada uno.
+
+5. DESEMPATES
+En caso de empate se aplicaran, en orden: mayor cantidad de marcadores exactos dentro de la fase correspondiente, mayor cantidad de facturas validas solo en fases donde aplique, mayor monto acumulado solo en fases donde aplique, aproximacion al total de goles solo para la Fase de Grupos y fecha/hora de registro mas temprana.
+Si despues de aplicar los criterios anteriores persiste un empate exacto en el corte de ganadores, la seleccion automatica quedara bloqueada hasta que Super Carnes resuelva el empate conforme a los mecanismos administrativos y legales aplicables.`
+
 function normalizeBrandColor(prop: string, value: string) {
   const normalized = value.trim().toLowerCase()
   const legacyPrimaryReds = new Set(['#da291c', '#e3261d', '#ff3349', '#c1122a', '#8f0d1d', '#f53003', '#f61500'])
@@ -1185,7 +1220,7 @@ export function App() {
   const [headerLogoUrl, setHeaderLogoUrl] = useState('')
   const [heroVideoUrl, setHeroVideoUrl] = useState('')
   const [, setParticipantBrands] = useState<ParticipantBrand[]>([])
-  const [termsText, setTermsText] = useState(OFFICIAL_TERMS_TEXT_V2 || OFFICIAL_TERMS_TEXT)
+  const [termsText, setTermsText] = useState(OFFICIAL_TERMS_TEXT_KNOCKOUT || OFFICIAL_TERMS_TEXT_V2 || OFFICIAL_TERMS_TEXT)
   const [recaptchaEnabled, setRecaptchaEnabled] = useState(true)
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('')
   const [recaptchaScriptReady, setRecaptchaScriptReady] = useState(false)
@@ -2683,8 +2718,8 @@ export function App() {
   }
 
   async function handlePredictionSubmit(match: TournamentMatch) {
-    if (match.status !== 'scheduled' || matchTimeValue(match.kickoff_at) <= Date.now()) {
-      setError('El partido ya inicio y el pronostico esta cerrado.')
+    if (isMatchPredictionClosed(match)) {
+      setError('El pronostico cierra 15 minutos antes del partido, hora de Panama.')
       return
     }
 
@@ -2761,6 +2796,7 @@ export function App() {
   function renderCancha() {
     const activeGroupTitle = selectedGroupSummary?.displayLabel ?? activePredictionPhase?.name ?? 'la fase activa'
     const isSelectedGroupComplete = predictionMode === 'pending' && Boolean(selectedGroupSummary?.isComplete)
+    const bucketPlural = bucketSelectorLabel === 'Grupo' ? 'grupos' : 'rondas'
     const emptyTitle =
       predictionMode === 'mine'
         ? `Todavia no has enviado pronosticos en ${activeGroupTitle}.`
@@ -2771,7 +2807,7 @@ export function App() {
       predictionMode === 'mine'
         ? `Cuando envies tus resultados para ${activeGroupTitle}, los veras aqui.`
         : isSelectedGroupComplete
-          ? `En este grupo ya no te queda ningun partido por llenar. Puedes revisar otro grupo o entrar en Mis pronosticos para ver lo que ya enviaste.`
+          ? `En esta ronda ya no te queda ningun partido por llenar. Puedes revisar otra ronda o entrar en Mis pronosticos para ver lo que ya enviaste.`
           : `Cuando haya partidos habilitados para ${activeGroupTitle} los veras aqui.`
 
     return (
@@ -2806,7 +2842,7 @@ export function App() {
                 <div className="marea-progress-track">
                   <div className="marea-progress-fill" style={{ width: `${progress.percentage}%` }} />
                 </div>
-                <p className="cancha-progress-copy">Sigue participando y suma más puntos en cada fase.</p>
+                <p className="cancha-progress-copy">Los puntos de fases finales se calculan separados de la fase de grupos.</p>
                 <span className="cancha-progress-link">¿Cómo se ganan puntos?</span>
               </div>
             </div>
@@ -2849,7 +2885,7 @@ export function App() {
             <div className="marea-desktop-group-select-control">
               <select value={selectedGroupLabel ?? ''} onChange={(event) => setSelectedGroupLabel(event.target.value)}>
                 <option value={ALL_GROUPS_KEY}>
-                  {`Todos${groupSummaries.length ? ` - ${groupSummaries.length} grupos` : ''}`}
+                  {`Todos${groupSummaries.length ? ` - ${groupSummaries.length} ${bucketPlural}` : ''}`}
                 </option>
                 {groupSummaries.map((summary) => (
                   <option key={summary.groupLabel} value={summary.groupLabel}>
@@ -2872,7 +2908,7 @@ export function App() {
             <span>{bucketSelectorLabel}</span>
             <select value={selectedGroupLabel ?? ''} onChange={(event) => setSelectedGroupLabel(event.target.value)}>
               <option value={ALL_GROUPS_KEY}>
-                {`Todos${groupSummaries.length ? ` - ${groupSummaries.length} grupos` : ''}`}
+                {`Todos${groupSummaries.length ? ` - ${groupSummaries.length} ${bucketPlural}` : ''}`}
               </option>
               {groupSummaries.map((summary) => (
                 <option key={summary.groupLabel} value={summary.groupLabel}>
@@ -2894,7 +2930,7 @@ export function App() {
                 const prediction = predictionMap.get(match.id)
                 const isSaving = savingPredictionIds.includes(match.id)
                 const isReadonlyPrediction = predictionMode === 'mine' && Boolean(prediction)
-                const isPredictionClosed = match.status !== 'scheduled' || matchTimeValue(match.kickoff_at) <= Date.now()
+                const isPredictionClosed = isMatchPredictionClosed(match)
                 const homeDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_home_score ?? 0) : draft.home
                 const awayDisplayScore = isReadonlyPrediction ? String(prediction?.predicted_away_score ?? 0) : draft.away
 
@@ -3298,7 +3334,7 @@ export function App() {
     )
   }
 
-  const TERMS_TEXT = termsText.trim() ? termsText : (OFFICIAL_TERMS_TEXT_V2 || OFFICIAL_TERMS_TEXT)
+  const TERMS_TEXT = termsText.trim() ? termsText : (OFFICIAL_TERMS_TEXT_KNOCKOUT || OFFICIAL_TERMS_TEXT_V2 || OFFICIAL_TERMS_TEXT)
 
   return (
     <div className="marea-app-shell">
