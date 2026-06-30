@@ -24,6 +24,7 @@ class TournamentScoring
             );
 
             $prediction->update([
+                'phase_id' => $match->phase_id,
                 'points_awarded' => $points,
                 'result_type' => $resultType,
             ]);

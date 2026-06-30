@@ -13,6 +13,7 @@ use App\Models\Wallet;
 use App\Support\LiveScoreApiClient;
 use App\Support\LiveScoreSyncService;
 use App\Support\PromotionRankingService;
+use App\Support\TournamentScoring;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Laravel\Sanctum\Sanctum;
@@ -282,6 +283,40 @@ class KnockoutPhaseRulesTest extends TestCase
         $this->assertSame(9.0, $playerRow['total_points']);
         $this->assertSame(8.0, $rivalRow['prediction_points']);
         $this->assertSame([$player->id, $rival->id], $leaderboard->pluck('user_id')->all());
+    }
+
+    public function test_recalculation_moves_prediction_points_to_current_match_phase(): void
+    {
+        $groupPhase = TournamentPhase::query()->where('slug', 'fase-grupos')->firstOrFail();
+        $knockoutPhase = $this->activatePhase('dieciseisavos');
+
+        $player = $this->createClient('Fase Corregida', 'fase-corregida@example.com', '8-111-0016');
+        $match = $this->createMatch($knockoutPhase);
+        $match->update([
+            'status' => 'final',
+            'home_score' => 2,
+            'away_score' => 1,
+        ]);
+
+        $prediction = MatchPrediction::query()->create([
+            'match_id' => $match->id,
+            'user_id' => $player->id,
+            'phase_id' => $groupPhase->id,
+            'predicted_home_score' => 2,
+            'predicted_away_score' => 1,
+            'points_awarded' => 0,
+            'result_type' => 'pending',
+        ]);
+
+        app(TournamentScoring::class)->recalculateForMatch($match->fresh('phase', 'predictions'));
+
+        $this->assertSame($knockoutPhase->id, $prediction->fresh()->phase_id);
+
+        $groupLeaderboard = app(PromotionRankingService::class)->leaderboardForPhase($groupPhase->id, 10);
+        $knockoutLeaderboard = app(PromotionRankingService::class)->leaderboardForPhase($knockoutPhase->id, 10);
+
+        $this->assertSame(0.0, $groupLeaderboard->firstWhere('user_id', $player->id)['prediction_points']);
+        $this->assertSame(5.0, $knockoutLeaderboard->firstWhere('user_id', $player->id)['prediction_points']);
     }
 
     public function test_client_bootstrap_phase_goals_use_accumulated_knockout_points(): void
