@@ -882,6 +882,19 @@ function normalizeStageBucket(value: string | null | undefined) {
   return value?.trim().replace(/\s+/g, ' ') ?? ''
 }
 
+function displayRoundLabel(value: string | null | undefined) {
+  const normalized = normalizeStageBucket(value)
+  const key = normalized.toLowerCase().replace(/[\s_-]+/g, '')
+
+  if (['r32', 'roundof32', 'last32', 'dieciseisavos', '16avos', '16avosdefinal'].includes(key)) return '16avos de final'
+  if (['r16', 'roundof16', 'last16', 'octavos', 'octavosdefinal'].includes(key)) return 'Octavos de final'
+  if (['qf', 'quarterfinal', 'quarterfinals', 'cuartos', 'cuartosdefinal'].includes(key)) return 'Cuartos de final'
+  if (['sf', 'semifinal', 'semifinals', 'semifinales'].includes(key)) return 'Semifinal'
+  if (['f', 'final'].includes(key)) return 'Final'
+
+  return normalized
+}
+
 function matchBucket(match: TournamentMatch, phaseName?: string | null) {
   const groupValue = groupLabelValue(match.group_label)
   if (groupValue) {
@@ -892,7 +905,7 @@ function matchBucket(match: TournamentMatch, phaseName?: string | null) {
     }
   }
 
-  const roundValue = normalizeStageBucket(match.round_label)
+  const roundValue = displayRoundLabel(match.round_label)
   if (roundValue) {
     return {
       key: `round:${roundValue.toLowerCase()}`,
@@ -901,7 +914,7 @@ function matchBucket(match: TournamentMatch, phaseName?: string | null) {
     }
   }
 
-  const stageValue = normalizeStageBucket(match.stage_label)
+  const stageValue = displayRoundLabel(match.stage_label)
   if (stageValue) {
     return {
       key: `stage:${stageValue.toLowerCase()}`,
@@ -931,6 +944,10 @@ function predictionCutoffValue(dateValue: string) {
 
 function isMatchPredictionClosed(match: TournamentMatch) {
   return match.status !== 'scheduled' || predictionCutoffValue(match.kickoff_at) <= Date.now()
+}
+
+function canSubmitPrediction(match: TournamentMatch) {
+  return !isMatchPredictionClosed(match)
 }
 
 function getFavoriteTeam(match: TournamentMatch) {
@@ -2196,7 +2213,7 @@ export function App() {
       const matchesForGroup = activePhaseMatches.filter((match) => matchBucket(match, phaseName).key === bucket.key)
       const total = matchesForGroup.length
       const completed = matchesForGroup.filter((match) => predictionMap.has(match.id)).length
-      const pending = Math.max(total - completed, 0)
+      const pending = matchesForGroup.filter((match) => !predictionMap.has(match.id) && canSubmitPrediction(match)).length
 
       return {
         groupLabel: bucket.key,
@@ -2234,7 +2251,7 @@ export function App() {
       return selectedGroupMatches.filter((match) => predictionMap.has(match.id))
     }
 
-    return selectedGroupMatches.filter((match) => !predictionMap.has(match.id))
+    return selectedGroupMatches.filter((match) => !predictionMap.has(match.id) && canSubmitPrediction(match))
   }, [activePhaseMatches, activePredictionPhase, predictionMap, predictionMode, selectedGroupLabel])
 
   const selectedGroupSummary = useMemo(
@@ -2242,7 +2259,7 @@ export function App() {
       if (selectedGroupLabel === ALL_GROUPS_KEY) {
         const total = activePhaseMatches.length
         const completed = activePhaseMatches.filter((match) => predictionMap.has(match.id)).length
-        const pending = Math.max(total - completed, 0)
+        const pending = activePhaseMatches.filter((match) => !predictionMap.has(match.id) && canSubmitPrediction(match)).length
 
         return {
           groupLabel: ALL_GROUPS_KEY,
@@ -2812,14 +2829,14 @@ export function App() {
       predictionMode === 'mine'
         ? `Todavia no has enviado pronosticos en ${activeGroupTitle}.`
         : isSelectedGroupComplete
-          ? `Ya completaste todos tus pronosticos de ${activeGroupTitle}.`
+          ? `No hay pronosticos pendientes en ${activeGroupTitle}.`
           : 'No hay partidos pendientes en esta fase.'
     const emptyDescription =
       predictionMode === 'mine'
         ? `Cuando envies tus resultados para ${activeGroupTitle}, los veras aqui.`
         : isSelectedGroupComplete
-          ? `En esta ronda ya no te queda ningun partido por llenar. Puedes revisar otra ronda o entrar en Mis pronosticos para ver lo que ya enviaste.`
-          : `Cuando haya partidos habilitados para ${activeGroupTitle} los veras aqui.`
+          ? `Solo aparecen partidos que aun puedes editar. Los partidos cerrados o ya iniciados salen de pendientes.`
+          : `Cuando haya partidos habilitados y editables para ${activeGroupTitle} los veras aqui.`
 
     return (
       <>
@@ -2880,11 +2897,11 @@ export function App() {
                 ].filter(Boolean).join(' ')}
                 type="button"
                 onClick={() => setSelectedGroupLabel(summary.groupLabel)}
-                aria-label={`${summary.displayLabel}. ${summary.isComplete ? 'Pronosticos completados' : `${summary.pending} partidos pendientes`}.`}
+                aria-label={`${summary.displayLabel}. ${summary.isComplete ? 'Sin pronosticos pendientes' : `${summary.pending} partidos pendientes`}.`}
               >
                 <span className="round-tab-label">{summary.displayLabel}</span>
                 <span className="round-tab-status">
-                  {summary.isComplete ? 'COMPLETADO' : `${summary.pending} PENDIENTE${summary.pending === 1 ? '' : 'S'}`}
+                  {summary.isComplete ? 'SIN PENDIENTES' : `${summary.pending} PENDIENTE${summary.pending === 1 ? '' : 'S'}`}
                 </span>
                 <img className="round-tab-watermark" alt="" src="/redesign/cancha-ball-mark.svg" />
               </button>
@@ -2900,7 +2917,7 @@ export function App() {
                 </option>
                 {groupSummaries.map((summary) => (
                   <option key={summary.groupLabel} value={summary.groupLabel}>
-                    {`${summary.displayLabel}${summary.isComplete ? ' - Completado' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
+                    {`${summary.displayLabel}${summary.isComplete ? ' - Sin pendientes' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
                   </option>
                 ))}
               </select>
@@ -2908,7 +2925,7 @@ export function App() {
                 <strong>{selectedGroupSummary?.displayLabel ?? activeGroupTitle}</strong>
                 <small>
                   {selectedGroupSummary?.isComplete
-                    ? 'Pronosticos completados'
+                    ? 'Sin pronosticos pendientes'
                     : `${selectedGroupSummary?.pending ?? 0} pendiente${selectedGroupSummary?.pending === 1 ? '' : 's'}`}
                 </small>
               </div>
@@ -2923,7 +2940,7 @@ export function App() {
               </option>
               {groupSummaries.map((summary) => (
                 <option key={summary.groupLabel} value={summary.groupLabel}>
-                  {`${summary.displayLabel}${summary.isComplete ? ' - Completado' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
+                  {`${summary.displayLabel}${summary.isComplete ? ' - Sin pendientes' : ` - ${summary.pending} pendiente${summary.pending === 1 ? '' : 's'}`}`}
                 </option>
               ))}
             </select>
@@ -2960,7 +2977,7 @@ export function App() {
 
                     <div className="marea-match-banner meta">
                         <span>{match.venue_name ?? 'Sede por confirmar'}</span>
-                        <span>{match.round_label ?? match.stage_label ?? 'Calendario oficial'}</span>
+                        <span>{displayRoundLabel(match.round_label) || displayRoundLabel(match.stage_label) || 'Calendario oficial'}</span>
                       </div>
 
                     {favoriteTeam ? (
