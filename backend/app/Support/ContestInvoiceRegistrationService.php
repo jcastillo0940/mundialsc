@@ -253,7 +253,7 @@ class ContestInvoiceRegistrationService
             'issued_at' => $issuedAt,
         ], $resolvedInvoice);
         $canonicalCufe = strtoupper((string) ($verification['canonical_cufe'] ?? $canonicalCufe));
-        $invoicePhase = $this->phaseResolver->phaseForDate($issuedAt);
+        $invoicePhase = $this->phaseResolver->phaseForDate($now);
 
         try {
             $invoice = DB::transaction(function () use ($targetUser, $campaign, $data, $canonicalCufe, $purchaseAmount, $issuedAt, $verification, $resolvedInvoice, $minimumAmount, $maxInvoiceAgeDays, $settings, $request, $invoicePhase, $registrationSource, $actor, $assistanceNotes, $fraudFlag): RegisteredInvoice {
@@ -430,7 +430,7 @@ class ContestInvoiceRegistrationService
         // CUFE sintetico — no se consulta DGI, esta factura no tiene CUFE real
         $canonicalCufe = 'MANUAL-'.preg_replace('/[^A-Z0-9]/', '', $invoiceSerial).'-'.$targetUser->id.'-'.now()->format('Ymd');
 
-        $invoicePhase = $this->phaseResolver->phaseForDate($issuedAt);
+        $invoicePhase = $this->phaseResolver->phaseForDate(now('America/Panama'));
 
         try {
             $invoice = DB::transaction(function () use ($targetUser, $campaign, $data, $canonicalCufe, $invoiceSerial, $purchaseAmount, $issuedAt, $notes, $actor, $invoicePhase): RegisteredInvoice {

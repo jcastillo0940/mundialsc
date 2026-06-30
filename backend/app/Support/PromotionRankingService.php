@@ -8,6 +8,7 @@ use App\Models\PromoWinner;
 use App\Models\RegisteredInvoice;
 use App\Models\TournamentMatch;
 use App\Models\TournamentPhase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -62,11 +63,7 @@ class PromotionRankingService
     {
         $phase = TournamentPhase::findOrFail($phaseId);
         $leaderboardPhaseIds = $this->leaderboardPhaseIds($phase);
-        $leaderboardPhases = TournamentPhase::query()
-            ->whereIn('id', $leaderboardPhaseIds)
-            ->get();
         $priorWinnerUserIds = $this->priorWinnerUserIds($phaseId);
-        $countsInvoices = ! $this->isKnockoutPhase($phase);
 
         $predictionTotals = MatchPrediction::query()
             ->selectRaw("
@@ -77,20 +74,18 @@ class PromotionRankingService
             ->whereIn('phase_id', $leaderboardPhaseIds)
             ->groupBy('user_id');
 
-        // Only count invoices issued during this leaderboard's date window.
-        $invoiceTotals = RegisteredInvoice::query()
+        // Count invoices by registration time, not by invoice issue date.
+        $invoiceTotals = $this->constrainInvoiceQueryToPhase(
+            RegisteredInvoice::query()
             ->selectRaw("
                 user_id,
                 SUM(points_awarded) as invoice_points,
                 COUNT(*) as invoice_count,
                 SUM(purchase_amount) as invoice_total_amount
             ")
-            ->where('validation_status', 'approved')
-            ->when(! $countsInvoices, fn ($query) => $query->whereRaw('1 = 0'))
-            ->whereBetween('issued_at', [
-                $leaderboardPhases->min('starts_at') ?? $phase->starts_at,
-                $leaderboardPhases->max('ends_at') ?? $phase->ends_at,
-            ])
+            ->where('validation_status', 'approved'),
+            $phase,
+        )
             ->groupBy('user_id');
 
         $actualGoals = (int) TournamentMatch::query()
@@ -279,6 +274,53 @@ class PromotionRankingService
     public function isKnockoutPhase(TournamentPhase $phase): bool
     {
         return in_array($phase->slug, self::KNOCKOUT_PHASE_SLUGS, true);
+    }
+
+    public function constrainInvoiceQueryToPhase($query, TournamentPhase $phase)
+    {
+        [$windowStart, $windowEnd] = $this->invoiceWindowForPhase($phase);
+        $groupCutoff = $this->groupStageInvoiceCutoff();
+
+        if ($this->isKnockoutPhase($phase) && $groupCutoff) {
+            return $query
+                ->where('created_at', '>', $groupCutoff)
+                ->where('created_at', '<=', $windowEnd);
+        }
+
+        return $query->whereBetween('created_at', [$windowStart, $windowEnd]);
+    }
+
+    public function invoiceWindowForPhase(TournamentPhase $phase): array
+    {
+        $leaderboardPhaseIds = $this->leaderboardPhaseIds($phase);
+        $leaderboardPhases = TournamentPhase::query()
+            ->whereIn('id', $leaderboardPhaseIds)
+            ->get();
+
+        $windowStart = $leaderboardPhases->min('starts_at') ?? $phase->starts_at;
+        $windowEnd = $leaderboardPhases->max('ends_at') ?? $phase->ends_at;
+        $groupCutoff = $this->groupStageInvoiceCutoff();
+
+        if ($phase->slug === 'fase-grupos' && $groupCutoff) {
+            $windowEnd = $groupCutoff;
+        }
+
+        if ($this->isKnockoutPhase($phase) && $groupCutoff) {
+            $windowStart = $groupCutoff;
+        }
+
+        return [$windowStart, $windowEnd];
+    }
+
+    public function groupStageInvoiceCutoff(): ?Carbon
+    {
+        $lastGroupKickoff = TournamentMatch::query()
+            ->where('stage_label', 'Group Stage')
+            ->whereNotNull('group_label')
+            ->whereIn('round_label', ['1', '2', '3'])
+            ->max('kickoff_at');
+
+        return $lastGroupKickoff ? Carbon::parse($lastGroupKickoff)->addHours(2) : null;
     }
 
     private function sameTieMetrics(array $left, array $right): bool

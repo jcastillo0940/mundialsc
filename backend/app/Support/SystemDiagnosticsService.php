@@ -255,9 +255,9 @@ class SystemDiagnosticsService
 
         $invoicePoints = RegisteredInvoice::query()
             ->whereIn('validation_status', self::APPROVED_INVOICE_STATUSES)
-            ->whereBetween('issued_at', [$phase->starts_at, $phase->ends_at])
-            ->selectRaw('user_id, SUM(points_awarded) as pts')
-            ->groupBy('user_id');
+            ->selectRaw('user_id, SUM(points_awarded) as pts');
+        $this->rankingService->constrainInvoiceQueryToPhase($invoicePoints, $phase);
+        $invoicePoints->groupBy('user_id');
 
         $clientsWithPoints = DB::table('users')
             ->leftJoinSub($predictionPoints, 'p', fn ($join) => $join->on('users.id', '=', 'p.user_id'))
@@ -271,10 +271,12 @@ class SystemDiagnosticsService
         return [
             'phase_name' => $phase->name,
             'prediction_points_total' => (int) MatchPrediction::where('phase_id', $phase->id)->sum('points_awarded'),
-            'invoice_points_total' => (int) RegisteredInvoice::query()
+            'invoice_points_total' => (int) $this->rankingService->constrainInvoiceQueryToPhase(
+                RegisteredInvoice::query()
                 ->whereIn('validation_status', self::APPROVED_INVOICE_STATUSES)
-                ->whereBetween('issued_at', [$phase->starts_at, $phase->ends_at])
-                ->sum('points_awarded'),
+                ->select('points_awarded'),
+                $phase,
+            )->sum('points_awarded'),
             'clients_with_points' => $clientsWithPoints,
             'clients_without_points' => $totalClients - $clientsWithPoints,
         ];

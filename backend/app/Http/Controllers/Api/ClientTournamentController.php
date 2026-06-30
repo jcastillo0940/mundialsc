@@ -94,22 +94,17 @@ class ClientTournamentController extends Controller
     private function phaseGoalsForUser(int $userId, TournamentPhase $phase): float
     {
         $phaseIds = $this->rankingService->leaderboardPhaseIds($phase);
-        $phaseWindows = TournamentPhase::query()->whereIn('id', $phaseIds)->get();
-
         $predictionGoals = (float) MatchPrediction::query()
             ->where('user_id', $userId)
             ->whereIn('phase_id', $phaseIds)
             ->sum('points_awarded');
 
-        $invoiceGoals = (float) RegisteredInvoice::query()
+        $invoiceQuery = RegisteredInvoice::query()
             ->where('user_id', $userId)
-            ->where('validation_status', 'approved')
-            ->when($this->rankingService->isKnockoutPhase($phase), fn ($query) => $query->whereRaw('1 = 0'))
-            ->whereBetween('issued_at', [
-                $phaseWindows->min('starts_at') ?? $phase->starts_at,
-                $phaseWindows->max('ends_at') ?? $phase->ends_at,
-            ])
-            ->sum('points_awarded');
+            ->where('validation_status', 'approved');
+        $this->rankingService->constrainInvoiceQueryToPhase($invoiceQuery, $phase);
+
+        $invoiceGoals = (float) $invoiceQuery->sum('points_awarded');
 
         return $predictionGoals + $invoiceGoals;
     }

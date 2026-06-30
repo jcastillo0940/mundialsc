@@ -226,10 +226,13 @@ class EmployeeRosterService
 
     private function invoiceStatsByUser(TournamentPhase $phase): Collection
     {
-        return RegisteredInvoice::query()
+        $query = RegisteredInvoice::query()
             ->whereIn('validation_status', self::APPROVED_INVOICE_STATUSES)
-            ->whereBetween('issued_at', [$phase->starts_at, $phase->ends_at])
-            ->selectRaw('user_id, SUM(points_awarded) as pts, COUNT(*) as cnt')
+            ->selectRaw('user_id, SUM(points_awarded) as pts, COUNT(*) as cnt');
+
+        $this->rankingService->constrainInvoiceQueryToPhase($query, $phase);
+
+        return $query
             ->groupBy('user_id')
             ->get()
             ->keyBy('user_id');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\RegisteredInvoice;
 use App\Support\ContestInvoiceRegistrationService;
+use App\Support\PromotionRankingService;
 use App\Support\TournamentPhaseResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,7 @@ class DailyInvoiceGoalController extends Controller
     public function __construct(
         private readonly ContestInvoiceRegistrationService $registrationService,
         private readonly TournamentPhaseResolver $phaseResolver,
+        private readonly PromotionRankingService $rankingService,
     ) {
     }
 
@@ -23,6 +25,14 @@ class DailyInvoiceGoalController extends Controller
         $invoiceTotalsQuery = RegisteredInvoice::query()
             ->where('user_id', $request->user()->id)
             ->where('validation_status', 'approved');
+
+        $phaseGoalsQuery = clone $invoiceTotalsQuery;
+        $phaseAmountQuery = clone $invoiceTotalsQuery;
+
+        if ($activePhase) {
+            $this->rankingService->constrainInvoiceQueryToPhase($phaseGoalsQuery, $activePhase);
+            $this->rankingService->constrainInvoiceQueryToPhase($phaseAmountQuery, $activePhase);
+        }
 
         return response()->json([
             'data' => RegisteredInvoice::query()
@@ -34,14 +44,10 @@ class DailyInvoiceGoalController extends Controller
                 'goals' => (float) (clone $invoiceTotalsQuery)->sum('points_awarded'),
                 'amount' => (float) (clone $invoiceTotalsQuery)->sum('purchase_amount'),
                 'phase_goals' => $activePhase
-                    ? (float) (clone $invoiceTotalsQuery)
-                        ->whereBetween('issued_at', [$activePhase->starts_at, $activePhase->ends_at])
-                        ->sum('points_awarded')
+                    ? (float) $phaseGoalsQuery->sum('points_awarded')
                     : 0,
                 'phase_amount' => $activePhase
-                    ? (float) (clone $invoiceTotalsQuery)
-                        ->whereBetween('issued_at', [$activePhase->starts_at, $activePhase->ends_at])
-                        ->sum('purchase_amount')
+                    ? (float) $phaseAmountQuery->sum('purchase_amount')
                     : 0,
             ],
             'active_phase' => $activePhase,

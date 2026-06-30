@@ -2140,9 +2140,13 @@ class BackofficeController extends Controller
 
         $invoiceSubquery = DB::table('registered_invoices')
             ->selectRaw('user_id, SUM(points_awarded) as invoice_pts, COUNT(*) as invoice_cnt')
-            ->where('validation_status', 'approved')
-            ->when($activePhase, fn ($q) => $q->whereBetween('issued_at', [$activePhase->starts_at, $activePhase->ends_at]))
-            ->groupBy('user_id');
+            ->where('validation_status', 'approved');
+
+        if ($activePhase) {
+            $this->rankingService->constrainInvoiceQueryToPhase($invoiceSubquery, $activePhase);
+        }
+
+        $invoiceSubquery->groupBy('user_id');
 
         $predSubquery = DB::table('match_predictions')
             ->selectRaw('user_id, SUM(points_awarded) as pred_pts, COUNT(*) as pred_hits')

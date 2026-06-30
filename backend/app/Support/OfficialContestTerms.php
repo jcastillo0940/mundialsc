@@ -33,8 +33,8 @@ Si un ganador de la Fase de Grupos aparece dentro de las primeras posiciones del
 5. SISTEMA DE PUNTUACION
 Los participantes acumularan puntos conforme a la precision de sus pronosticos en los partidos habilitados de cada fase.
 En Fase de Grupos se mantiene la regla oficial ya aplicada para esa fase: 1 punto por acertar victoria del equipo favorito, 2 puntos por acertar empate, 3 puntos por acertar victoria del equipo no favorito y 3 puntos adicionales por marcador exacto.
-En Fases Finales se aplicaran los puntos configurados para cada ronda en la plataforma. El ranking de la segunda fase sumara exclusivamente los puntos de pronosticos obtenidos desde dieciseisavos de final hasta la final.
-Para la segunda fase no se sumaran puntos, marcadores exactos, facturas, desempates ni beneficios obtenidos en la Fase de Grupos. Las facturas no sumaran puntos ni serviran como desempate para la adjudicacion del premio de Fases Finales.
+En Fases Finales se aplicaran los puntos configurados para cada ronda en la plataforma. El ranking de la segunda fase sumara los puntos de pronosticos obtenidos desde dieciseisavos de final hasta la final y las facturas validas registradas despues del cierre operativo de la Fase de Grupos.
+Para la segunda fase no se sumaran puntos, marcadores exactos, facturas, desempates ni beneficios obtenidos durante la Fase de Grupos.
 
 6. PREMIOS
 Los premios de cada fase se otorgan de manera independiente.

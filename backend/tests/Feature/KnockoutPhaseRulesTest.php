@@ -120,8 +120,40 @@ class KnockoutPhaseRulesTest extends TestCase
         ]);
     }
 
-    public function test_knockout_leaderboard_ignores_invoice_points_even_inside_knockout_window(): void
+    public function test_group_leaderboard_ignores_invoices_registered_after_group_cutoff(): void
     {
+        $groupPhase = TournamentPhase::query()->where('slug', 'fase-grupos')->firstOrFail();
+        $groupPhase->update([
+            'starts_at' => '2026-06-01 00:00:00',
+            'ends_at' => '2026-07-03 23:59:59',
+        ]);
+        $this->createRealGroupMatchForCutoff($groupPhase);
+
+        $player = $this->createClient('Factura Tarde Grupos', 'factura-tarde-grupos@example.com', '8-111-0017');
+
+        $this->createApprovedInvoice(
+            $player,
+            $groupPhase,
+            1,
+            issuedAt: '2026-06-27 18:00:00',
+            createdAt: '2026-06-28 05:00:00',
+        );
+
+        $leaderboard = app(PromotionRankingService::class)->leaderboardForPhase($groupPhase->id, 10);
+        $playerRow = $leaderboard->firstWhere('user_id', $player->id);
+
+        $this->assertSame(0.0, $playerRow['invoice_points']);
+        $this->assertSame(0.0, $playerRow['total_points']);
+    }
+
+    public function test_knockout_leaderboard_counts_invoice_points_registered_after_group_cutoff(): void
+    {
+        $groupPhase = TournamentPhase::query()->where('slug', 'fase-grupos')->firstOrFail();
+        $groupPhase->update([
+            'starts_at' => '2026-06-01 00:00:00',
+            'ends_at' => '2026-06-28 04:00:00',
+        ]);
+        $this->createRealGroupMatchForCutoff($groupPhase);
         $finalPhase = $this->activatePhase('final');
         $match = $this->createMatch($finalPhase);
 
@@ -129,15 +161,21 @@ class KnockoutPhaseRulesTest extends TestCase
         $invoicePlayer = $this->createClient('Factura Finales', 'factura@example.com', '8-111-0011');
 
         $this->createPrediction($match, $predictionPlayer, 5);
-        $this->createApprovedInvoice($invoicePlayer, $finalPhase, 100);
+        $this->createApprovedInvoice(
+            $invoicePlayer,
+            $finalPhase,
+            1,
+            issuedAt: '2026-06-27 18:00:00',
+            createdAt: '2026-06-28 05:00:00',
+        );
 
         $leaderboard = app(PromotionRankingService::class)->leaderboardForPhase($finalPhase->id, 10);
         $predictionRow = $leaderboard->firstWhere('user_id', $predictionPlayer->id);
         $invoiceRow = $leaderboard->firstWhere('user_id', $invoicePlayer->id);
 
         $this->assertSame(5.0, $predictionRow['total_points']);
-        $this->assertSame(0.0, $invoiceRow['invoice_points']);
-        $this->assertSame(0.0, $invoiceRow['total_points']);
+        $this->assertSame(1.0, $invoiceRow['invoice_points']);
+        $this->assertSame(1.0, $invoiceRow['total_points']);
         $this->assertSame([$predictionPlayer->id, $invoicePlayer->id], $leaderboard->pluck('user_id')->all());
     }
 
@@ -620,14 +658,20 @@ class KnockoutPhaseRulesTest extends TestCase
         ]);
     }
 
-    private function createApprovedInvoice(User $user, TournamentPhase $phase, int $points): void
+    private function createApprovedInvoice(
+        User $user,
+        TournamentPhase $phase,
+        int $points,
+        mixed $issuedAt = null,
+        mixed $createdAt = null,
+    ): void
     {
-        RegisteredInvoice::query()->create([
+        $invoice = RegisteredInvoice::query()->create([
             'user_id' => $user->id,
             'cufe' => 'TEST-CUFE-'.$user->id.'-'.$phase->id,
             'qr_raw_text' => 'QR TEST',
             'invoice_number' => 'FAC-'.$user->id.'-'.$phase->id,
-            'issued_at' => $phase->starts_at->copy()->addHour(),
+            'issued_at' => $issuedAt ?? $phase->starts_at->copy()->addHour(),
             'purchase_amount' => 100,
             'points_awarded' => $points,
             'shots_awarded' => 0,
@@ -635,6 +679,28 @@ class KnockoutPhaseRulesTest extends TestCase
             'daily_invoice_limit_hit' => false,
             'status' => 'approved',
             'validation_status' => 'approved',
+        ]);
+
+        if ($createdAt !== null) {
+            $invoice->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();
+        }
+    }
+
+    private function createRealGroupMatchForCutoff(TournamentPhase $phase): TournamentMatch
+    {
+        return TournamentMatch::query()->create([
+            'phase_id' => $phase->id,
+            'match_number' => 72,
+            'round_label' => '3',
+            'stage_label' => 'Group Stage',
+            'group_label' => 'H',
+            'home_team_id' => $this->insertTeam('Grupo Local', 'GHL'),
+            'away_team_id' => $this->insertTeam('Grupo Visita', 'GHV'),
+            'favorite_side' => 'home',
+            'kickoff_at' => '2026-06-28 02:00:00',
+            'home_score' => 1,
+            'away_score' => 1,
+            'status' => 'final',
         ]);
     }
 

@@ -238,17 +238,17 @@ class PointsAuditService
 
     private function movementMatchesPhaseFilter(WalletMovement $movement, int $phaseId): bool
     {
+        if ($movement->resource_type === 'registered_invoice' && $movement->resource_id) {
+            $invoice = RegisteredInvoice::query()->find($movement->resource_id);
+            $invoicePhase = $this->phaseResolver->phaseForDate($invoice?->created_at);
+
+            return $invoicePhase && (int) $invoicePhase->id === $phaseId;
+        }
+
         $phaseIdFromMeta = (int) data_get($movement->meta, 'phase_id', 0);
 
         if ($phaseIdFromMeta > 0) {
             return $phaseIdFromMeta === $phaseId;
-        }
-
-        if ($movement->resource_type === 'registered_invoice' && $movement->resource_id) {
-            $invoice = RegisteredInvoice::query()->find($movement->resource_id);
-            $invoicePhase = $this->phaseResolver->phaseForDate($invoice?->issued_at);
-
-            return $invoicePhase && (int) $invoicePhase->id === $phaseId;
         }
 
         return false;
@@ -369,14 +369,14 @@ class PointsAuditService
 
     private function movementPhase(WalletMovement $movement, ?RegisteredInvoice $invoice, Collection $phasesById): ?TournamentPhase
     {
+        if ($invoice) {
+            return $this->phaseResolver->phaseForDate($invoice->created_at);
+        }
+
         $phaseIdFromMeta = (int) data_get($movement->meta, 'phase_id', 0);
 
         if ($phaseIdFromMeta > 0) {
             return $phasesById->get($phaseIdFromMeta);
-        }
-
-        if ($invoice) {
-            return $this->phaseResolver->phaseForDate($invoice->issued_at);
         }
 
         return null;

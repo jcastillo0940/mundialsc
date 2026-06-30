@@ -24,7 +24,8 @@ class ContestTermsAlignmentTest extends TestCase
                 && str_contains($terms, 'desde dieciseisavos de final hasta la final')
                 && str_contains($terms, 'cerrara 15 minutos antes')
                 && str_contains($terms, 'no podran ganar premio nuevamente en la segunda fase')
-                && str_contains($terms, 'Los puntos obtenidos en la Fase de Grupos no se acumulan'));
+                && str_contains($terms, 'Los puntos obtenidos en la Fase de Grupos no se acumulan')
+                && str_contains($terms, 'facturas validas registradas despues del cierre operativo de la Fase de Grupos'));
     }
 
     public function test_client_bootstrap_lists_active_elimination_phase(): void
