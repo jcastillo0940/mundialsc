@@ -8903,6 +8903,46 @@ button.marea-vitrina-chip:hover {
   font-weight: 600;
 }
 
+.marea-ranking-contest-status {
+  max-width: 520px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(248, 204, 38, 0.34);
+  border-radius: 16px;
+  background: rgba(248, 204, 38, 0.1);
+}
+
+.marea-ranking-contest-status span,
+.marea-ranking-contest-status small {
+  display: block;
+  color: #e5eeff;
+  font-weight: 700;
+}
+
+.marea-ranking-contest-status span {
+  color: #f8cc26;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.marea-ranking-contest-status strong {
+  display: block;
+  margin-top: 4px;
+  color: #fff;
+  font: 700 1.7rem/0.95 'Archivo Narrow', sans-serif;
+  text-transform: uppercase;
+}
+
+.marea-ranking-contest-status small {
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
+.marea-ranking-contest-switch {
+  margin-top: 12px;
+}
+
 .marea-ranking-hero-art {
   position: relative;
   min-height: 260px;

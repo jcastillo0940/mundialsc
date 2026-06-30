@@ -83,6 +83,9 @@ export function VestuarioView({
     ?? contestOptions[0]?.contest
     ?? null
   const selectedContestLabel = contestOptions.find((option) => option.contest === selectedContest)?.label ?? 'Ranking oficial'
+  const selectedContestDescription = selectedContest?.key === 'group_stage'
+    ? 'Competencia cerrada de Fase de Grupos. Estos puntos no se suman a Fases Finales.'
+    : 'Competencia activa de Fases Finales. Suma desde 16avos hasta la final, separada de grupos.'
   const leaderboard = selectedContest?.leaderboard ?? overview?.leaderboard ?? []
   const topThree = leaderboard.slice(0, 3)
   const userEntry = leaderboard.find((entry) => entry.user_id === user.id) ?? null
@@ -114,6 +117,25 @@ export function VestuarioView({
             <span className="auth-reference-title-line is-gold">GOLEADORES</span>
           </h1>
           <p className="marea-ranking-hero-description">Consulta tu posicion, tus goles y el avance oficial de la promocion.</p>
+          <div className="marea-ranking-contest-status">
+            <span>Estas viendo</span>
+            <strong>{selectedContestLabel}</strong>
+            <small>{selectedContestDescription}</small>
+          </div>
+          {contestOptions.length > 1 ? (
+            <div className="marea-vitrina-chip-row marea-ranking-contest-switch">
+              {contestOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`marea-vitrina-chip is-filter${selectedContest === option.contest ? ' is-active' : ''}`}
+                  onClick={() => setSelectedContestKey(option.key)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="marea-ranking-hero-art" aria-hidden="true">
