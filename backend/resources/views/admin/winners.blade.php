@@ -16,7 +16,11 @@
     @if($phase)
         <p><strong>Fase activa:</strong> {{ $phase->name }}</p>
         <p><strong>Max_Premios:</strong> {{ $winnerSlots }} | La tabla oficial se corta estrictamente en ese limite.</p>
-        <p><a href="{{ route('admin.winners.acta', ['phase_id' => $phase->id]) }}" target="_blank">Abrir acta general de ganadores</a></p>
+        <p>
+            <a href="{{ route('admin.winners.acta', ['phase_id' => $phase->id]) }}" target="_blank">Abrir acta general de ganadores</a>
+            ·
+            <a href="{{ route('admin.winners.export', ['phase_id' => $phase->id]) }}">Exportar Excel criterios desempate</a>
+        </p>
         <form method="post" action="{{ route('admin.winners.generate') }}">
             @csrf
             <input type="hidden" name="phase_id" value="{{ $phase->id }}">
@@ -49,8 +53,13 @@
                 <th title="Puntos de pronosticos + facturas en esta fase">Total pts</th>
                 <th title="Puntos de pronosticos en esta fase">Pts Prono.</th>
                 <th title="Puntos de facturas en esta fase">Pts Fact.</th>
-                <th>Exactos</th>
-                <th>Facturas</th>
+                <th title="Desempate 1: marcadores exactos">D1 Exactos</th>
+                <th title="Desempate 2: facturas validas">D2 Facturas</th>
+                <th title="Desempate 3: monto de compras">D3 Monto</th>
+                <th title="Desempate 4: goles predichos">D4 Pred.</th>
+                <th title="Desempate 4: goles reales">D4 Real</th>
+                <th title="Desempate 4: diferencia absoluta">D4 Dif.</th>
+                <th title="Desempate 5: fecha de registro">D5 Registro</th>
                 <th>Rol</th>
             </tr>
         </thead>
@@ -70,10 +79,15 @@
                 <td>{{ number_format($row['invoice_points'], 2) }}</td>
                 <td>{{ $row['exact_hits'] }}</td>
                 <td>{{ $row['invoice_count'] }}</td>
+                <td>{{ number_format($row['invoice_total_amount'], 2) }}</td>
+                <td>{{ $row['group_stage_goal_prediction'] ?? '-' }}</td>
+                <td>{{ ($row['group_stage_goal_prediction'] ?? null) !== null ? ($row['actual_goals'] ?? '-') : '-' }}</td>
+                <td>{{ (($row['group_stage_goal_prediction'] ?? null) !== null && ($row['goal_prediction_delta'] ?? PHP_INT_MAX) !== PHP_INT_MAX) ? $row['goal_prediction_delta'] : '-' }}</td>
+                <td>{{ $row['ranking_timestamp'] ? \Carbon\Carbon::parse($row['ranking_timestamp'])->format('Y-m-d H:i:s') : '-' }}</td>
                 <td>{{ $row['football_role'] }}</td>
             </tr>
         @empty
-            <tr><td colspan="8">Todavia no hay ranking disponible.</td></tr>
+            <tr><td colspan="13">Todavia no hay ranking disponible.</td></tr>
         @endforelse
         </tbody>
     </table>

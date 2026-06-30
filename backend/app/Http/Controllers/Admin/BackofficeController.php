@@ -692,6 +692,52 @@ class BackofficeController extends Controller
         ]);
     }
 
+    public function winnersExportCsv(): StreamedResponse
+    {
+        $phaseId = request()->integer('phase_id') ?: null;
+        $phase = $this->rankingService->activeRankingPhase($phaseId);
+        abort_if(! $phase, 404);
+
+        $winnerSlots = $this->rankingService->winnerSlotsForPhase($phase->id);
+        $leaderboard = $this->rankingService->leaderboardForPhase($phase->id, $winnerSlots);
+        $phasePrizes = PhasePrize::query()
+            ->where('phase_id', $phase->id)
+            ->orderBy('ranking_from')
+            ->get();
+        $filename = 'ganadores-desempates-'.$phase->slug.'-'.now()->format('Y-m-d_H-i').'.csv';
+
+        return response()->streamDownload(function () use ($leaderboard, $phasePrizes): void {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($out, [
+                'puesto',
+                'tipo_premio',
+                'participante',
+                'cedula',
+                'correo',
+                'telefono',
+                'sucursal',
+                'puntos',
+                'de_1_marc_exactos',
+                'd_2_facturas',
+                'd_3_monto_compras',
+                'd_4_goles_predichos',
+                'd_4_goles_reales',
+                'de_4_diferencia_goles',
+                'd_5_fecha_registro',
+            ]);
+
+            foreach ($leaderboard as $row) {
+                fputcsv($out, $this->winnerCriteriaExportRow($row, $phasePrizes));
+            }
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     public function winnerCommunicationsActa(PromoWinner $winner): View
     {
         $winner->loadMissing(['phase', 'user', 'contacts', 'prizeToken']);
@@ -1894,6 +1940,51 @@ class BackofficeController extends Controller
         ]);
 
         return $winner;
+    }
+
+    private function winnerCriteriaExportRow(array $row, \Illuminate\Support\Collection $phasePrizes): array
+    {
+        $goalPrediction = $row['group_stage_goal_prediction'] ?? null;
+        $goalDelta = $row['goal_prediction_delta'] ?? null;
+        $registrationTimestamp = $row['ranking_timestamp'] ?? null;
+
+        return [
+            $row['position'],
+            $this->prizeTitleForPosition($phasePrizes, (int) $row['position']),
+            $row['full_name'],
+            $row['cedula'] ?? '',
+            $row['email'] ?? '',
+            $row['phone'] ?? '',
+            $row['branch_name'] ?? '',
+            $this->csvNumber($row['total_points'] ?? 0),
+            $row['exact_hits'] ?? 0,
+            $row['invoice_count'] ?? 0,
+            $this->csvNumber($row['invoice_total_amount'] ?? 0),
+            $goalPrediction ?? '',
+            $goalPrediction !== null ? ($row['actual_goals'] ?? '') : '',
+            $goalPrediction !== null && $goalDelta !== PHP_INT_MAX ? $goalDelta : '',
+            $registrationTimestamp ? \Carbon\Carbon::parse($registrationTimestamp)->format('Y-m-d H:i:s') : '',
+        ];
+    }
+
+    private function prizeTitleForPosition(\Illuminate\Support\Collection $phasePrizes, int $position): string
+    {
+        $phasePrize = $phasePrizes->first(
+            fn (PhasePrize $prize) => (int) $prize->ranking_from <= $position && (int) $prize->ranking_to >= $position
+        );
+
+        return $phasePrize?->prize_title ?? '';
+    }
+
+    private function csvNumber(mixed $value): string
+    {
+        $number = (float) $value;
+
+        if (floor($number) === $number) {
+            return (string) (int) $number;
+        }
+
+        return number_format($number, 2, '.', '');
     }
 
     private function ensurePrizeTokensForPhase(int $phaseId, int $requiredTokens): void

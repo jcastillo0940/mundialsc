@@ -107,6 +107,7 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::delete('/prizes/{prize}', [BackofficeController::class, 'destroyPrize'])->name('admin.prizes.destroy');
         Route::get('/winners', [BackofficeController::class, 'winners'])->name('admin.winners');
         Route::get('/winners/acta', [BackofficeController::class, 'winnersActa'])->name('admin.winners.acta');
+        Route::get('/winners/export', [BackofficeController::class, 'winnersExportCsv'])->name('admin.winners.export');
         Route::post('/winners/generate', [BackofficeController::class, 'generateWinners'])->name('admin.winners.generate');
         Route::post('/winners/resolve-draw', [BackofficeController::class, 'resolveDraw'])->name('admin.winners.resolve-draw');
         Route::get('/winners/{winner}/acta-comunicaciones', [BackofficeController::class, 'winnerCommunicationsActa'])->name('admin.winners.communications-acta');

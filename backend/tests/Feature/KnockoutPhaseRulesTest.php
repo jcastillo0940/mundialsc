@@ -431,6 +431,59 @@ class KnockoutPhaseRulesTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_export_winners_with_tiebreaker_criteria(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin Export',
+            'email' => 'admin-export@example.com',
+            'cedula' => 'ADMIN-EXPORT',
+            'document_type' => 'passport',
+            'password' => bcrypt('secret'),
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $groupPhase = TournamentPhase::query()->where('slug', 'fase-grupos')->firstOrFail();
+        $player = $this->createClient('Exportable Uno', 'exportable@example.com', '8-111-0015');
+        $player->update([
+            'group_stage_goal_prediction' => 190,
+            'registration_completed_at' => '2026-06-10 11:33:55',
+            'registration_order_key' => '2026-06-10 11:33:55',
+        ]);
+
+        PhasePrize::query()->create([
+            'phase_id' => $groupPhase->id,
+            'ranking_from' => 1,
+            'ranking_to' => 1,
+            'football_role' => 'Goleador Estrella',
+            'prize_title' => 'TV 50 pulgadas',
+            'prize_type' => 'tv_50',
+            'stock' => 1,
+        ]);
+
+        $match = $this->createMatch($groupPhase);
+        $match->update([
+            'status' => 'final',
+            'home_score' => 2,
+            'away_score' => 1,
+        ]);
+        $this->createPrediction($match, $player, 7);
+        $this->createApprovedInvoice($player, $groupPhase, 1);
+
+        $response = $this->actingAs($admin)->get('/adminrepus1car/winners/export?phase_id='.$groupPhase->id);
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('puesto,tipo_premio,participante,cedula,correo,telefono,sucursal,puntos,de_1_marc_exactos,d_2_facturas,d_3_monto_compras,d_4_goles_predichos,d_4_goles_reales,de_4_diferencia_goles,d_5_fecha_registro', $content);
+        $this->assertStringContainsString('TV 50 pulgadas', $content);
+        $this->assertStringContainsString('Exportable Uno', $content);
+        $this->assertStringContainsString('8-111-0015', $content);
+        $this->assertStringContainsString('190', $content);
+        $this->assertStringContainsString('3', $content);
+        $this->assertStringContainsString('187', $content);
+    }
+
     private function activatePhase(string $slug): TournamentPhase
     {
         TournamentPhase::query()->where('slug', 'fase-grupos')->update(['is_active' => false]);

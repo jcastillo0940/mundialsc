@@ -101,17 +101,20 @@ class PromotionRankingService
         return DB::table('users')
             ->leftJoinSub($predictionTotals, 'prediction_totals', fn ($join) => $join->on('users.id', '=', 'prediction_totals.user_id'))
             ->leftJoinSub($invoiceTotals, 'invoice_totals', fn ($join) => $join->on('users.id', '=', 'invoice_totals.user_id'))
+            ->leftJoin('branches', 'branches.id', '=', 'users.branch_id')
             ->where('users.role', 'client')
             ->whereNull('users.disqualified_at')
             ->selectRaw("
                 users.id,
                 users.name,
+                users.cedula,
                 users.email,
                 users.phone,
                 users.group_stage_goal_prediction,
                 users.registration_completed_at,
                 users.registration_order_key,
                 users.created_at,
+                branches.name as branch_name,
                 COALESCE(prediction_totals.prediction_points, 0) as prediction_points,
                 COALESCE(invoice_totals.invoice_points, 0) as invoice_points,
                 COALESCE(prediction_totals.prediction_points, 0) + COALESCE(invoice_totals.invoice_points, 0) as total_points,
@@ -132,8 +135,10 @@ class PromotionRankingService
                 return [
                     'user_id' => (int) $row->id,
                     'full_name' => $row->name,
+                    'cedula' => $row->cedula,
                     'email' => $row->email,
                     'phone' => $row->phone,
+                    'branch_name' => $row->branch_name,
                     'prediction_points' => (float) $row->prediction_points,
                     'invoice_points' => (float) $row->invoice_points,
                     'goals' => (float) $row->total_points,
@@ -142,6 +147,7 @@ class PromotionRankingService
                     'invoice_count' => (int) $row->invoice_count,
                     'invoice_total_amount' => (float) $row->invoice_total_amount,
                     'group_stage_goal_prediction' => $goalPrediction,
+                    'actual_goals' => $actualGoals,
                     'goal_prediction_delta' => $goalPredictionDelta,
                     'ranking_timestamp' => $rankingTimestamp,
                     'ranking_order_key' => $rankingOrderKey,
