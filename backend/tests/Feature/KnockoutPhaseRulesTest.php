@@ -452,6 +452,32 @@ class KnockoutPhaseRulesTest extends TestCase
         $this->assertSame('final', $phase->slug);
     }
 
+    public function test_live_score_maps_short_knockout_round_labels_to_their_phases(): void
+    {
+        $service = new LiveScoreSyncService(new LiveScoreApiClient(new HttpFactory()));
+        $method = new \ReflectionMethod($service, 'resolvePhaseFromFixture');
+        $method->setAccessible(true);
+
+        $expected = [
+            'R32' => 'dieciseisavos',
+            'R16' => 'octavos',
+            'QF' => 'cuartos',
+            'SF' => 'semifinal',
+            '3PPO' => 'final',
+            'F' => 'final',
+        ];
+
+        foreach ($expected as $roundLabel => $expectedSlug) {
+            $phase = $method->invoke($service, [
+                'round' => $roundLabel,
+                'stage' => null,
+                'group_name' => null,
+            ]);
+
+            $this->assertSame($expectedSlug, $phase->slug, "Round {$roundLabel} debe mapear a {$expectedSlug}.");
+        }
+    }
+
     public function test_final_phase_has_twenty_two_hundred_dollar_bonus_prizes(): void
     {
         $finalPhase = TournamentPhase::query()->where('slug', 'final')->firstOrFail();

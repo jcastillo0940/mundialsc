@@ -403,9 +403,25 @@ class LiveScoreSyncService
     {
         $groupName = Str::lower((string) ($item['group_name'] ?? $item['group'] ?? ''));
         $stageName = Str::lower((string) ($item['round'] ?? $item['stage'] ?? $item['competition']['name'] ?? ''));
+        $roundCode = Str::upper(trim((string) ($item['round'] ?? '')));
 
         if (str_contains($groupName, 'group') || preg_match('/^[a-z]$/', $groupName)) {
             return TournamentPhase::query()->where('slug', 'fase-grupos')->firstOrFail();
+        }
+        if ($roundCode === 'R32') {
+            return TournamentPhase::query()->where('slug', 'dieciseisavos')->firstOrFail();
+        }
+        if ($roundCode === 'R16') {
+            return TournamentPhase::query()->where('slug', 'octavos')->firstOrFail();
+        }
+        if ($roundCode === 'QF') {
+            return TournamentPhase::query()->where('slug', 'cuartos')->firstOrFail();
+        }
+        if ($roundCode === 'SF') {
+            return $this->phaseBySlug('semifinal', 'semifinal-final');
+        }
+        if (in_array($roundCode, ['F', '3PPO'], true)) {
+            return $this->phaseBySlug('final', 'semifinal-final');
         }
         if (str_contains($stageName, 'round of 32') || str_contains($stageName, 'last 32') || str_contains($stageName, 'sixteenth')) {
             return TournamentPhase::query()->where('slug', 'dieciseisavos')->firstOrFail();
