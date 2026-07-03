@@ -27,7 +27,7 @@ class OnlineStoreOrderBonusTest extends TestCase
             'services.magento.base_url' => 'https://magento.test',
             'services.magento.access_token' => 'test-token',
             'services.magento.order_bonus_enabled' => true,
-            'services.magento.order_bonus_statuses' => ['processing', 'complete'],
+            'services.magento.order_bonus_statuses' => ['processing', 'complete', 'authorized_payment'],
         ]);
     }
 
@@ -65,6 +65,26 @@ class OnlineStoreOrderBonusTest extends TestCase
         ]);
         $this->assertSame(0, (int) $user->wallet()->first()?->goals_balance);
         $this->assertSame(0, WalletMovement::query()->where('user_id', $user->id)->count());
+    }
+
+    public function test_client_cannot_submit_claim_when_magento_order_is_not_found(): void
+    {
+        $this->travelTo('2026-07-03 09:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $user = $this->createClient('cliente@example.com');
+        Sanctum::actingAs($user);
+        $this->fakeMagentoOrders([]);
+
+        $response = $this->postJson('/api/client/online-orders/verify', [
+            'order_number' => '1200000032812',
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('order_number');
+
+        $this->assertDatabaseCount('online_store_order_claims', 0);
+        $this->assertSame(0, (int) $user->wallet()->first()?->goals_balance);
     }
 
     public function test_multiple_users_can_submit_claims_for_same_online_store_order_for_admin_review(): void
@@ -178,7 +198,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 incrementId: '13000001729',
                 email: 'cliente@example.com',
                 total: 25.00,
-                status: 'processing',
+                status: 'authorized_payment',
                 createdAt: '2026-07-03 09:00:00',
             ),
         ]);
@@ -275,7 +295,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 entityId: 1004,
                 incrementId: '13000001731',
                 email: 'cliente@example.com',
-                total: 19.99,
+                total: 24.99,
                 status: 'processing',
                 createdAt: '2026-07-03 09:00:00',
             ),

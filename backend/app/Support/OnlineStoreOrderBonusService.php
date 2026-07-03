@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 class OnlineStoreOrderBonusService
 {
     private const BONUS_POINTS = 5;
-    private const MINIMUM_TOTAL = 20.00;
+    private const MINIMUM_TOTAL = 25.00;
     private const PROMO_START_AT = '2026-06-02 00:00:00';
     private const PROMO_TIMEZONE = 'America/Panama';
 
@@ -54,7 +54,14 @@ class OnlineStoreOrderBonusService
 
         $orders = $this->magento->ordersForIncrementId($orderNumber);
         $payload = $orders[0] ?? null;
-        $order = is_array($payload) ? $this->storeOrderSnapshot($payload, $user) : null;
+
+        if (! is_array($payload)) {
+            throw ValidationException::withMessages([
+                'order_number' => 'No encontramos esa orden en supercarnes.com. Verifica el numero exacto de orden Magento.',
+            ]);
+        }
+
+        $order = $this->storeOrderSnapshot($payload, $user);
 
         $claim = OnlineStoreOrderClaim::query()
             ->where('increment_id', $orderNumber)
@@ -116,7 +123,7 @@ class OnlineStoreOrderBonusService
 
         if (! $order || ! $this->isEligibleForManualApproval($order, $claim)) {
             throw ValidationException::withMessages([
-                'claim' => 'La orden no cumple las reglas del bono: $20.00 o mas, fecha valida, estado valido y solicitud antes de octavos.',
+                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida, estado valido y solicitud antes de octavos.',
             ]);
         }
 
@@ -307,7 +314,7 @@ class OnlineStoreOrderBonusService
      */
     private function eligibleStatuses(): array
     {
-        $statuses = config('services.magento.order_bonus_statuses', ['processing', 'complete']);
+        $statuses = config('services.magento.order_bonus_statuses', ['processing', 'complete', 'authorized_payment']);
 
         if (is_string($statuses)) {
             $statuses = explode(',', $statuses);
@@ -358,6 +365,6 @@ class OnlineStoreOrderBonusService
             return 'Tus compras en linea ya fueron revisadas. No hay puntos nuevos por acreditar.';
         }
 
-        return 'No encontramos compras en linea validas de $20.00 o mas con el correo de tu cuenta.';
+        return 'No encontramos compras en linea validas de $25.00 o mas con el correo de tu cuenta.';
     }
 }
