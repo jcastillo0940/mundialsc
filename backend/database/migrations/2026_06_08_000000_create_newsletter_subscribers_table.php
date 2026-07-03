@@ -15,7 +15,7 @@ return new class extends Migration
                 $table->timestamp('subscribed_at')->nullable();
                 $table->timestamp('unsubscribed_at')->nullable();
                 $table->timestamp('confirmed_at')->nullable();
-                $table->string('confirmation_token_hash', 255)->nullable()->index();
+                $table->string('confirmation_token_hash', 191)->nullable()->index();
                 $table->timestamp('confirmation_sent_at')->nullable();
                 $table->string('source', 50)->nullable();
                 $table->string('ip_address', 45)->nullable();

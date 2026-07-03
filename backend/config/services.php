@@ -70,4 +70,14 @@ return [
         })(),
     ],
 
+    'magento' => [
+        'base_url' => env('MAGENTO_BASE_URL'),
+        'access_token' => env('MAGENTO_ACCESS_TOKEN'),
+        'store_code' => env('MAGENTO_STORE_CODE'),
+        'timeout' => env('MAGENTO_TIMEOUT', 20),
+        'order_lookup_page_size' => env('MAGENTO_ORDER_LOOKUP_PAGE_SIZE', 25),
+        'order_bonus_enabled' => env('MAGENTO_ORDER_BONUS_ENABLED', false),
+        'order_bonus_statuses' => array_filter(array_map('trim', explode(',', env('MAGENTO_ORDER_BONUS_STATUSES', 'processing,complete')))),
+    ],
+
 ];

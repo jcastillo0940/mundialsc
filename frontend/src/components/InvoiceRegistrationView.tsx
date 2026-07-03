@@ -41,9 +41,13 @@ interface InvoiceRegistrationViewProps {
   invoiceScannerError: string | null
   invoiceScannerDebug: InvoiceScannerDebugInfo
   invoiceSubmitting: boolean
+  onlineOrderSubmitting: boolean
+  onlineOrderMessage: string | null
   resolvedInvoiceData: ResolvedInvoiceData | null
+  userEmail: string
   onActivateScan: () => void
   onRegister: (rawCufe: string) => void
+  onVerifyOnlineOrder: (orderNumber?: string) => void
   onReset: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>
   onGalleryUpload: (event: ChangeEvent<HTMLInputElement>) => void | Promise<void>
@@ -95,9 +99,13 @@ export function InvoiceRegistrationView({
   invoiceScannerError,
   invoiceScannerDebug,
   invoiceSubmitting,
+  onlineOrderSubmitting,
+  onlineOrderMessage,
   resolvedInvoiceData,
+  userEmail,
   onActivateScan,
   onRegister,
+  onVerifyOnlineOrder,
   onReset,
   onModeChange,
   onFieldChange,
@@ -105,6 +113,7 @@ export function InvoiceRegistrationView({
 }: InvoiceRegistrationViewProps) {
   const hasResolved = Boolean(resolvedInvoiceData)
   const [debugOpen, setDebugOpen] = useState(false)
+  const [onlineOrderNumber, setOnlineOrderNumber] = useState('')
   const loaderRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -161,6 +170,9 @@ export function InvoiceRegistrationView({
         ? 'Tus facturas validadas ya estan sumando goles dentro de la promocion.'
         : 'Tu proxima factura valida puede convertir este entrenamiento en puntos.'
       : 'Escanea tu primera factura DGI para empezar a sumar goles dentro de la promocion.'
+  const whatsappReportUrl = `https://wa.me/50768982167?text=${encodeURIComponent(
+    `Hola, quiero reportar una compra en la tienda en linea para sumar puntos. Mi correo en la app es ${userEmail}. Mi numero de orden es ${onlineOrderNumber || '[escribe aqui tu numero de orden]'}.`,
+  )}`
 
   const invoiceCards = useMemo(
     () =>
@@ -253,6 +265,54 @@ export function InvoiceRegistrationView({
             </span>
           ) : null}
         </aside>
+      </section>
+
+      <section className="marea-online-order-card">
+        <div className="marea-online-order-copy">
+          <span className="marea-invoice-panel-kicker">Tienda en linea</span>
+          <h2>Compra online, suma 5 goles</h2>
+          <p>
+            Reporta compras de $20.00 o mas hechas en supercarnes.com desde el 2 de junio y antes del inicio de octavos. Escribe el numero exacto de orden, por ejemplo 13000001729, para que el equipo revise tu solicitud.
+          </p>
+        </div>
+        <div className="marea-online-order-action">
+          <label className="marea-online-order-field">
+            <span>Numero de orden Magento</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="Ej: 13000001729"
+              value={onlineOrderNumber}
+              onChange={(event) => setOnlineOrderNumber(event.target.value.replace(/\s/g, ''))}
+              disabled={onlineOrderSubmitting}
+            />
+          </label>
+          <button
+            type="button"
+            className="marea-invoice-action-button secondary"
+            disabled={onlineOrderSubmitting || !onlineOrderNumber}
+            onClick={() => onVerifyOnlineOrder(onlineOrderNumber)}
+          >
+            <span className="material-symbols-outlined">shopping_cart_checkout</span>
+            {onlineOrderSubmitting ? 'Enviando...' : 'Enviar solicitud'}
+          </button>
+          <a
+            className="marea-invoice-action-button whatsapp"
+            href={whatsappReportUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="material-symbols-outlined">forum</span>
+            Reportar compra via WhatsApp
+          </a>
+          {onlineOrderMessage ? (
+            <div className="marea-invoice-inline-alert is-info">
+              <span className="material-symbols-outlined">info</span>
+              {onlineOrderMessage}
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <div className="marea-invoice-mode-switch">

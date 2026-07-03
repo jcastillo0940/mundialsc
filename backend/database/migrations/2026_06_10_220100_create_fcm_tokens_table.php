@@ -15,7 +15,8 @@ return new class extends Migration
         Schema::create('fcm_tokens', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('token', 512)->unique();
+            $table->string('token', 512);
+            $table->string('token_hash', 64)->unique();
             $table->string('device_name', 120)->nullable();
             $table->string('platform', 50)->nullable();
             $table->string('user_agent', 500)->nullable();

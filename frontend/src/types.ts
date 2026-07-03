@@ -216,3 +216,10 @@ export interface WalletSnapshot {
   wallet: WalletSummary | null
   movements: WalletMovement[]
 }
+
+export interface OnlineOrderVerifyResponse {
+  credited_points: number
+  credited_orders: number
+  checked_orders: number
+  message: string
+}

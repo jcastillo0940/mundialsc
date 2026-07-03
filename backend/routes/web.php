@@ -99,6 +99,9 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::get('/rules', [BackofficeController::class, 'rules'])->name('admin.rules');
         Route::get('/points-audit', [BackofficeController::class, 'pointsAudit'])->name('admin.points-audit');
         Route::get('/points-audit/export/csv', [BackofficeController::class, 'pointsAuditExportCsv'])->name('admin.points-audit.csv');
+        Route::get('/online-order-claims', [BackofficeController::class, 'onlineOrderClaims'])->name('admin.online-order-claims');
+        Route::post('/online-order-claims/{claim}/approve', [BackofficeController::class, 'approveOnlineOrderClaim'])->name('admin.online-order-claims.approve');
+        Route::post('/online-order-claims/{claim}/reject', [BackofficeController::class, 'rejectOnlineOrderClaim'])->name('admin.online-order-claims.reject');
         Route::put('/rules/phases/{phase}', [BackofficeController::class, 'updatePhase'])->name('admin.rules.phase');
         Route::put('/rules/invoice', [BackofficeController::class, 'updateInvoiceSettings'])->name('admin.rules.invoice');
         Route::get('/prizes', [BackofficeController::class, 'prizes'])->name('admin.prizes');

@@ -46,13 +46,16 @@ class PushSubscriptionController extends Controller
             ]);
         }
 
+        $endpointHash = hash('sha256', $data['endpoint']);
+
         $subscription = PushSubscription::query()->updateOrCreate(
-            ['endpoint' => $data['endpoint']],
+            ['endpoint_hash' => $endpointHash],
             [
                 'user_id' => $user->id,
                 'p256dh_key' => $data['keys']['p256dh'],
                 'auth_key' => $data['keys']['auth'],
                 'content_encoding' => $data['content_encoding'] ?? 'aes128gcm',
+                'endpoint' => $data['endpoint'],
                 'user_agent' => substr((string) $request->userAgent(), 0, 500) ?: null,
                 'is_enabled' => true,
                 'last_seen_at' => now(),

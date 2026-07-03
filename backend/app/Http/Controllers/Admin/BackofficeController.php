@@ -20,6 +20,7 @@ use App\Models\MailLog;
 use App\Models\Campaign;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\OnlineStoreOrderClaim;
 use App\Models\RegisteredInvoice;
 use App\Models\SiteSetting;
 use App\Models\Team;
@@ -31,6 +32,7 @@ use App\Support\Audit;
 use App\Support\ContestInvoiceRegistrationService;
 use App\Support\EmployeeRosterService;
 use App\Support\LiveScoreSyncService;
+use App\Support\OnlineStoreOrderBonusService;
 use App\Support\PointsAuditService;
 use App\Support\PromotionRankingService;
 use App\Support\SystemDiagnosticsService;
@@ -60,6 +62,7 @@ class BackofficeController extends Controller
         private readonly PushCampaignDispatcher $pushCampaignDispatcher,
         private readonly SystemDiagnosticsService $diagnosticsService,
         private readonly EmployeeRosterService $employeeRoster,
+        private readonly OnlineStoreOrderBonusService $onlineStoreOrderBonusService,
     ) {
     }
 
@@ -559,6 +562,69 @@ class BackofficeController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    public function onlineOrderClaims(Request $request): View
+    {
+        $status = (string) $request->query('status', 'pending');
+        $query = trim((string) $request->query('query', ''));
+
+        $claims = OnlineStoreOrderClaim::query()
+            ->with(['user', 'reviewedBy'])
+            ->when(in_array($status, ['pending', 'approved', 'rejected'], true), fn ($builder) => $builder->where('status', $status))
+            ->when($query !== '', function ($builder) use ($query): void {
+                $builder->where(function ($where) use ($query): void {
+                    $where->where('increment_id', 'like', "%{$query}%")
+                        ->orWhere('customer_email', 'like', "%{$query}%")
+                        ->orWhere('submitted_email', 'like', "%{$query}%")
+                        ->orWhereHas('user', function ($userQuery) use ($query): void {
+                            $userQuery->where('name', 'like', "%{$query}%")
+                                ->orWhere('email', 'like', "%{$query}%")
+                                ->orWhere('cedula', 'like', "%{$query}%");
+                        });
+                });
+            })
+            ->latest('id')
+            ->paginate(50)
+            ->withQueryString();
+
+        $summary = [
+            'pending' => OnlineStoreOrderClaim::query()->where('status', 'pending')->count(),
+            'approved' => OnlineStoreOrderClaim::query()->where('status', 'approved')->count(),
+            'rejected' => OnlineStoreOrderClaim::query()->where('status', 'rejected')->count(),
+        ];
+
+        return view('admin.online-order-claims', compact('claims', 'summary', 'status', 'query'));
+    }
+
+    public function approveOnlineOrderClaim(Request $request, OnlineStoreOrderClaim $claim): RedirectResponse
+    {
+        $validated = $request->validate([
+            'review_notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $this->onlineStoreOrderBonusService->approveClaim(
+            $claim,
+            $request->user(),
+            $validated['review_notes'] ?? null,
+        );
+
+        return redirect()->route('admin.online-order-claims')->with('status', 'Solicitud aprobada y puntos acreditados.');
+    }
+
+    public function rejectOnlineOrderClaim(Request $request, OnlineStoreOrderClaim $claim): RedirectResponse
+    {
+        $validated = $request->validate([
+            'review_notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $this->onlineStoreOrderBonusService->rejectClaim(
+            $claim,
+            $request->user(),
+            $validated['review_notes'] ?? null,
+        );
+
+        return redirect()->route('admin.online-order-claims')->with('status', 'Solicitud rechazada.');
     }
 
     public function updatePhase(Request $request, TournamentPhase $phase): RedirectResponse

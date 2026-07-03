@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\InvoiceGoalSetting;
 use App\Models\MatchPrediction;
+use App\Models\OnlineStoreOrder;
 use App\Models\RegisteredInvoice;
 use App\Models\TournamentMatch;
 use App\Models\TournamentPhase;
@@ -105,8 +106,14 @@ class ClientTournamentController extends Controller
         $this->rankingService->constrainInvoiceQueryToPhase($invoiceQuery, $phase);
 
         $invoiceGoals = (float) $invoiceQuery->sum('points_awarded');
+        $onlineStoreGoals = $this->rankingService->isKnockoutPhase($phase)
+            ? (float) OnlineStoreOrder::query()
+                ->where('user_id', $userId)
+                ->whereNotNull('credited_at')
+                ->sum('points_awarded')
+            : 0.0;
 
-        return $predictionGoals + $invoiceGoals;
+        return $predictionGoals + $invoiceGoals + $onlineStoreGoals;
     }
 
     private function generalGoalsForUser(int $userId): float
@@ -116,8 +123,12 @@ class ClientTournamentController extends Controller
             ->where('user_id', $userId)
             ->where('validation_status', 'approved')
             ->sum('points_awarded');
+        $onlineStoreGoals = (float) OnlineStoreOrder::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('credited_at')
+            ->sum('points_awarded');
 
-        return $predictionGoals + $invoiceGoals;
+        return $predictionGoals + $invoiceGoals + $onlineStoreGoals;
     }
 
     private function contestSummaryForUser(int $userId, ?TournamentPhase $phase, string $key): ?array

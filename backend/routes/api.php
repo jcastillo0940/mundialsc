@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DailyInvoiceGoalController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\OnlineStoreOrderController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PredictionController;
 use App\Http\Controllers\Api\PrizeController;
@@ -53,6 +54,7 @@ Route::middleware(['auth:sanctum', 'registration.complete'])->group(function ():
     Route::post('client/matches/{match}/predict', [PredictionController::class, 'store'])->middleware('role:client');
     Route::post('client/invoices/resolve', [DailyInvoiceGoalController::class, 'resolve'])->middleware(['role:client', 'throttle:invoice-scan']);
     Route::post('client/invoices', [DailyInvoiceGoalController::class, 'store'])->middleware(['role:client', 'throttle:invoice-scan']);
+    Route::post('client/online-orders/verify', [OnlineStoreOrderController::class, 'verify'])->middleware(['role:client', 'throttle:online-order-claim']);
 
     Route::get('dashboard', [DashboardController::class, 'show']);
     Route::get('wallet', [DashboardController::class, 'wallet']);

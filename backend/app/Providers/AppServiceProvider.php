@@ -80,6 +80,16 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('online-order-claim', function (Request $request) {
+            $key = $request->user()?->id ? 'user:'.$request->user()->id : 'ip:'.$request->ip();
+
+            return [
+                Limit::perMinute(5)->by('online-order-minute:'.$key),
+                Limit::perHour(20)->by('online-order-hour:'.$key),
+                Limit::perMinute(20)->by('online-order-ip:'.$request->ip()),
+            ];
+        });
+
         RateLimiter::for('game-action', function (Request $request) {
             $key = $request->user()?->id ? 'user:'.$request->user()->id : 'ip:'.$request->ip();
 

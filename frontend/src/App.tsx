@@ -22,6 +22,7 @@ import type {
   Branch,
   ClientBootstrap,
   DashboardSnapshot,
+  OnlineOrderVerifyResponse,
   Prediction,
   Prize,
   RegisteredInvoice,
@@ -1203,6 +1204,8 @@ export function App() {
     issued_at: '',
   })
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false)
+  const [onlineOrderSubmitting, setOnlineOrderSubmitting] = useState(false)
+  const [onlineOrderMessage, setOnlineOrderMessage] = useTimedFeedback()
   const [resolvedInvoiceData, setResolvedInvoiceData] = useState<ResolvedInvoiceData | null>(null)
   const [invoiceScannerError, setInvoiceScannerError] = useTimedFeedback()
   const [invoiceScannerDebug, setInvoiceScannerDebug] = useState<InvoiceScannerDebugInfo>(() =>
@@ -2821,6 +2824,29 @@ export function App() {
     await handleQrScanRegister(invoiceForm.rawInput)
   }
 
+  async function handleVerifyOnlineOrder(orderNumber?: string) {
+    setOnlineOrderSubmitting(true)
+    setOnlineOrderMessage(null)
+    setError(null)
+
+    try {
+      const trimmedOrderNumber = orderNumber?.trim()
+      const response = await api.post<OnlineOrderVerifyResponse>(
+        '/client/online-orders/verify',
+        trimmedOrderNumber ? { order_number: trimmedOrderNumber } : {},
+      )
+      setOnlineOrderMessage(response.data.message)
+      setMessage(response.data.message)
+      await bootstrap()
+    } catch (onlineOrderError) {
+      const message = normalizeError(onlineOrderError)
+      setOnlineOrderMessage(message)
+      setError(message)
+    } finally {
+      setOnlineOrderSubmitting(false)
+    }
+  }
+
   function renderCancha() {
     const activeGroupTitle = selectedGroupSummary?.displayLabel ?? activePredictionPhase?.name ?? 'la fase activa'
     const isSelectedGroupComplete = predictionMode === 'pending' && Boolean(selectedGroupSummary?.isComplete)
@@ -3101,8 +3127,12 @@ export function App() {
         invoiceScannerError={invoiceScannerError}
         invoiceScannerDebug={invoiceScannerDebug}
         invoiceSubmitting={invoiceSubmitting}
+        onlineOrderSubmitting={onlineOrderSubmitting}
+        onlineOrderMessage={onlineOrderMessage}
         invoices={invoices}
+        userEmail={user?.email ?? ''}
         onRegister={(rawCufe) => void handleQrScanRegister(rawCufe)}
+        onVerifyOnlineOrder={(orderNumber) => void handleVerifyOnlineOrder(orderNumber)}
         onActivateScan={async () => {
           setInvoiceScannerError(null)
           if (typeof navigator !== 'undefined' && 'mediaDevices' in navigator) {

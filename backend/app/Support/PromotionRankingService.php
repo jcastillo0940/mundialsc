@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\MatchPrediction;
+use App\Models\OnlineStoreOrder;
 use App\Models\PhasePrize;
 use App\Models\PromoWinner;
 use App\Models\RegisteredInvoice;
@@ -88,6 +89,18 @@ class PromotionRankingService
         )
             ->groupBy('user_id');
 
+        $onlineStoreTotals = OnlineStoreOrder::query()
+            ->selectRaw('user_id, SUM(points_awarded) as online_store_points')
+            ->whereNotNull('user_id')
+            ->whereNotNull('credited_at')
+            ->where('points_awarded', '>', 0);
+
+        if (! $this->isKnockoutPhase($phase)) {
+            $onlineStoreTotals->whereRaw('1 = 0');
+        }
+
+        $onlineStoreTotals->groupBy('user_id');
+
         $actualGoals = (int) TournamentMatch::query()
             ->whereIn('phase_id', $leaderboardPhaseIds)
             ->where('status', 'final')
@@ -96,6 +109,7 @@ class PromotionRankingService
         return DB::table('users')
             ->leftJoinSub($predictionTotals, 'prediction_totals', fn ($join) => $join->on('users.id', '=', 'prediction_totals.user_id'))
             ->leftJoinSub($invoiceTotals, 'invoice_totals', fn ($join) => $join->on('users.id', '=', 'invoice_totals.user_id'))
+            ->leftJoinSub($onlineStoreTotals, 'online_store_totals', fn ($join) => $join->on('users.id', '=', 'online_store_totals.user_id'))
             ->leftJoin('branches', 'branches.id', '=', 'users.branch_id')
             ->where('users.role', 'client')
             ->whereNull('users.disqualified_at')
@@ -112,7 +126,8 @@ class PromotionRankingService
                 branches.name as branch_name,
                 COALESCE(prediction_totals.prediction_points, 0) as prediction_points,
                 COALESCE(invoice_totals.invoice_points, 0) as invoice_points,
-                COALESCE(prediction_totals.prediction_points, 0) + COALESCE(invoice_totals.invoice_points, 0) as total_points,
+                COALESCE(online_store_totals.online_store_points, 0) as online_store_points,
+                COALESCE(prediction_totals.prediction_points, 0) + COALESCE(invoice_totals.invoice_points, 0) + COALESCE(online_store_totals.online_store_points, 0) as total_points,
                 COALESCE(prediction_totals.exact_hits, 0) as exact_hits,
                 COALESCE(invoice_totals.invoice_count, 0) as invoice_count,
                 COALESCE(invoice_totals.invoice_total_amount, 0) as invoice_total_amount
@@ -136,6 +151,7 @@ class PromotionRankingService
                     'branch_name' => $row->branch_name,
                     'prediction_points' => (float) $row->prediction_points,
                     'invoice_points' => (float) $row->invoice_points,
+                    'online_store_points' => (float) $row->online_store_points,
                     'goals' => (float) $row->total_points,
                     'total_points' => (float) $row->total_points,
                     'exact_hits' => (int) $row->exact_hits,

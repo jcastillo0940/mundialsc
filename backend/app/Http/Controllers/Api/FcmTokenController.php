@@ -17,10 +17,13 @@ class FcmTokenController extends Controller
             'platform' => ['nullable', 'string', 'max:50'],
         ]);
 
+        $tokenHash = hash('sha256', $data['token']);
+
         $record = FcmToken::query()->updateOrCreate(
-            ['token' => $data['token']],
+            ['token_hash' => $tokenHash],
             [
                 'user_id' => $request->user()->id,
+                'token' => $data['token'],
                 'device_name' => $data['device_name'] ?? null,
                 'platform' => $data['platform'] ?? null,
                 'user_agent' => substr((string) $request->userAgent(), 0, 500) ?: null,

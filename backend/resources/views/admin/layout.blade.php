@@ -53,6 +53,7 @@
             <a href="{{ route('admin.rules') }}">Reglas</a>
             <a href="{{ route('admin.points-audit') }}">Auditoría de puntos</a>
             <a href="{{ route('admin.player-points') }}">Puntos por participante</a>
+            <a href="{{ route('admin.online-order-claims') }}">Solicitudes tienda online</a>
             <a href="{{ route('admin.prizes') }}">Premios</a>
             <a href="{{ route('admin.winners') }}">Ganadores</a>
             <a href="{{ route('admin.integrations') }}">Integraciones</a>
