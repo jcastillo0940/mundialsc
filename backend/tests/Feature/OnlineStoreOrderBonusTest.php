@@ -34,7 +34,7 @@ class OnlineStoreOrderBonusTest extends TestCase
     public function test_client_submits_online_store_order_claim_without_receiving_points_immediately(): void
     {
         $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
         $user = $this->createClient('cliente@example.com');
         Sanctum::actingAs($user);
         $this->fakeMagentoOrders([
@@ -44,7 +44,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 09:00:00',
+                createdAt: '2026-07-03 07:00:00',
             ),
         ]);
 
@@ -70,7 +70,7 @@ class OnlineStoreOrderBonusTest extends TestCase
     public function test_client_cannot_submit_claim_when_magento_order_is_not_found(): void
     {
         $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
         $user = $this->createClient('cliente@example.com');
         Sanctum::actingAs($user);
         $this->fakeMagentoOrders([]);
@@ -90,7 +90,7 @@ class OnlineStoreOrderBonusTest extends TestCase
     public function test_multiple_users_can_submit_claims_for_same_online_store_order_for_admin_review(): void
     {
         $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
         $firstUser = $this->createClient('cliente@example.com');
         $secondUser = $this->createClient('dueno@example.com');
         $this->fakeMagentoOrders([
@@ -100,7 +100,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'dueno@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 09:00:00',
+                createdAt: '2026-07-03 08:00:00',
             ),
         ]);
 
@@ -119,8 +119,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_online_store_order_claim_stores_only_sanitized_magento_snapshot(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->travelTo('2026-07-03 08:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
         $user = $this->createClient('cliente@example.com');
         Sanctum::actingAs($user);
         $payload = $this->magentoOrder(
@@ -170,7 +170,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 09:00:00',
+                createdAt: '2026-07-03 08:00:00',
             ),
         ]);
 
@@ -354,6 +354,161 @@ class OnlineStoreOrderBonusTest extends TestCase
         $this->assertSame(5.0, $knockoutRow['online_store_points']);
     }
 
+    public function test_admin_can_credit_valid_whatsapp_online_order_with_mismatched_magento_email(): void
+    {
+        $this->travelTo('2026-07-03 10:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $user = $this->createClient('cliente-app@example.com');
+        $admin = $this->createAdmin();
+        $this->fakeMagentoOrders([
+            $this->magentoOrder(
+                entityId: 2001,
+                incrementId: '10000000193',
+                email: 'cliente-magento@example.com',
+                total: 25.00,
+                status: 'authorized_payment',
+                createdAt: '2026-07-03 08:00:00',
+            ),
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('admin.online-order-claims.whatsapp.store'), [
+            'cedula' => $user->cedula,
+            'order_number' => '10000000193',
+            'source_reported_at' => '2026-07-03T07:30',
+            'review_notes' => 'Cliente reporto la compra por WhatsApp al 68982167.',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('online_store_order_claims', [
+            'user_id' => $user->id,
+            'increment_id' => '10000000193',
+            'customer_email' => 'cliente-magento@example.com',
+            'status' => 'approved',
+            'source' => 'admin_whatsapp',
+            'points_awarded' => 5,
+            'created_by_user_id' => $admin->id,
+            'reviewed_by_user_id' => $admin->id,
+        ]);
+        $this->assertSame(5, (int) $user->wallet()->first()?->goals_balance);
+
+        $movement = WalletMovement::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertSame('admin_whatsapp', $movement->meta['source'] ?? null);
+        $this->assertSame($admin->id, $movement->meta['admin_user_id'] ?? null);
+        $this->assertSame('10000000193', $movement->meta['order']['increment_id'] ?? null);
+    }
+
+    public function test_admin_whatsapp_credit_requires_existing_client_document(): void
+    {
+        $this->travelTo('2026-07-03 08:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $admin = $this->createAdmin();
+        $this->fakeMagentoOrders([]);
+
+        $response = $this->actingAs($admin)->from(route('admin.online-order-claims'))->post(route('admin.online-order-claims.whatsapp.store'), [
+            'cedula' => '8-000-000',
+            'order_number' => '10000000193',
+            'source_reported_at' => '2026-07-03T08:00',
+            'review_notes' => 'Reporte WhatsApp.',
+        ]);
+
+        $response->assertRedirect(route('admin.online-order-claims'));
+        $response->assertSessionHasErrors('cedula');
+        $this->assertDatabaseCount('online_store_order_claims', 0);
+    }
+
+    public function test_admin_whatsapp_credit_rejects_disqualified_user(): void
+    {
+        $this->travelTo('2026-07-03 08:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $user = $this->createClient('cliente@example.com');
+        $user->forceFill(['disqualified_at' => now()])->save();
+        $admin = $this->createAdmin();
+        $this->fakeMagentoOrders([
+            $this->magentoOrder(
+                entityId: 2002,
+                incrementId: '10000000194',
+                email: 'cliente@example.com',
+                total: 25.00,
+                status: 'processing',
+                createdAt: '2026-07-03 07:00:00',
+            ),
+        ]);
+
+        $response = $this->actingAs($admin)->from(route('admin.online-order-claims'))->post(route('admin.online-order-claims.whatsapp.store'), [
+            'cedula' => $user->cedula,
+            'order_number' => '10000000194',
+            'source_reported_at' => '2026-07-03T07:30',
+            'review_notes' => 'Reporte WhatsApp.',
+        ]);
+
+        $response->assertRedirect(route('admin.online-order-claims'));
+        $response->assertSessionHasErrors('cedula');
+        $this->assertSame(0, (int) $user->wallet()->first()?->goals_balance);
+    }
+
+    public function test_admin_whatsapp_credit_rejects_report_after_round_of_16_kickoff(): void
+    {
+        $this->travelTo('2026-07-03 10:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $user = $this->createClient('cliente@example.com');
+        $admin = $this->createAdmin();
+        $this->fakeMagentoOrders([
+            $this->magentoOrder(
+                entityId: 2003,
+                incrementId: '10000000195',
+                email: 'cliente@example.com',
+                total: 25.00,
+                status: 'processing',
+                createdAt: '2026-07-03 09:00:00',
+            ),
+        ]);
+
+        $response = $this->actingAs($admin)->from(route('admin.online-order-claims'))->post(route('admin.online-order-claims.whatsapp.store'), [
+            'cedula' => $user->cedula,
+            'order_number' => '10000000195',
+            'source_reported_at' => '2026-07-03T12:05',
+            'review_notes' => 'Reporte WhatsApp.',
+        ]);
+
+        $response->assertRedirect(route('admin.online-order-claims'));
+        $response->assertSessionHasErrors('source_reported_at');
+        $this->assertDatabaseCount('online_store_order_claims', 0);
+    }
+
+    public function test_admin_whatsapp_credit_does_not_duplicate_an_already_credited_order(): void
+    {
+        $this->travelTo('2026-07-03 08:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $user = $this->createClient('cliente@example.com');
+        $admin = $this->createAdmin();
+        $this->fakeMagentoOrders([
+            $this->magentoOrder(
+                entityId: 2004,
+                incrementId: '10000000196',
+                email: 'cliente@example.com',
+                total: 25.00,
+                status: 'processing',
+                createdAt: '2026-07-03 08:00:00',
+            ),
+        ]);
+
+        $payload = [
+            'cedula' => $user->cedula,
+            'order_number' => '10000000196',
+            'source_reported_at' => '2026-07-03T08:00',
+            'review_notes' => 'Reporte WhatsApp.',
+        ];
+
+        $this->actingAs($admin)->post(route('admin.online-order-claims.whatsapp.store'), $payload)->assertRedirect();
+        $response = $this->actingAs($admin)->from(route('admin.online-order-claims'))->post(route('admin.online-order-claims.whatsapp.store'), $payload);
+
+        $response->assertRedirect(route('admin.online-order-claims'));
+        $response->assertSessionHasErrors('claim');
+        $this->assertSame(1, WalletMovement::query()->where('user_id', $user->id)->count());
+        $this->assertSame(5, (int) $user->wallet()->first()?->goals_balance);
+    }
+
     private function createClient(string $email): User
     {
         $user = User::query()->create([
@@ -421,6 +576,8 @@ class OnlineStoreOrderBonusTest extends TestCase
     {
         $phase ??= TournamentPhase::query()->where('slug', 'octavos')->firstOrFail();
         $phase->update(['is_active' => true]);
+        $octavosPhaseIds = TournamentPhase::query()->where('slug', 'octavos')->pluck('id');
+        TournamentMatch::query()->whereIn('phase_id', $octavosPhaseIds)->delete();
 
         return TournamentMatch::query()->create([
             'phase_id' => $phase->id,

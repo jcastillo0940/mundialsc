@@ -10,6 +10,39 @@
 </div>
 
 <div class="card">
+    <h2>Registrar compra reportada por WhatsApp</h2>
+    <p class="muted">
+        Usa este formulario solo para reportes recibidos por WhatsApp. La fecha del reporte debe ser anterior al inicio de octavos y quedara auditada.
+    </p>
+    <form method="post" action="{{ route('admin.online-order-claims.whatsapp.store') }}" class="grid" style="gap:12px">
+        @csrf
+        <div class="grid cols-2">
+            <label>
+                Cedula o documento del cliente
+                <input name="cedula" value="{{ old('cedula') }}" placeholder="Ej: 8-123-456" required>
+            </label>
+            <label>
+                Numero exacto de orden Magento
+                <input name="order_number" value="{{ old('order_number') }}" placeholder="Ej: 10000000193" required>
+            </label>
+        </div>
+        <div class="grid cols-2">
+            <label>
+                Fecha/hora del reporte por WhatsApp
+                <input type="datetime-local" name="source_reported_at" value="{{ old('source_reported_at') }}" required>
+            </label>
+            <label>
+                Nota de auditoria
+                <textarea name="review_notes" placeholder="Ej: Cliente reporto la compra por WhatsApp al 68982167." required>{{ old('review_notes') }}</textarea>
+            </label>
+        </div>
+        <div>
+            <button type="submit">Validar Magento y acreditar 5 puntos</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
     <h2>Filtros</h2>
     <form method="get" action="{{ route('admin.online-order-claims') }}" class="grid">
         <div class="row">
@@ -42,6 +75,10 @@
         @forelse($claims as $claim)
             @php
                 $emailsMatch = strtolower((string) $claim->submitted_email) === strtolower((string) $claim->customer_email);
+                $sourceLabels = [
+                    'client_frontend' => 'Cliente / Frontend',
+                    'admin_whatsapp' => 'Admin / WhatsApp',
+                ];
             @endphp
             <tr>
                 <td>
@@ -67,8 +104,18 @@
                 <td>
                     <span class="pill">{{ strtoupper($claim->status) }}</span><br>
                     <small class="muted">{{ $claim->points_awarded }} puntos</small>
+                    <div style="margin-top:6px">
+                        <small class="muted">Origen: {{ $sourceLabels[$claim->source] ?? ($claim->source ?: 'sin dato') }}</small><br>
+                        @if($claim->source_reported_at)
+                            <small class="muted">Reporte: {{ $claim->source_reported_at->format('Y-m-d H:i') }}</small>
+                        @endif
+                    </div>
                 </td>
                 <td>
+                    @if($claim->createdBy)
+                        <div>Creada por {{ $claim->createdBy->name }}</div>
+                        <small class="muted">Gobernanza manual</small>
+                    @endif
                     @if($claim->reviewed_at)
                         <div>{{ $claim->reviewedBy?->name ?? 'Admin' }}</div>
                         <small class="muted">{{ $claim->reviewed_at->format('Y-m-d H:i') }}</small>

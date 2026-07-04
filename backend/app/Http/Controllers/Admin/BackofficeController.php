@@ -39,6 +39,7 @@ use App\Support\SystemDiagnosticsService;
 use App\Support\TournamentScoring;
 use App\Services\FirebaseMessagingService;
 use App\Services\PushCampaignDispatcher;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -570,7 +571,7 @@ class BackofficeController extends Controller
         $query = trim((string) $request->query('query', ''));
 
         $claims = OnlineStoreOrderClaim::query()
-            ->with(['user', 'reviewedBy'])
+            ->with(['user', 'reviewedBy', 'createdBy'])
             ->when(in_array($status, ['pending', 'approved', 'rejected'], true), fn ($builder) => $builder->where('status', $status))
             ->when($query !== '', function ($builder) use ($query): void {
                 $builder->where(function ($where) use ($query): void {
@@ -595,6 +596,42 @@ class BackofficeController extends Controller
         ];
 
         return view('admin.online-order-claims', compact('claims', 'summary', 'status', 'query'));
+    }
+
+    public function storeWhatsappOnlineOrderClaim(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'cedula' => ['required', 'string', 'max:40'],
+            'order_number' => ['required', 'string', 'max:80'],
+            'source_reported_at' => ['required', 'date'],
+            'review_notes' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $cedula = Str::upper(trim((string) $validated['cedula']));
+        $targetUser = User::query()
+            ->where('role', 'client')
+            ->where('cedula', $cedula)
+            ->first();
+
+        if (! $targetUser) {
+            throw ValidationException::withMessages([
+                'cedula' => 'No encontramos un cliente registrado con esa cedula o documento.',
+            ]);
+        }
+
+        $reportedAt = CarbonImmutable::parse((string) $validated['source_reported_at'], 'America/Panama');
+
+        $claim = $this->onlineStoreOrderBonusService->approveManualWhatsappClaim(
+            $targetUser,
+            (string) $validated['order_number'],
+            $reportedAt,
+            $request->user(),
+            (string) $validated['review_notes'],
+        );
+
+        return redirect()
+            ->route('admin.online-order-claims', ['query' => $claim->increment_id, 'status' => 'all'])
+            ->with('status', 'Compra reportada por WhatsApp validada y 5 puntos acreditados.');
     }
 
     public function approveOnlineOrderClaim(Request $request, OnlineStoreOrderClaim $claim): RedirectResponse

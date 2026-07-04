@@ -92,10 +92,13 @@ class OnlineStoreOrderBonusService
             'magento_status' => $order?->status,
             'ordered_at' => $order?->ordered_at,
             'status' => 'pending',
+            'source' => 'client_frontend',
             'points_awarded' => 0,
             'submitted_at' => $claim->submitted_at ?? now(self::PROMO_TIMEZONE),
+            'source_reported_at' => $claim->source_reported_at ?? now(self::PROMO_TIMEZONE),
             'reviewed_at' => null,
             'reviewed_by_user_id' => null,
+            'created_by_user_id' => null,
             'review_notes' => null,
             'raw_payload' => $this->sanitizedPayload($payload),
         ])->save();
@@ -127,7 +130,7 @@ class OnlineStoreOrderBonusService
             ]);
         }
 
-        $credited = $this->creditOrder($order, $claim->user);
+        $credited = $this->creditOrder($order, $claim->user, $claim->source ?: 'client_frontend', $admin);
 
         $claim->forceFill([
             'online_store_order_id' => $order->id,
@@ -138,6 +141,7 @@ class OnlineStoreOrderBonusService
             'magento_status' => $order->status,
             'ordered_at' => $order->ordered_at,
             'status' => 'approved',
+            'source' => $claim->source ?: 'client_frontend',
             'points_awarded' => $credited,
             'reviewed_at' => now(),
             'reviewed_by_user_id' => $admin->id,
@@ -146,6 +150,120 @@ class OnlineStoreOrderBonusService
         ])->save();
 
         return $claim->fresh();
+    }
+
+    public function approveManualWhatsappClaim(
+        User $targetUser,
+        ?string $orderNumber,
+        CarbonImmutable $reportedAt,
+        User $admin,
+        ?string $notes = null,
+    ): OnlineStoreOrderClaim {
+        if (! filter_var(config('services.magento.order_bonus_enabled', false), FILTER_VALIDATE_BOOL)) {
+            throw ValidationException::withMessages([
+                'magento' => 'La verificacion de compras en linea no esta disponible todavia.',
+            ]);
+        }
+
+        if ($targetUser->role !== 'client') {
+            throw ValidationException::withMessages([
+                'cedula' => 'El documento encontrado no pertenece a un cliente.',
+            ]);
+        }
+
+        if ($targetUser->disqualified_at !== null) {
+            throw ValidationException::withMessages([
+                'cedula' => 'Este cliente esta descalificado y no puede recibir puntos.',
+            ]);
+        }
+
+        $orderNumber = trim((string) $orderNumber);
+        if ($orderNumber === '') {
+            throw ValidationException::withMessages([
+                'order_number' => 'Escribe el numero exacto de orden Magento.',
+            ]);
+        }
+
+        $notes = trim((string) $notes);
+        if ($notes === '') {
+            throw ValidationException::withMessages([
+                'review_notes' => 'Escribe una nota de auditoria para esta acreditacion manual.',
+            ]);
+        }
+
+        $cutoff = $this->firstRoundOf16Kickoff();
+        if ($cutoff === null || $reportedAt->setTimezone(self::PROMO_TIMEZONE)->gte($cutoff->copy()->setTimezone(self::PROMO_TIMEZONE))) {
+            throw ValidationException::withMessages([
+                'source_reported_at' => 'El reporte por WhatsApp debe haber ocurrido antes del inicio de octavos.',
+            ]);
+        }
+
+        $orders = $this->magento->ordersForIncrementId($orderNumber);
+        $payload = $orders[0] ?? null;
+
+        if (! is_array($payload)) {
+            throw ValidationException::withMessages([
+                'order_number' => 'No encontramos esa orden en supercarnes.com. Verifica el numero exacto de orden Magento.',
+            ]);
+        }
+
+        $order = $this->storeOrderSnapshot($payload, $targetUser);
+
+        if (! $this->isEligibleForManualWhatsappApproval($order, $targetUser, $reportedAt)) {
+            throw ValidationException::withMessages([
+                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida, estado valido, reporte antes de octavos y sin credito previo.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($orderNumber, $targetUser, $order, $admin, $reportedAt, $notes, $payload): OnlineStoreOrderClaim {
+            $claim = OnlineStoreOrderClaim::query()
+                ->where('increment_id', $orderNumber)
+                ->where('user_id', $targetUser->id)
+                ->lockForUpdate()
+                ->first();
+
+            $claim ??= new OnlineStoreOrderClaim([
+                'increment_id' => $orderNumber,
+                'user_id' => $targetUser->id,
+            ]);
+
+            if ($claim->exists && $claim->status === 'approved') {
+                throw ValidationException::withMessages([
+                    'claim' => 'Esta orden ya fue aprobada para este cliente.',
+                ]);
+            }
+
+            $credited = $this->creditOrder($order, $targetUser, 'admin_whatsapp', $admin);
+            if ($credited <= 0) {
+                throw ValidationException::withMessages([
+                    'claim' => 'Esta orden ya tenia puntos acreditados.',
+                ]);
+            }
+
+            $claim->forceFill([
+                'user_id' => $targetUser->id,
+                'online_store_order_id' => $order->id,
+                'submitted_email' => strtolower((string) $targetUser->email),
+                'magento_order_id' => $order->magento_order_id,
+                'customer_email' => $order->customer_email,
+                'grand_total' => $order->grand_total,
+                'currency' => $order->currency,
+                'magento_status' => $order->status,
+                'ordered_at' => $order->ordered_at,
+                'status' => 'approved',
+                'source' => 'admin_whatsapp',
+                'points_awarded' => $credited,
+                'submitted_at' => $reportedAt,
+                'source_reported_at' => $reportedAt,
+                'reviewed_at' => now(),
+                'reviewed_by_user_id' => $admin->id,
+                'created_by_user_id' => $admin->id,
+                'review_notes' => $notes,
+                'raw_payload' => $this->sanitizedPayload($payload),
+            ])->save();
+
+            return $claim->fresh();
+        });
     }
 
     public function rejectClaim(OnlineStoreOrderClaim $claim, User $admin, ?string $notes = null): OnlineStoreOrderClaim
@@ -213,8 +331,7 @@ class OnlineStoreOrderBonusService
             && $order->ordered_at->gte($promoStart)
             && $order->ordered_at->lt($cutoff)
             && $order->credited_at === null
-            && (int) $order->points_awarded === 0
-            && ($order->user_id === null || (int) $order->user_id === (int) $user->id);
+            && (int) $order->points_awarded === 0;
     }
 
     private function isEligibleForManualApproval(OnlineStoreOrder $order, OnlineStoreOrderClaim $claim): bool
@@ -235,9 +352,26 @@ class OnlineStoreOrderBonusService
             && ($order->user_id === null || (int) $order->user_id === (int) $claim->user_id);
     }
 
-    private function creditOrder(OnlineStoreOrder $order, User $user): int
+    private function isEligibleForManualWhatsappApproval(OnlineStoreOrder $order, User $user, CarbonImmutable $reportedAt): bool
     {
-        return DB::transaction(function () use ($order, $user): int {
+        $cutoff = $this->firstRoundOf16Kickoff();
+        $promoStart = CarbonImmutable::parse(self::PROMO_START_AT, self::PROMO_TIMEZONE);
+
+        return $cutoff !== null
+            && $reportedAt->setTimezone(self::PROMO_TIMEZONE)->lt($cutoff->copy()->setTimezone(self::PROMO_TIMEZONE))
+            && (float) $order->grand_total >= self::MINIMUM_TOTAL
+            && in_array(strtolower($order->status), $this->eligibleStatuses(), true)
+            && $order->ordered_at !== null
+            && $order->ordered_at->gte($promoStart)
+            && $order->ordered_at->lt($cutoff)
+            && $order->credited_at === null
+            && (int) $order->points_awarded === 0
+            && ($order->user_id === null || (int) $order->user_id === (int) $user->id);
+    }
+
+    private function creditOrder(OnlineStoreOrder $order, User $user, string $source = 'client_frontend', ?User $admin = null): int
+    {
+        return DB::transaction(function () use ($order, $user, $source, $admin): int {
             $lockedOrder = OnlineStoreOrder::query()
                 ->whereKey($order->id)
                 ->lockForUpdate()
@@ -269,8 +403,10 @@ class OnlineStoreOrderBonusService
                 campaignId: $campaignId ? (int) $campaignId : null,
                 notes: 'Bono por compra en tienda en linea Super Carnes.',
                 meta: [
-                    'source' => 'magento',
+                    'source' => $source,
                     'rule_code' => 'online_store_order_before_round_of_16',
+                    'admin_user_id' => $admin?->id,
+                    'user_id' => $user->id,
                     'minimum_total' => self::MINIMUM_TOTAL,
                     'promo_start_at' => CarbonImmutable::parse(self::PROMO_START_AT, self::PROMO_TIMEZONE)->toIso8601String(),
                     'promo_end_at' => $this->firstRoundOf16Kickoff()?->toIso8601String(),

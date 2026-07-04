@@ -19,10 +19,13 @@ class OnlineStoreOrderClaim extends Model
         'magento_status',
         'ordered_at',
         'status',
+        'source',
         'points_awarded',
         'submitted_at',
+        'source_reported_at',
         'reviewed_at',
         'reviewed_by_user_id',
+        'created_by_user_id',
         'review_notes',
         'raw_payload',
     ];
@@ -33,6 +36,7 @@ class OnlineStoreOrderClaim extends Model
             'grand_total' => 'decimal:2',
             'ordered_at' => 'datetime',
             'submitted_at' => 'datetime',
+            'source_reported_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'raw_payload' => 'array',
         ];
@@ -51,5 +55,10 @@ class OnlineStoreOrderClaim extends Model
     public function reviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by_user_id');
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }
