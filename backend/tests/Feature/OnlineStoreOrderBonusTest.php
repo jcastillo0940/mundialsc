@@ -33,8 +33,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_client_submits_online_store_order_claim_without_receiving_points_immediately(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $this->travelTo('2026-07-05 09:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 17:00:00');
         $user = $this->createClient('cliente@example.com');
         Sanctum::actingAs($user);
         $this->fakeMagentoOrders([
@@ -44,7 +44,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 07:00:00',
+                createdAt: '2026-07-05 07:00:00',
             ),
         ]);
 
@@ -69,8 +69,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_client_cannot_submit_claim_when_magento_order_is_not_found(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $this->travelTo('2026-07-05 09:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 17:00:00');
         $user = $this->createClient('cliente@example.com');
         Sanctum::actingAs($user);
         $this->fakeMagentoOrders([]);
@@ -89,8 +89,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_multiple_users_can_submit_claims_for_same_online_store_order_for_admin_review(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $this->travelTo('2026-07-05 09:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 17:00:00');
         $firstUser = $this->createClient('cliente@example.com');
         $secondUser = $this->createClient('dueno@example.com');
         $this->fakeMagentoOrders([
@@ -100,7 +100,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'dueno@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 08:00:00',
+                createdAt: '2026-07-05 08:00:00',
             ),
         ]);
 
@@ -119,8 +119,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_online_store_order_claim_stores_only_sanitized_magento_snapshot(): void
     {
-        $this->travelTo('2026-07-03 08:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $this->travelTo('2026-07-05 08:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 17:00:00');
         $user = $this->createClient('cliente@example.com');
         Sanctum::actingAs($user);
         $payload = $this->magentoOrder(
@@ -129,7 +129,7 @@ class OnlineStoreOrderBonusTest extends TestCase
             email: 'cliente@example.com',
             total: 25.00,
             status: 'processing',
-            createdAt: '2026-07-03 09:00:00',
+            createdAt: '2026-07-05 09:00:00',
         );
         $payload['billing_address'] = ['telephone' => '61234567', 'street' => ['Casa privada']];
         $payload['payment'] = ['cc_last4' => '4242'];
@@ -159,8 +159,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_online_store_order_claim_endpoint_is_rate_limited(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->travelTo('2026-07-05 09:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 10:00:00');
         $user = $this->createClient('cliente@example.com');
         Sanctum::actingAs($user);
         $this->fakeMagentoOrders([
@@ -170,7 +170,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 08:00:00',
+                createdAt: '2026-07-05 08:00:00',
             ),
         ]);
 
@@ -187,8 +187,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_admin_can_approve_valid_online_store_order_claim_and_credit_five_points(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->travelTo('2026-07-05 09:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 10:00:00');
         $user = $this->createClient('cliente@example.com');
         $admin = $this->createAdmin();
         Sanctum::actingAs($user);
@@ -199,7 +199,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 25.00,
                 status: 'authorized_payment',
-                createdAt: '2026-07-03 09:00:00',
+                createdAt: '2026-07-05 09:00:00',
             ),
         ]);
         $this->postJson('/api/client/online-orders/verify', [
@@ -233,8 +233,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_admin_can_reject_online_store_order_claim_without_crediting_points(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->travelTo('2026-07-05 09:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 10:00:00');
         $user = $this->createClient('cliente@example.com');
         $admin = $this->createAdmin();
         Sanctum::actingAs($user);
@@ -245,7 +245,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'otro@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 09:00:00',
+                createdAt: '2026-07-05 09:00:00',
             ),
         ]);
         $this->postJson('/api/client/online-orders/verify', [
@@ -269,10 +269,10 @@ class OnlineStoreOrderBonusTest extends TestCase
         $this->assertSame(0, WalletMovement::query()->where('user_id', $user->id)->count());
     }
 
-    public function test_claim_cannot_be_submitted_after_round_of_16_kickoff(): void
+    public function test_claim_cannot_be_submitted_after_promo_window_ends(): void
     {
-        $this->travelTo('2026-07-03 10:00:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->travelTo('2026-07-07 05:00:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 10:00:00');
         $user = $this->createClient('cliente@example.com');
         Sanctum::actingAs($user);
 
@@ -285,8 +285,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_admin_approval_revalidates_minimum_total_before_crediting_points(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->travelTo('2026-07-05 09:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 10:00:00');
         $user = $this->createClient('cliente@example.com');
         $admin = $this->createAdmin();
         Sanctum::actingAs($user);
@@ -297,7 +297,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 24.99,
                 status: 'processing',
-                createdAt: '2026-07-03 09:00:00',
+                createdAt: '2026-07-05 09:00:00',
             ),
         ]);
         $this->postJson('/api/client/online-orders/verify', [
@@ -319,10 +319,10 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_online_store_bonus_counts_only_in_knockout_ranking_after_admin_approval(): void
     {
-        $this->travelTo('2026-07-03 09:30:00');
+        $this->travelTo('2026-07-05 09:30:00');
         $groupPhase = TournamentPhase::query()->where('slug', 'fase-grupos')->firstOrFail();
         $knockoutPhase = $this->activatePhase('octavos');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00', $knockoutPhase);
+        $this->seedFirstRoundOf16Match('2026-07-05 10:00:00', $knockoutPhase);
         $user = $this->createClient('cliente@example.com');
         $admin = $this->createAdmin();
         Sanctum::actingAs($user);
@@ -333,7 +333,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 30.00,
                 status: 'complete',
-                createdAt: '2026-07-03 09:00:00',
+                createdAt: '2026-07-05 09:00:00',
             ),
         ]);
         $this->postJson('/api/client/online-orders/verify', [
@@ -356,8 +356,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_admin_can_credit_valid_whatsapp_online_order_with_mismatched_magento_email(): void
     {
-        $this->travelTo('2026-07-03 10:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $this->travelTo('2026-07-05 10:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 17:00:00');
         $user = $this->createClient('cliente-app@example.com');
         $admin = $this->createAdmin();
         $this->fakeMagentoOrders([
@@ -367,14 +367,14 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente-magento@example.com',
                 total: 25.00,
                 status: 'authorized_payment',
-                createdAt: '2026-07-03 08:00:00',
+                createdAt: '2026-07-05 08:00:00',
             ),
         ]);
 
         $response = $this->actingAs($admin)->post(route('admin.online-order-claims.whatsapp.store'), [
             'cedula' => $user->cedula,
             'order_number' => '10000000193',
-            'source_reported_at' => '2026-07-03T07:30',
+            'source_reported_at' => '2026-07-05T07:30',
             'review_notes' => 'Cliente reporto la compra por WhatsApp al 68982167.',
         ]);
 
@@ -400,15 +400,15 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_admin_whatsapp_credit_requires_existing_client_document(): void
     {
-        $this->travelTo('2026-07-03 08:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->travelTo('2026-07-05 08:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 10:00:00');
         $admin = $this->createAdmin();
         $this->fakeMagentoOrders([]);
 
         $response = $this->actingAs($admin)->from(route('admin.online-order-claims'))->post(route('admin.online-order-claims.whatsapp.store'), [
             'cedula' => '8-000-000',
             'order_number' => '10000000193',
-            'source_reported_at' => '2026-07-03T08:00',
+            'source_reported_at' => '2026-07-05T08:00',
             'review_notes' => 'Reporte WhatsApp.',
         ]);
 
@@ -419,8 +419,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_admin_whatsapp_credit_rejects_disqualified_user(): void
     {
-        $this->travelTo('2026-07-03 08:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 10:00:00');
+        $this->travelTo('2026-07-05 08:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 10:00:00');
         $user = $this->createClient('cliente@example.com');
         $user->forceFill(['disqualified_at' => now()])->save();
         $admin = $this->createAdmin();
@@ -431,14 +431,14 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 07:00:00',
+                createdAt: '2026-07-05 07:00:00',
             ),
         ]);
 
         $response = $this->actingAs($admin)->from(route('admin.online-order-claims'))->post(route('admin.online-order-claims.whatsapp.store'), [
             'cedula' => $user->cedula,
             'order_number' => '10000000194',
-            'source_reported_at' => '2026-07-03T07:30',
+            'source_reported_at' => '2026-07-05T07:30',
             'review_notes' => 'Reporte WhatsApp.',
         ]);
 
@@ -447,10 +447,10 @@ class OnlineStoreOrderBonusTest extends TestCase
         $this->assertSame(0, (int) $user->wallet()->first()?->goals_balance);
     }
 
-    public function test_admin_whatsapp_credit_rejects_report_after_round_of_16_kickoff(): void
+    public function test_admin_whatsapp_credit_rejects_report_after_promo_window_ends(): void
     {
-        $this->travelTo('2026-07-03 10:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $this->travelTo('2026-07-05 10:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 17:00:00');
         $user = $this->createClient('cliente@example.com');
         $admin = $this->createAdmin();
         $this->fakeMagentoOrders([
@@ -460,14 +460,14 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 09:00:00',
+                createdAt: '2026-07-05 09:00:00',
             ),
         ]);
 
         $response = $this->actingAs($admin)->from(route('admin.online-order-claims'))->post(route('admin.online-order-claims.whatsapp.store'), [
             'cedula' => $user->cedula,
             'order_number' => '10000000195',
-            'source_reported_at' => '2026-07-03T12:05',
+            'source_reported_at' => '2026-07-07T12:05',
             'review_notes' => 'Reporte WhatsApp.',
         ]);
 
@@ -478,8 +478,8 @@ class OnlineStoreOrderBonusTest extends TestCase
 
     public function test_admin_whatsapp_credit_does_not_duplicate_an_already_credited_order(): void
     {
-        $this->travelTo('2026-07-03 08:30:00');
-        $this->seedFirstRoundOf16Match('2026-07-03 17:00:00');
+        $this->travelTo('2026-07-05 08:30:00');
+        $this->seedFirstRoundOf16Match('2026-07-05 17:00:00');
         $user = $this->createClient('cliente@example.com');
         $admin = $this->createAdmin();
         $this->fakeMagentoOrders([
@@ -489,14 +489,14 @@ class OnlineStoreOrderBonusTest extends TestCase
                 email: 'cliente@example.com',
                 total: 25.00,
                 status: 'processing',
-                createdAt: '2026-07-03 08:00:00',
+                createdAt: '2026-07-05 08:00:00',
             ),
         ]);
 
         $payload = [
             'cedula' => $user->cedula,
             'order_number' => '10000000196',
-            'source_reported_at' => '2026-07-03T08:00',
+            'source_reported_at' => '2026-07-05T08:00',
             'review_notes' => 'Reporte WhatsApp.',
         ];
 

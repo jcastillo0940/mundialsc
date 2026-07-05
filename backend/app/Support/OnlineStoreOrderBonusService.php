@@ -5,9 +5,9 @@ namespace App\Support;
 use App\Models\Campaign;
 use App\Models\OnlineStoreOrder;
 use App\Models\OnlineStoreOrderClaim;
-use App\Models\TournamentMatch;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -15,7 +15,8 @@ class OnlineStoreOrderBonusService
 {
     private const BONUS_POINTS = 5;
     private const MINIMUM_TOTAL = 25.00;
-    private const PROMO_START_AT = '2026-06-02 00:00:00';
+    private const DEFAULT_PROMO_START_AT = '2026-07-04 00:00:00';
+    private const DEFAULT_PROMO_END_AT = '2026-07-06 23:59:59';
     private const PROMO_TIMEZONE = 'America/Panama';
 
     public function __construct(
@@ -126,7 +127,7 @@ class OnlineStoreOrderBonusService
 
         if (! $order || ! $this->isEligibleForManualApproval($order, $claim)) {
             throw ValidationException::withMessages([
-                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida, estado valido y solicitud antes de octavos.',
+                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida del 4 al 6 de julio, estado valido y solicitud dentro de la promocion.',
             ]);
         }
 
@@ -191,10 +192,9 @@ class OnlineStoreOrderBonusService
             ]);
         }
 
-        $cutoff = $this->firstRoundOf16Kickoff();
-        if ($cutoff === null || $reportedAt->setTimezone(self::PROMO_TIMEZONE)->gte($cutoff->copy()->setTimezone(self::PROMO_TIMEZONE))) {
+        if (! $this->dateIsInsidePromoWindow($reportedAt)) {
             throw ValidationException::withMessages([
-                'source_reported_at' => 'El reporte por WhatsApp debe haber ocurrido antes del inicio de octavos.',
+                'source_reported_at' => 'El reporte por WhatsApp debe estar dentro de la promocion del 4 al 6 de julio.',
             ]);
         }
 
@@ -211,7 +211,7 @@ class OnlineStoreOrderBonusService
 
         if (! $this->isEligibleForManualWhatsappApproval($order, $targetUser, $reportedAt)) {
             throw ValidationException::withMessages([
-                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida, estado valido, reporte antes de octavos y sin credito previo.',
+                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida del 4 al 6 de julio, estado valido, reporte dentro de promocion y sin credito previo.',
             ]);
         }
 
@@ -319,34 +319,24 @@ class OnlineStoreOrderBonusService
 
     private function isEligibleForBonus(OnlineStoreOrder $order, User $user): bool
     {
-        $cutoff = $this->firstRoundOf16Kickoff();
-        $promoStart = CarbonImmutable::parse(self::PROMO_START_AT, self::PROMO_TIMEZONE);
-
-        return $cutoff !== null
-            && now(self::PROMO_TIMEZONE)->lt($cutoff->copy()->setTimezone(self::PROMO_TIMEZONE))
+        return $this->dateIsInsidePromoWindow(now(self::PROMO_TIMEZONE))
             && strtolower($order->customer_email) === strtolower((string) $user->email)
             && (float) $order->grand_total >= self::MINIMUM_TOTAL
             && in_array(strtolower($order->status), $this->eligibleStatuses(), true)
             && $order->ordered_at !== null
-            && $order->ordered_at->gte($promoStart)
-            && $order->ordered_at->lt($cutoff)
+            && $this->dateIsInsidePromoWindow(CarbonImmutable::parse($order->ordered_at))
             && $order->credited_at === null
             && (int) $order->points_awarded === 0;
     }
 
     private function isEligibleForManualApproval(OnlineStoreOrder $order, OnlineStoreOrderClaim $claim): bool
     {
-        $cutoff = $this->firstRoundOf16Kickoff();
-        $promoStart = CarbonImmutable::parse(self::PROMO_START_AT, self::PROMO_TIMEZONE);
-
-        return $cutoff !== null
-            && $claim->submitted_at !== null
-            && $claim->submitted_at->lt($cutoff)
+        return $claim->submitted_at !== null
+            && $this->dateIsInsidePromoWindow(CarbonImmutable::parse($claim->submitted_at))
             && (float) $order->grand_total >= self::MINIMUM_TOTAL
             && in_array(strtolower($order->status), $this->eligibleStatuses(), true)
             && $order->ordered_at !== null
-            && $order->ordered_at->gte($promoStart)
-            && $order->ordered_at->lt($cutoff)
+            && $this->dateIsInsidePromoWindow(CarbonImmutable::parse($order->ordered_at))
             && $order->credited_at === null
             && (int) $order->points_awarded === 0
             && ($order->user_id === null || (int) $order->user_id === (int) $claim->user_id);
@@ -354,16 +344,11 @@ class OnlineStoreOrderBonusService
 
     private function isEligibleForManualWhatsappApproval(OnlineStoreOrder $order, User $user, CarbonImmutable $reportedAt): bool
     {
-        $cutoff = $this->firstRoundOf16Kickoff();
-        $promoStart = CarbonImmutable::parse(self::PROMO_START_AT, self::PROMO_TIMEZONE);
-
-        return $cutoff !== null
-            && $reportedAt->setTimezone(self::PROMO_TIMEZONE)->lt($cutoff->copy()->setTimezone(self::PROMO_TIMEZONE))
+        return $this->dateIsInsidePromoWindow($reportedAt)
             && (float) $order->grand_total >= self::MINIMUM_TOTAL
             && in_array(strtolower($order->status), $this->eligibleStatuses(), true)
             && $order->ordered_at !== null
-            && $order->ordered_at->gte($promoStart)
-            && $order->ordered_at->lt($cutoff)
+            && $this->dateIsInsidePromoWindow(CarbonImmutable::parse($order->ordered_at))
             && $order->credited_at === null
             && (int) $order->points_awarded === 0
             && ($order->user_id === null || (int) $order->user_id === (int) $user->id);
@@ -404,12 +389,12 @@ class OnlineStoreOrderBonusService
                 notes: 'Bono por compra en tienda en linea Super Carnes.',
                 meta: [
                     'source' => $source,
-                    'rule_code' => 'online_store_order_before_round_of_16',
+                    'rule_code' => 'online_store_order_july_4_to_6',
                     'admin_user_id' => $admin?->id,
                     'user_id' => $user->id,
                     'minimum_total' => self::MINIMUM_TOTAL,
-                    'promo_start_at' => CarbonImmutable::parse(self::PROMO_START_AT, self::PROMO_TIMEZONE)->toIso8601String(),
-                    'promo_end_at' => $this->firstRoundOf16Kickoff()?->toIso8601String(),
+                    'promo_start_at' => $this->promoStartAt()->toIso8601String(),
+                    'promo_end_at' => $this->promoEndAt()->toIso8601String(),
                     'order' => [
                         'magento_order_id' => $lockedOrder->magento_order_id,
                         'increment_id' => $lockedOrder->increment_id,
@@ -424,23 +409,36 @@ class OnlineStoreOrderBonusService
         });
     }
 
-    private function firstRoundOf16Kickoff(): ?CarbonImmutable
+    private function promoStartAt(): CarbonImmutable
     {
-        $kickoff = TournamentMatch::query()
-            ->join('tournament_phases', 'tournament_phases.id', '=', 'tournament_matches.phase_id')
-            ->where('tournament_phases.slug', 'octavos')
-            ->min('tournament_matches.kickoff_at');
+        return CarbonImmutable::parse(
+            (string) config('services.magento.order_bonus_promo_start_at', self::DEFAULT_PROMO_START_AT),
+            self::PROMO_TIMEZONE,
+        );
+    }
 
-        return $kickoff ? CarbonImmutable::parse($kickoff) : null;
+    private function promoEndAt(): CarbonImmutable
+    {
+        return CarbonImmutable::parse(
+            (string) config('services.magento.order_bonus_promo_end_at', self::DEFAULT_PROMO_END_AT),
+            self::PROMO_TIMEZONE,
+        );
+    }
+
+    private function dateIsInsidePromoWindow(CarbonInterface $date): bool
+    {
+        $date = $date->setTimezone(self::PROMO_TIMEZONE);
+
+        return $date->gte($this->promoStartAt()) && $date->lte($this->promoEndAt());
     }
 
     private function ensureClaimWindowIsOpen(): void
     {
-        $cutoff = $this->firstRoundOf16Kickoff();
+        $now = now(self::PROMO_TIMEZONE);
 
-        if ($cutoff === null || now(self::PROMO_TIMEZONE)->gte($cutoff->copy()->setTimezone(self::PROMO_TIMEZONE))) {
+        if (! $this->dateIsInsidePromoWindow(CarbonImmutable::parse($now))) {
             throw ValidationException::withMessages([
-                'order_number' => 'El periodo para reportar compras en linea ya finalizo.',
+                'order_number' => 'El periodo para reportar compras en linea es del 4 al 6 de julio de 2026.',
             ]);
         }
     }

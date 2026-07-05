@@ -272,7 +272,7 @@ export function InvoiceRegistrationView({
           <span className="marea-invoice-panel-kicker">Tienda en linea</span>
           <h2>Compra online, suma 5 goles</h2>
           <p>
-            Reporta compras de $25.00 o mas hechas en supercarnes.com desde el 2 de junio y antes del inicio de octavos. Escribe el numero exacto de orden Magento, por ejemplo 10000000193, para que el equipo revise tu solicitud.
+            Reporta compras online de $25.00 o mas hechas en supercarnes.com del 4 al 6 de julio de 2026. Escribe el numero exacto de orden Magento, por ejemplo 10000000193, para que el equipo revise tu solicitud.
           </p>
         </div>
         <div className="marea-online-order-action">
