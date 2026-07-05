@@ -77,8 +77,7 @@ return [
         'timeout' => env('MAGENTO_TIMEOUT', 20),
         'order_lookup_page_size' => env('MAGENTO_ORDER_LOOKUP_PAGE_SIZE', 25),
         'order_bonus_enabled' => env('MAGENTO_ORDER_BONUS_ENABLED', false),
-        'order_bonus_statuses' => array_filter(array_map('trim', explode(',', env('MAGENTO_ORDER_BONUS_STATUSES', 'processing,complete,authorized_payment')))),
-        'order_bonus_promo_start_at' => env('MAGENTO_ORDER_BONUS_PROMO_START_AT', '2026-07-04 00:00:00'),
+        'order_bonus_promo_start_at' => env('MAGENTO_ORDER_BONUS_PROMO_START_AT', '2026-07-03 00:00:00'),
         'order_bonus_promo_end_at' => env('MAGENTO_ORDER_BONUS_PROMO_END_AT', '2026-07-06 23:59:59'),
     ],
 

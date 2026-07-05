@@ -12,7 +12,7 @@
 <div class="card">
     <h2>Registrar compra reportada por WhatsApp</h2>
     <p class="muted">
-        Usa este formulario solo para reportes recibidos por WhatsApp. La fecha del reporte debe ser anterior al inicio de octavos y quedara auditada.
+        Usa este formulario solo para reportes recibidos por WhatsApp. La compra debe ser de $25.00 o mas y estar entre el 3 y el 6 de julio; el estado Magento no bloquea la acreditacion.
     </p>
     <form method="post" action="{{ route('admin.online-order-claims.whatsapp.store') }}" class="grid" style="gap:12px">
         @csrf

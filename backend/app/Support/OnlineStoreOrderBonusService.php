@@ -15,7 +15,7 @@ class OnlineStoreOrderBonusService
 {
     private const BONUS_POINTS = 5;
     private const MINIMUM_TOTAL = 25.00;
-    private const DEFAULT_PROMO_START_AT = '2026-07-04 00:00:00';
+    private const DEFAULT_PROMO_START_AT = '2026-07-03 00:00:00';
     private const DEFAULT_PROMO_END_AT = '2026-07-06 23:59:59';
     private const PROMO_TIMEZONE = 'America/Panama';
 
@@ -127,7 +127,7 @@ class OnlineStoreOrderBonusService
 
         if (! $order || ! $this->isEligibleForManualApproval($order, $claim)) {
             throw ValidationException::withMessages([
-                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida del 4 al 6 de julio, estado valido y solicitud dentro de la promocion.',
+                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida del 3 al 6 de julio y solicitud dentro de la promocion.',
             ]);
         }
 
@@ -194,7 +194,7 @@ class OnlineStoreOrderBonusService
 
         if (! $this->dateIsInsidePromoWindow($reportedAt)) {
             throw ValidationException::withMessages([
-                'source_reported_at' => 'El reporte por WhatsApp debe estar dentro de la promocion del 4 al 6 de julio.',
+                'source_reported_at' => 'El reporte por WhatsApp debe estar dentro de la promocion del 3 al 6 de julio.',
             ]);
         }
 
@@ -211,7 +211,7 @@ class OnlineStoreOrderBonusService
 
         if (! $this->isEligibleForManualWhatsappApproval($order, $targetUser, $reportedAt)) {
             throw ValidationException::withMessages([
-                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida del 4 al 6 de julio, estado valido, reporte dentro de promocion y sin credito previo.',
+                'claim' => 'La orden no cumple las reglas del bono: $25.00 o mas, fecha valida del 3 al 6 de julio, reporte dentro de promocion y sin credito previo.',
             ]);
         }
 
@@ -322,7 +322,6 @@ class OnlineStoreOrderBonusService
         return $this->dateIsInsidePromoWindow(now(self::PROMO_TIMEZONE))
             && strtolower($order->customer_email) === strtolower((string) $user->email)
             && (float) $order->grand_total >= self::MINIMUM_TOTAL
-            && in_array(strtolower($order->status), $this->eligibleStatuses(), true)
             && $order->ordered_at !== null
             && $this->dateIsInsidePromoWindow(CarbonImmutable::parse($order->ordered_at))
             && $order->credited_at === null
@@ -334,7 +333,6 @@ class OnlineStoreOrderBonusService
         return $claim->submitted_at !== null
             && $this->dateIsInsidePromoWindow(CarbonImmutable::parse($claim->submitted_at))
             && (float) $order->grand_total >= self::MINIMUM_TOTAL
-            && in_array(strtolower($order->status), $this->eligibleStatuses(), true)
             && $order->ordered_at !== null
             && $this->dateIsInsidePromoWindow(CarbonImmutable::parse($order->ordered_at))
             && $order->credited_at === null
@@ -346,7 +344,6 @@ class OnlineStoreOrderBonusService
     {
         return $this->dateIsInsidePromoWindow($reportedAt)
             && (float) $order->grand_total >= self::MINIMUM_TOTAL
-            && in_array(strtolower($order->status), $this->eligibleStatuses(), true)
             && $order->ordered_at !== null
             && $this->dateIsInsidePromoWindow(CarbonImmutable::parse($order->ordered_at))
             && $order->credited_at === null
@@ -438,26 +435,9 @@ class OnlineStoreOrderBonusService
 
         if (! $this->dateIsInsidePromoWindow(CarbonImmutable::parse($now))) {
             throw ValidationException::withMessages([
-                'order_number' => 'El periodo para reportar compras en linea es del 4 al 6 de julio de 2026.',
+                'order_number' => 'El periodo para reportar compras en linea es del 3 al 6 de julio de 2026.',
             ]);
         }
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function eligibleStatuses(): array
-    {
-        $statuses = config('services.magento.order_bonus_statuses', ['processing', 'complete', 'authorized_payment']);
-
-        if (is_string($statuses)) {
-            $statuses = explode(',', $statuses);
-        }
-
-        return array_values(array_filter(array_map(
-            fn ($status) => strtolower(trim((string) $status)),
-            is_array($statuses) ? $statuses : [],
-        )));
     }
 
     private function parseDate(mixed $value): ?CarbonImmutable

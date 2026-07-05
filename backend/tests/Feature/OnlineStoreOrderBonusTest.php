@@ -27,7 +27,6 @@ class OnlineStoreOrderBonusTest extends TestCase
             'services.magento.base_url' => 'https://magento.test',
             'services.magento.access_token' => 'test-token',
             'services.magento.order_bonus_enabled' => true,
-            'services.magento.order_bonus_statuses' => ['processing', 'complete', 'authorized_payment'],
         ]);
     }
 
@@ -198,8 +197,8 @@ class OnlineStoreOrderBonusTest extends TestCase
                 incrementId: '13000001729',
                 email: 'cliente@example.com',
                 total: 25.00,
-                status: 'authorized_payment',
-                createdAt: '2026-07-05 09:00:00',
+                status: 'canceled',
+                createdAt: '2026-07-03 09:00:00',
             ),
         ]);
         $this->postJson('/api/client/online-orders/verify', [
@@ -366,7 +365,7 @@ class OnlineStoreOrderBonusTest extends TestCase
                 incrementId: '10000000193',
                 email: 'cliente-magento@example.com',
                 total: 25.00,
-                status: 'authorized_payment',
+                status: 'payment_review',
                 createdAt: '2026-07-05 08:00:00',
             ),
         ]);
