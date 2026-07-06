@@ -266,6 +266,152 @@ class OnlineStoreOrderBonusService
         });
     }
 
+    public function approveManualOnlineOrderWithoutMagento(
+        User $targetUser,
+        string $reference,
+        int $points,
+        User $admin,
+        string $notes,
+    ): OnlineStoreOrderClaim {
+        if ($targetUser->role !== 'client') {
+            throw ValidationException::withMessages([
+                'manual_cedula' => 'El documento encontrado no pertenece a un cliente.',
+            ]);
+        }
+
+        if ($targetUser->disqualified_at !== null) {
+            throw ValidationException::withMessages([
+                'manual_cedula' => 'Este cliente esta descalificado y no puede recibir puntos.',
+            ]);
+        }
+
+        $reference = trim($reference);
+        if ($reference === '') {
+            throw ValidationException::withMessages([
+                'manual_order_reference' => 'Escribe el numero de orden o referencia.',
+            ]);
+        }
+
+        $notes = trim($notes);
+        if ($notes === '') {
+            throw ValidationException::withMessages([
+                'manual_review_notes' => 'Escribe una nota de auditoria para esta acreditacion manual.',
+            ]);
+        }
+
+        if ($points <= 0 || $points > 50) {
+            throw ValidationException::withMessages([
+                'manual_points' => 'Los puntos deben estar entre 1 y 50.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($targetUser, $reference, $points, $admin, $notes): OnlineStoreOrderClaim {
+            $existingApprovedClaim = OnlineStoreOrderClaim::query()
+                ->where('increment_id', $reference)
+                ->where('status', 'approved')
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingApprovedClaim) {
+                throw ValidationException::withMessages([
+                    'manual_order_reference' => 'Esta referencia ya fue aprobada anteriormente.',
+                ]);
+            }
+
+            $order = OnlineStoreOrder::query()
+                ->where('increment_id', $reference)
+                ->lockForUpdate()
+                ->first();
+
+            if ($order && ($order->credited_at !== null || (int) $order->points_awarded > 0)) {
+                throw ValidationException::withMessages([
+                    'manual_order_reference' => 'Esta orden ya tiene puntos acreditados.',
+                ]);
+            }
+
+            $order ??= new OnlineStoreOrder([
+                'increment_id' => $reference,
+            ]);
+
+            $order->forceFill([
+                'user_id' => $targetUser->id,
+                'magento_order_id' => $order->magento_order_id,
+                'customer_email' => strtolower((string) $targetUser->email),
+                'grand_total' => 0,
+                'currency' => 'USD',
+                'status' => 'manual_approved',
+                'ordered_at' => now(self::PROMO_TIMEZONE),
+                'points_awarded' => $points,
+                'credited_at' => now(),
+                'raw_payload' => [
+                    'source' => 'admin_manual_online_order',
+                    'reference' => $reference,
+                    'admin_user_id' => $admin->id,
+                    'notes' => $notes,
+                ],
+            ])->save();
+
+            $claim = OnlineStoreOrderClaim::query()
+                ->where('increment_id', $reference)
+                ->where('user_id', $targetUser->id)
+                ->lockForUpdate()
+                ->first();
+
+            $claim ??= new OnlineStoreOrderClaim([
+                'increment_id' => $reference,
+                'user_id' => $targetUser->id,
+            ]);
+
+            $claim->forceFill([
+                'user_id' => $targetUser->id,
+                'online_store_order_id' => $order->id,
+                'submitted_email' => strtolower((string) $targetUser->email),
+                'magento_order_id' => null,
+                'customer_email' => strtolower((string) $targetUser->email),
+                'grand_total' => 0,
+                'currency' => 'USD',
+                'magento_status' => 'manual_approved',
+                'ordered_at' => $order->ordered_at,
+                'status' => 'approved',
+                'source' => 'admin_manual_online_order',
+                'points_awarded' => $points,
+                'submitted_at' => now(),
+                'source_reported_at' => now(),
+                'reviewed_at' => now(),
+                'reviewed_by_user_id' => $admin->id,
+                'created_by_user_id' => $admin->id,
+                'review_notes' => $notes,
+                'raw_payload' => [
+                    'source' => 'admin_manual_online_order',
+                    'reference' => $reference,
+                    'admin_user_id' => $admin->id,
+                    'points' => $points,
+                    'notes' => $notes,
+                ],
+            ])->save();
+
+            $this->walletService->creditGoals(
+                user: $targetUser,
+                amount: $points,
+                type: 'online_store_purchase_bonus',
+                resourceType: 'manual_online_store_order',
+                resourceId: $order->id,
+                campaignId: $this->activeCampaignId(),
+                notes: 'Bono manual por compra en tienda en linea Super Carnes.',
+                meta: [
+                    'source' => 'admin_manual_online_order',
+                    'rule_code' => 'manual_online_order_without_magento',
+                    'admin_user_id' => $admin->id,
+                    'user_id' => $targetUser->id,
+                    'reference' => $reference,
+                    'points' => $points,
+                ],
+            );
+
+            return $claim->fresh();
+        });
+    }
+
     public function rejectClaim(OnlineStoreOrderClaim $claim, User $admin, ?string $notes = null): OnlineStoreOrderClaim
     {
         if ($claim->status !== 'pending') {
@@ -369,20 +515,13 @@ class OnlineStoreOrderBonusService
                 'credited_at' => now(),
             ])->save();
 
-            $campaignId = Campaign::query()
-                ->where('status', 'active')
-                ->where('starts_at', '<=', now())
-                ->where('ends_at', '>=', now())
-                ->latest('id')
-                ->value('id');
-
             $this->walletService->creditGoals(
                 user: $user,
                 amount: self::BONUS_POINTS,
                 type: 'online_store_purchase_bonus',
                 resourceType: 'online_store_order',
                 resourceId: $lockedOrder->id,
-                campaignId: $campaignId ? (int) $campaignId : null,
+                campaignId: $this->activeCampaignId(),
                 notes: 'Bono por compra en tienda en linea Super Carnes.',
                 meta: [
                     'source' => $source,
@@ -412,6 +551,18 @@ class OnlineStoreOrderBonusService
             (string) config('services.magento.order_bonus_promo_start_at', self::DEFAULT_PROMO_START_AT),
             self::PROMO_TIMEZONE,
         );
+    }
+
+    private function activeCampaignId(): ?int
+    {
+        $campaignId = Campaign::query()
+            ->where('status', 'active')
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>=', now())
+            ->latest('id')
+            ->value('id');
+
+        return $campaignId ? (int) $campaignId : null;
     }
 
     private function promoEndAt(): CarbonImmutable

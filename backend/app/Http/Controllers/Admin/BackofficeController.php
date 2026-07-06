@@ -569,6 +569,15 @@ class BackofficeController extends Controller
     {
         $status = (string) $request->query('status', 'pending');
         $query = trim((string) $request->query('query', ''));
+        $manualCedula = Str::upper(trim((string) $request->query('manual_cedula', '')));
+        $manualUser = null;
+
+        if ($manualCedula !== '') {
+            $manualUser = User::query()
+                ->where('role', 'client')
+                ->where('cedula', $manualCedula)
+                ->first();
+        }
 
         $claims = OnlineStoreOrderClaim::query()
             ->with(['user', 'reviewedBy', 'createdBy'])
@@ -595,7 +604,7 @@ class BackofficeController extends Controller
             'rejected' => OnlineStoreOrderClaim::query()->where('status', 'rejected')->count(),
         ];
 
-        return view('admin.online-order-claims', compact('claims', 'summary', 'status', 'query'));
+        return view('admin.online-order-claims', compact('claims', 'summary', 'status', 'query', 'manualCedula', 'manualUser'));
     }
 
     public function storeWhatsappOnlineOrderClaim(Request $request): RedirectResponse
@@ -632,6 +641,32 @@ class BackofficeController extends Controller
         return redirect()
             ->route('admin.online-order-claims', ['query' => $claim->increment_id, 'status' => 'all'])
             ->with('status', 'Compra reportada por WhatsApp validada y 5 puntos acreditados.');
+    }
+
+    public function storeManualOnlineOrderClaim(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'manual_user_id' => ['required', 'integer', 'exists:users,id'],
+            'manual_order_reference' => ['required', 'string', 'max:80'],
+            'manual_points' => ['required', 'integer', 'min:1', 'max:50'],
+            'manual_review_notes' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $targetUser = User::query()
+            ->where('role', 'client')
+            ->findOrFail((int) $validated['manual_user_id']);
+
+        $claim = $this->onlineStoreOrderBonusService->approveManualOnlineOrderWithoutMagento(
+            $targetUser,
+            (string) $validated['manual_order_reference'],
+            (int) $validated['manual_points'],
+            $request->user(),
+            (string) $validated['manual_review_notes'],
+        );
+
+        return redirect()
+            ->route('admin.online-order-claims', ['query' => $claim->increment_id, 'status' => 'all'])
+            ->with('status', 'Compra online manual acreditada sin consultar Magento.');
     }
 
     public function approveOnlineOrderClaim(Request $request, OnlineStoreOrderClaim $claim): RedirectResponse

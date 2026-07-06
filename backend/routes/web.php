@@ -101,6 +101,7 @@ Route::prefix('adminrepus1car')->group(function (): void {
         Route::get('/points-audit/export/csv', [BackofficeController::class, 'pointsAuditExportCsv'])->name('admin.points-audit.csv');
         Route::get('/online-order-claims', [BackofficeController::class, 'onlineOrderClaims'])->name('admin.online-order-claims');
         Route::post('/online-order-claims/whatsapp', [BackofficeController::class, 'storeWhatsappOnlineOrderClaim'])->name('admin.online-order-claims.whatsapp.store');
+        Route::post('/online-order-claims/manual', [BackofficeController::class, 'storeManualOnlineOrderClaim'])->name('admin.online-order-claims.manual.store');
         Route::post('/online-order-claims/{claim}/approve', [BackofficeController::class, 'approveOnlineOrderClaim'])->name('admin.online-order-claims.approve');
         Route::post('/online-order-claims/{claim}/reject', [BackofficeController::class, 'rejectOnlineOrderClaim'])->name('admin.online-order-claims.reject');
         Route::put('/rules/phases/{phase}', [BackofficeController::class, 'updatePhase'])->name('admin.rules.phase');

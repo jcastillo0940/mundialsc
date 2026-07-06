@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\OnlineStoreOrderClaim;
+use App\Models\OnlineStoreOrder;
 use Illuminate\Support\Arr;
 use App\Models\TournamentMatch;
 use App\Models\TournamentPhase;
@@ -506,6 +507,76 @@ class OnlineStoreOrderBonusTest extends TestCase
         $response->assertSessionHasErrors('claim');
         $this->assertSame(1, WalletMovement::query()->where('user_id', $user->id)->count());
         $this->assertSame(5, (int) $user->wallet()->first()?->goals_balance);
+    }
+
+    public function test_admin_can_credit_manual_online_order_without_magento_lookup(): void
+    {
+        $this->travelTo('2026-07-06 10:00:00');
+        $user = $this->createClient('cliente-manual@example.com');
+        $admin = $this->createAdmin();
+        Http::fake(function () {
+            $this->fail('Magento should not be called for manual online order credits.');
+        });
+
+        $response = $this->actingAs($admin)->post(route('admin.online-order-claims.manual.store'), [
+            'manual_user_id' => $user->id,
+            'manual_order_reference' => 'MANUAL-13000001729',
+            'manual_points' => 5,
+            'manual_review_notes' => 'Compra confirmada manualmente por soporte.',
+        ]);
+
+        $response->assertRedirect(route('admin.online-order-claims', ['query' => 'MANUAL-13000001729', 'status' => 'all']));
+        $this->assertDatabaseHas('online_store_orders', [
+            'user_id' => $user->id,
+            'increment_id' => 'MANUAL-13000001729',
+            'status' => 'manual_approved',
+            'points_awarded' => 5,
+        ]);
+        $this->assertDatabaseHas('online_store_order_claims', [
+            'user_id' => $user->id,
+            'increment_id' => 'MANUAL-13000001729',
+            'source' => 'admin_manual_online_order',
+            'status' => 'approved',
+            'points_awarded' => 5,
+            'created_by_user_id' => $admin->id,
+            'reviewed_by_user_id' => $admin->id,
+        ]);
+        $this->assertSame(5, (int) $user->wallet()->first()?->goals_balance);
+
+        $movement = WalletMovement::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertSame('online_store_purchase_bonus', $movement->type);
+        $this->assertSame('manual_online_store_order', $movement->resource_type);
+        $this->assertSame('admin_manual_online_order', $movement->meta['source'] ?? null);
+    }
+
+    public function test_admin_manual_online_order_credit_rejects_duplicate_reference(): void
+    {
+        $this->travelTo('2026-07-06 10:00:00');
+        $user = $this->createClient('cliente-manual@example.com');
+        $admin = $this->createAdmin();
+
+        OnlineStoreOrder::query()->create([
+            'user_id' => $user->id,
+            'increment_id' => 'MANUAL-DUP',
+            'customer_email' => $user->email,
+            'grand_total' => 0,
+            'currency' => 'USD',
+            'status' => 'manual_approved',
+            'ordered_at' => now(),
+            'points_awarded' => 5,
+            'credited_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)->from(route('admin.online-order-claims'))->post(route('admin.online-order-claims.manual.store'), [
+            'manual_user_id' => $user->id,
+            'manual_order_reference' => 'MANUAL-DUP',
+            'manual_points' => 5,
+            'manual_review_notes' => 'Intento duplicado.',
+        ]);
+
+        $response->assertRedirect(route('admin.online-order-claims'));
+        $response->assertSessionHasErrors('manual_order_reference');
+        $this->assertSame(0, WalletMovement::query()->where('user_id', $user->id)->count());
     }
 
     private function createClient(string $email): User

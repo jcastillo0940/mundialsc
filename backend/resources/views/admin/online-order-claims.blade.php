@@ -43,6 +43,57 @@
 </div>
 
 <div class="card">
+    <h2>Acreditacion manual sin Magento</h2>
+    <p class="muted">
+        Usa esta opcion solo cuando el equipo confirme la compra fuera del API de Magento. No consulta Magento y queda auditada como bono online manual.
+    </p>
+    <form method="get" action="{{ route('admin.online-order-claims') }}" class="grid" style="gap:12px;margin-bottom:14px">
+        <div class="row">
+            <input name="manual_cedula" value="{{ old('manual_cedula', $manualCedula) }}" placeholder="Cedula o documento del cliente" required>
+            <button type="submit">Buscar cliente</button>
+        </div>
+    </form>
+
+    @if($manualCedula !== '' && ! $manualUser)
+        <div style="margin-bottom:14px;padding:12px 16px;background:#2d1a1a;border:1px solid #7a2020;border-radius:10px;color:#f87171;font-size:13px">
+            No encontramos un cliente registrado con esa cedula o documento.
+        </div>
+    @endif
+
+    @if($manualUser)
+        <div style="margin-bottom:14px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#10202a">
+            <strong>{{ $manualUser->name }}</strong><br>
+            <small>{{ $manualUser->email }} · ID {{ $manualUser->id }} · Cedula {{ $manualUser->cedula }}</small>
+            @if($manualUser->disqualified_at)
+                <div style="margin-top:6px;color:#f87171">Cliente descalificado: no debe recibir puntos.</div>
+            @endif
+        </div>
+
+        <form method="post" action="{{ route('admin.online-order-claims.manual.store') }}" class="grid" style="gap:12px">
+            @csrf
+            <input type="hidden" name="manual_user_id" value="{{ $manualUser->id }}">
+            <div class="grid cols-2">
+                <label>
+                    Numero de orden o referencia
+                    <input name="manual_order_reference" value="{{ old('manual_order_reference') }}" placeholder="Ej: WhatsApp-13000001729" required>
+                </label>
+                <label>
+                    Puntos a acreditar
+                    <input name="manual_points" type="number" min="1" max="50" step="1" value="{{ old('manual_points', 5) }}" required>
+                </label>
+            </div>
+            <label>
+                Nota de auditoria obligatoria
+                <textarea name="manual_review_notes" placeholder="Ej: Compra confirmada manualmente por soporte. No se consulto Magento." required>{{ old('manual_review_notes') }}</textarea>
+            </label>
+            <div>
+                <button type="submit" @disabled($manualUser->disqualified_at !== null)>Acreditar puntos sin Magento</button>
+            </div>
+        </form>
+    @endif
+</div>
+
+<div class="card">
     <h2>Filtros</h2>
     <form method="get" action="{{ route('admin.online-order-claims') }}" class="grid">
         <div class="row">
@@ -78,6 +129,7 @@
                 $sourceLabels = [
                     'client_frontend' => 'Cliente / Frontend',
                     'admin_whatsapp' => 'Admin / WhatsApp',
+                    'admin_manual_online_order' => 'Admin / Manual sin Magento',
                 ];
             @endphp
             <tr>
