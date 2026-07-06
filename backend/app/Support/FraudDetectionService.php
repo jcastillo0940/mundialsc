@@ -47,7 +47,7 @@ class FraudDetectionService
     {
         $recentCount = RegisteredInvoice::query()
             ->where('user_id', $user->id)
-            ->where('validation_status', 'approved')
+            ->whereIn('validation_status', RegisteredInvoice::APPROVED_VALIDATION_STATUSES)
             ->where('created_at', '>=', now()->subMinutes(10))
             ->count();
 

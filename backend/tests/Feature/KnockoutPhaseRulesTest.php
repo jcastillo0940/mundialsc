@@ -179,6 +179,34 @@ class KnockoutPhaseRulesTest extends TestCase
         $this->assertSame([$predictionPlayer->id, $invoicePlayer->id], $leaderboard->pluck('user_id')->all());
     }
 
+    public function test_knockout_leaderboard_counts_manual_approved_invoice_points(): void
+    {
+        $groupPhase = TournamentPhase::query()->where('slug', 'fase-grupos')->firstOrFail();
+        $groupPhase->update([
+            'starts_at' => '2026-06-01 00:00:00',
+            'ends_at' => '2026-06-28 04:00:00',
+        ]);
+        $this->createRealGroupMatchForCutoff($groupPhase);
+        $finalPhase = $this->activatePhase('final');
+        $player = $this->createClient('Factura Manual Finales', 'manual-finales@example.com', '8-111-0099');
+
+        $this->createApprovedInvoice(
+            $player,
+            $finalPhase,
+            1,
+            issuedAt: '2026-07-06 00:00:00',
+            createdAt: '2026-07-06 13:23:59',
+            validationStatus: 'manual_approved',
+        );
+
+        $leaderboard = app(PromotionRankingService::class)->leaderboardForPhase($finalPhase->id, 10);
+        $playerRow = $leaderboard->firstWhere('user_id', $player->id);
+
+        $this->assertSame(1.0, $playerRow['invoice_points']);
+        $this->assertSame(1.0, $playerRow['total_points']);
+        $this->assertSame(1, $playerRow['invoice_count']);
+    }
+
     public function test_admin_cannot_generate_knockout_winners_before_final_phase(): void
     {
         $admin = User::query()->create([
@@ -664,6 +692,7 @@ class KnockoutPhaseRulesTest extends TestCase
         int $points,
         mixed $issuedAt = null,
         mixed $createdAt = null,
+        string $validationStatus = 'approved',
     ): void
     {
         $invoice = RegisteredInvoice::query()->create([
@@ -678,7 +707,7 @@ class KnockoutPhaseRulesTest extends TestCase
             'daily_points_capped' => false,
             'daily_invoice_limit_hit' => false,
             'status' => 'approved',
-            'validation_status' => 'approved',
+            'validation_status' => $validationStatus,
         ]);
 
         if ($createdAt !== null) {

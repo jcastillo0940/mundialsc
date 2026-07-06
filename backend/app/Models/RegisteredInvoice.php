@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class RegisteredInvoice extends Model
 {
     protected $table = 'registered_invoices';
+    public const APPROVED_VALIDATION_STATUSES = ['approved', 'manual_approved'];
 
     protected $fillable = [
         'user_id',
@@ -74,5 +75,10 @@ class RegisteredInvoice extends Model
     public function fraudFlags(): HasMany
     {
         return $this->hasMany(FraudFlag::class);
+    }
+
+    public function isApprovedForPoints(): bool
+    {
+        return in_array((string) $this->validation_status, self::APPROVED_VALIDATION_STATUSES, true);
     }
 }

@@ -84,7 +84,7 @@ class PromotionRankingService
                 COUNT(*) as invoice_count,
                 SUM(purchase_amount) as invoice_total_amount
             ")
-            ->where('validation_status', 'approved'),
+            ->whereIn('validation_status', RegisteredInvoice::APPROVED_VALIDATION_STATUSES),
             $phase,
         )
             ->groupBy('user_id');

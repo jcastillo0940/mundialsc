@@ -24,7 +24,7 @@ class DailyInvoiceGoalController extends Controller
         $activePhase = $this->phaseResolver->currentPhase();
         $invoiceTotalsQuery = RegisteredInvoice::query()
             ->where('user_id', $request->user()->id)
-            ->where('validation_status', 'approved');
+            ->whereIn('validation_status', RegisteredInvoice::APPROVED_VALIDATION_STATUSES);
 
         $phaseGoalsQuery = clone $invoiceTotalsQuery;
         $phaseAmountQuery = clone $invoiceTotalsQuery;

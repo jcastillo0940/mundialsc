@@ -60,7 +60,7 @@
                 <td>
                     @if($flag->invoice)
                         <small>{{ $flag->invoice->cufe }}</small><br>
-                        @if($flag->invoice->validation_status === 'approved')
+                        @if($flag->invoice->isApprovedForPoints())
                             <span class="pill" style="background:#1a2d1a;border-color:#2d5a2d;color:#8ee2b1">aprobada, +{{ number_format((float) $flag->invoice->points_awarded) }} punto(s)</span><br>
                         @elseif($flag->invoice->validation_status === 'pending')
                             <span class="pill" style="background:#2d2a1a;border-color:#7a6a20;color:#ffd27a">pendiente, 0 puntos</span><br>

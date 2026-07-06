@@ -2278,7 +2278,7 @@ class BackofficeController extends Controller
 
         $invoiceSubquery = DB::table('registered_invoices')
             ->selectRaw('user_id, SUM(points_awarded) as invoice_pts, COUNT(*) as invoice_cnt')
-            ->where('validation_status', 'approved');
+            ->whereIn('validation_status', RegisteredInvoice::APPROVED_VALIDATION_STATUSES);
 
         if ($activePhase) {
             $this->rankingService->constrainInvoiceQueryToPhase($invoiceSubquery, $activePhase);
@@ -2368,7 +2368,9 @@ class BackofficeController extends Controller
 
         $wallet = $user->wallet;
 
-        $invoicePoints    = $invoices->where('validation_status', 'approved')->sum('points_awarded');
+        $invoicePoints    = $invoices
+            ->filter(fn (RegisteredInvoice $invoice) => $invoice->isApprovedForPoints())
+            ->sum('points_awarded');
         $predictionPoints = $predictions->sum('points_awarded');
 
         return view('admin.player-points-detail', compact(

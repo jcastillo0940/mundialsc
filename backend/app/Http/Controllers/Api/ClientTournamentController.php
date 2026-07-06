@@ -102,7 +102,7 @@ class ClientTournamentController extends Controller
 
         $invoiceQuery = RegisteredInvoice::query()
             ->where('user_id', $userId)
-            ->where('validation_status', 'approved');
+            ->whereIn('validation_status', RegisteredInvoice::APPROVED_VALIDATION_STATUSES);
         $this->rankingService->constrainInvoiceQueryToPhase($invoiceQuery, $phase);
 
         $invoiceGoals = (float) $invoiceQuery->sum('points_awarded');
@@ -121,7 +121,7 @@ class ClientTournamentController extends Controller
         $predictionGoals = (float) MatchPrediction::query()->where('user_id', $userId)->sum('points_awarded');
         $invoiceGoals = (float) RegisteredInvoice::query()
             ->where('user_id', $userId)
-            ->where('validation_status', 'approved')
+            ->whereIn('validation_status', RegisteredInvoice::APPROVED_VALIDATION_STATUSES)
             ->sum('points_awarded');
         $onlineStoreGoals = (float) OnlineStoreOrder::query()
             ->where('user_id', $userId)

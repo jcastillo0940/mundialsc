@@ -26,11 +26,11 @@ class InvoiceController extends Controller
             'totals' => [
                 'approved_points' => (int) RegisteredInvoice::query()
                     ->where('user_id', $request->user()->id)
-                    ->where('validation_status', 'approved')
+                    ->whereIn('validation_status', RegisteredInvoice::APPROVED_VALIDATION_STATUSES)
                     ->sum('points_awarded'),
                 'approved_invoices' => (int) RegisteredInvoice::query()
                     ->where('user_id', $request->user()->id)
-                    ->where('validation_status', 'approved')
+                    ->whereIn('validation_status', RegisteredInvoice::APPROVED_VALIDATION_STATUSES)
                     ->count(),
             ],
         ]);

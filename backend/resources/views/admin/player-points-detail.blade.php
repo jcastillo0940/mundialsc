@@ -125,7 +125,7 @@
     <div class="card">
         <span class="muted">Puntos por facturas</span>
         <div class="metric" style="color:#8ee2b1">{{ number_format($invoicePoints) }}</div>
-        <small class="muted">{{ $invoices->where('validation_status', 'approved')->count() }} factura(s) aprobada(s)</small>
+        <small class="muted">{{ $invoices->filter(fn ($invoice) => $invoice->isApprovedForPoints())->count() }} factura(s) aprobada(s)</small>
     </div>
     <div class="card">
         <span class="muted">Puntos por pronosticos</span>
@@ -162,7 +162,7 @@
                 </td>
                 <td>{{ $invoice->issuer_name ?: '-' }}</td>
                 <td>
-                    @if($invoice->validation_status === 'approved')
+                    @if($invoice->isApprovedForPoints())
                         <span class="pill" style="background:#1a2d1a;border-color:#2d5a2d;color:#8ee2b1">aprobada</span>
                     @elseif($invoice->validation_status === 'pending')
                         <span class="pill" style="background:#2d2a1a;border-color:#7a6a20;color:#ffd27a">pendiente</span>
@@ -173,7 +173,7 @@
                     @endif
                 </td>
                 <td>
-                    @if($invoice->validation_status === 'approved')
+                    @if($invoice->isApprovedForPoints())
                         <span class="pill" style="background:#1a2d1a;border-color:#2d5a2d;color:#8ee2b1">aprobada, +{{ number_format($invoice->points_awarded) }} punto(s)</span>
                     @elseif($invoice->validation_status === 'pending')
                         <span class="pill" style="background:#2d2a1a;border-color:#7a6a20;color:#ffd27a">pendiente, 0 puntos</span>
