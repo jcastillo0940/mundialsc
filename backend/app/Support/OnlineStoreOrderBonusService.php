@@ -121,9 +121,22 @@ class OnlineStoreOrderBonusService
             ]);
         }
 
+        $targetUser = $claim->user ?? User::query()->find($claim->user_id);
+        if (! $targetUser) {
+            throw ValidationException::withMessages([
+                'claim' => 'No encontramos el cliente asociado a esta solicitud.',
+            ]);
+        }
+
         $orders = $this->magento->ordersForIncrementId($claim->increment_id);
         $payload = $orders[0] ?? $claim->raw_payload;
-        $order = is_array($payload) ? $this->storeOrderSnapshot($payload, $claim->user) : $claim->order;
+        $order = is_array($payload) ? $this->storeOrderSnapshot($payload, $targetUser) : $claim->order;
+
+        if (! $order) {
+            throw ValidationException::withMessages([
+                'claim' => 'No pudimos reconstruir la orden Magento para esta solicitud.',
+            ]);
+        }
 
         if (! $order || ! $this->isEligibleForManualApproval($order, $claim)) {
             throw ValidationException::withMessages([
@@ -131,7 +144,7 @@ class OnlineStoreOrderBonusService
             ]);
         }
 
-        $credited = $this->creditOrder($order, $claim->user, $claim->source ?: 'client_frontend', $admin);
+        $credited = $this->creditOrder($order, $targetUser, $claim->source ?: 'client_frontend', $admin);
 
         $claim->forceFill([
             'online_store_order_id' => $order->id,

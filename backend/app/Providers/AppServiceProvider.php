@@ -6,6 +6,7 @@ use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use App\Models\SiteSetting;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -120,28 +121,32 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureMailFromSiteSettings(): void
     {
-        if (! Schema::hasTable('site_settings')) {
-            return;
+        try {
+            if (! Schema::hasTable('site_settings')) {
+                return;
+            }
+
+            $mailer = SiteSetting::getOrConfig('mail_mailer', 'mail.default', 'smtp') ?? 'smtp';
+            $host = SiteSetting::getOrConfig('mail_host', 'mail.mailers.smtp.host', '127.0.0.1') ?? '127.0.0.1';
+            $port = (int) SiteSetting::getOrConfig('mail_port', 'mail.mailers.smtp.port', '2525');
+            $username = SiteSetting::getOrConfig('mail_username', 'mail.mailers.smtp.username', '') ?? '';
+            $password = SiteSetting::getOrConfig('mail_password', 'mail.mailers.smtp.password', '') ?? '';
+            $encryption = SiteSetting::getOrConfig('mail_encryption', 'mail.mailers.smtp.scheme', '') ?? '';
+            $fromAddress = SiteSetting::getOrConfig('mail_from_address', 'mail.from.address', 'hello@example.com') ?? 'hello@example.com';
+            $fromName = SiteSetting::getOrConfig('mail_from_name', 'mail.from.name', config('app.name', 'Laravel')) ?? config('app.name', 'Laravel');
+
+            config([
+                'mail.default' => $mailer,
+                'mail.mailers.smtp.host' => $host,
+                'mail.mailers.smtp.port' => $port,
+                'mail.mailers.smtp.username' => $username !== '' ? $username : null,
+                'mail.mailers.smtp.password' => $password !== '' ? $password : null,
+                'mail.mailers.smtp.scheme' => $encryption !== '' ? $encryption : null,
+                'mail.from.address' => $fromAddress,
+                'mail.from.name' => $fromName,
+            ]);
+        } catch (QueryException) {
+            // If MySQL is briefly unavailable, keep default mail config so requests do not fail.
         }
-
-        $mailer = SiteSetting::getOrConfig('mail_mailer', 'mail.default', 'smtp') ?? 'smtp';
-        $host = SiteSetting::getOrConfig('mail_host', 'mail.mailers.smtp.host', '127.0.0.1') ?? '127.0.0.1';
-        $port = (int) SiteSetting::getOrConfig('mail_port', 'mail.mailers.smtp.port', '2525');
-        $username = SiteSetting::getOrConfig('mail_username', 'mail.mailers.smtp.username', '') ?? '';
-        $password = SiteSetting::getOrConfig('mail_password', 'mail.mailers.smtp.password', '') ?? '';
-        $encryption = SiteSetting::getOrConfig('mail_encryption', 'mail.mailers.smtp.scheme', '') ?? '';
-        $fromAddress = SiteSetting::getOrConfig('mail_from_address', 'mail.from.address', 'hello@example.com') ?? 'hello@example.com';
-        $fromName = SiteSetting::getOrConfig('mail_from_name', 'mail.from.name', config('app.name', 'Laravel')) ?? config('app.name', 'Laravel');
-
-        config([
-            'mail.default' => $mailer,
-            'mail.mailers.smtp.host' => $host,
-            'mail.mailers.smtp.port' => $port,
-            'mail.mailers.smtp.username' => $username !== '' ? $username : null,
-            'mail.mailers.smtp.password' => $password !== '' ? $password : null,
-            'mail.mailers.smtp.scheme' => $encryption !== '' ? $encryption : null,
-            'mail.from.address' => $fromAddress,
-            'mail.from.name' => $fromName,
-        ]);
     }
 }
